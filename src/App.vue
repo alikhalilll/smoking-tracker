@@ -230,6 +230,31 @@ onUnmounted(() => {
   reminders.cancel()
 })
 
+// Notification clicks dispatch a CustomEvent — switch to that tab.
+function onReminderClicked(e: Event): void {
+  const detail = (e as CustomEvent<TabId>).detail
+  if (
+    detail === 'home' ||
+    detail === 'history' ||
+    detail === 'quit' ||
+    detail === 'settings'
+  ) {
+    view.value = detail
+  }
+}
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('reminder-clicked', onReminderClicked)
+  }
+})
+
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('reminder-clicked', onReminderClicked)
+  }
+})
+
 function handleStartQuit(payload: {
   intensity: QuitIntensity
   baseline: number

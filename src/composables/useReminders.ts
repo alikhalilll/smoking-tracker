@@ -102,6 +102,29 @@ function playChime(): void {
   }, 1500)
 }
 
+/** Tab the app should switch to when the user clicks a reminder notification. */
+const REMINDER_ROUTE = 'quit'
+
+function emitNotificationClick(): void {
+  if (typeof window === 'undefined') return
+  try {
+    window.focus()
+  } catch {
+    // ignore
+  }
+  window.dispatchEvent(
+    new CustomEvent('reminder-clicked', { detail: REMINDER_ROUTE })
+  )
+}
+
+function attachClickHandler(n: Notification): void {
+  n.onclick = (e) => {
+    e.preventDefault()
+    emitNotificationClick()
+    n.close()
+  }
+}
+
 async function showNotification(
   title: string,
   body: string
@@ -131,6 +154,7 @@ async function showNotification(
         badge: ICON_URL,
         tag: 'smoke-reminder',
         renotify: true,
+        data: { route: REMINDER_ROUTE },
       } as NotificationOptions)
       return true
     } catch (err) {
@@ -139,7 +163,12 @@ async function showNotification(
   }
 
   try {
-    new Notification(title, { body, icon: ICON_URL, tag: 'smoke-reminder' })
+    const n = new Notification(title, {
+      body,
+      icon: ICON_URL,
+      tag: 'smoke-reminder',
+    })
+    attachClickHandler(n)
     return true
   } catch (err) {
     console.warn('[reminders] Notification constructor failed:', err)
@@ -232,7 +261,7 @@ export function useReminders(): UseReminders {
 
     // Try plain Notification first — works on macOS Safari/Chrome/Firefox tabs.
     try {
-      new Notification(payload.title, {
+      const n = new Notification(payload.title, {
         body: payload.body,
         icon: ICON_URL,
         tag: 'smoke-reminder-test',
@@ -240,6 +269,7 @@ export function useReminders(): UseReminders {
         // "I clicked but saw nothing" debugging path is conclusive.
         requireInteraction: true,
       } as NotificationOptions)
+      attachClickHandler(n)
       return { ok: true, via: 'CONSTRUCTOR' }
     } catch (err) {
       console.warn('[reminders] Notification ctor failed, trying SW:', err)
@@ -256,6 +286,7 @@ export function useReminders(): UseReminders {
           tag: 'smoke-reminder-test',
           renotify: true,
           requireInteraction: true,
+          data: { route: REMINDER_ROUTE },
         } as NotificationOptions)
         return { ok: true, via: 'SW' }
       } catch (err) {
