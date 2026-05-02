@@ -4,6 +4,11 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   base: '/smoking-tracker/',
+  define: {
+    __BUILD_ID__: JSON.stringify(
+      new Date().toISOString().replace(/[-:T.Z]/g, '').slice(0, 14)
+    ),
+  },
   plugins: [
     vue(),
     VitePWA({

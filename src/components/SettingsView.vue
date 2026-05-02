@@ -128,6 +128,32 @@
       <button class="test-btn" @click="sendTest">
         {{ t('reminders.test_btn') }}
       </button>
+
+      <!-- Persistent diagnostic panel -->
+      <div class="diag-panel" v-if="diag">
+        <div class="diag-header">
+          <span
+            class="diag-pill"
+            :class="{
+              'diag-ok': diag.lastTest?.ok,
+              'diag-err': diag.lastTest && !diag.lastTest.ok,
+            }"
+          >
+            {{
+              diag.lastTest?.ok
+                ? `OK · ${diag.lastTest.via ?? ''}`
+                : diag.lastTest?.reason ?? 'Idle'
+            }}
+          </span>
+          <button class="diag-copy" @click="copyDiag">Copy</button>
+        </div>
+
+        <div v-if="diag.primarySuspect" class="diag-suspect">
+          {{ diag.primarySuspect }}
+        </div>
+
+        <pre class="diag-pre">{{ diagText }}</pre>
+      </div>
     </div>
 
     <!-- Reset -->
@@ -144,6 +170,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
 import { useI18n, type Locale } from '../i18n'
 import { useTheme, type ThemeMode } from '../composables/useTheme'
 import {
@@ -194,51 +221,144 @@ function onGapChange(minutes: number): void {
   emit('reminders-changed')
 }
 
+interface DiagSnapshot {
+  buildId: string
+  url: string
+  notificationApi: boolean
+  permission: NotificationPermission | 'unsupported'
+  isStandalone: boolean
+  hasServiceWorker: boolean
+  swController: string | null
+  swActive: string | null
+  userAgent: string
+  primarySuspect: string | null
+  lastTest: { ok: boolean; reason?: string; via?: string } | null
+}
+
+const diag = ref<DiagSnapshot | null>(null)
+
+const diagText = computed(() => {
+  if (!diag.value) return ''
+  const d = diag.value
+  return [
+    `build:           ${d.buildId}`,
+    `url:             ${d.url}`,
+    `notificationApi: ${d.notificationApi}`,
+    `permission:      ${d.permission}`,
+    `standalone:      ${d.isStandalone}`,
+    `serviceWorker:   ${d.hasServiceWorker}`,
+    `sw.controller:   ${d.swController ?? '(none)'}`,
+    `sw.active:       ${d.swActive ?? '(none)'}`,
+    `lastTest:        ${
+      d.lastTest
+        ? d.lastTest.ok
+          ? `ok via ${d.lastTest.via}`
+          : `failed: ${d.lastTest.reason}${d.lastTest.via ? ` (${d.lastTest.via})` : ''}`
+        : '(none)'
+    }`,
+    `userAgent:       ${d.userAgent}`,
+  ].join('\n')
+})
+
+function detectStandalone(): boolean {
+  if (typeof window === 'undefined') return false
+  if (window.matchMedia('(display-mode: standalone)').matches) return true
+  // iOS Safari exposes navigator.standalone for home-screen apps.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (window.navigator as any).standalone === true
+}
+
+function pickSuspect(snap: Omit<DiagSnapshot, 'primarySuspect'>): string | null {
+  if (!snap.notificationApi) {
+    return 'This browser/device doesn’t support web notifications at all.'
+  }
+  const ua = snap.userAgent
+  const isIos = /iPhone|iPad|iPod/.test(ua)
+  if (isIos && !snap.isStandalone) {
+    return 'iPhone/iPad: notifications only work in the installed PWA. Tap Share → Add to Home Screen, then open the app from that icon and try again.'
+  }
+  if (snap.permission === 'denied') {
+    return 'You previously blocked notifications for this site. Re-enable them in your browser site settings, reload, and try again — the page can’t re-prompt by itself.'
+  }
+  if (snap.permission === 'default') {
+    return 'Permission hasn’t been granted yet. Tap the test button — when the prompt appears, choose Allow.'
+  }
+  if (
+    snap.lastTest &&
+    !snap.lastTest.ok &&
+    snap.lastTest.reason === 'SW_FAILED'
+  ) {
+    return 'The page tried both notification paths and the service worker rejected the request. Try a hard refresh (close all tabs / reopen the PWA).'
+  }
+  if (
+    snap.permission === 'granted' &&
+    snap.lastTest?.ok &&
+    snap.lastTest.via === 'CONSTRUCTOR'
+  ) {
+    return 'The notification was sent successfully. If you didn’t see it, check macOS System Settings → Notifications and ensure your browser is allowed.'
+  }
+  return null
+}
+
+async function refreshDiag(
+  lastTest: DiagSnapshot['lastTest'] = null
+): Promise<void> {
+  let swController: string | null = null
+  let swActive: string | null = null
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    swController = navigator.serviceWorker.controller?.scriptURL ?? null
+    try {
+      const reg = await navigator.serviceWorker.getRegistration()
+      swActive = reg?.active?.scriptURL ?? null
+    } catch {
+      // ignore
+    }
+  }
+  const snap: Omit<DiagSnapshot, 'primarySuspect'> = {
+    buildId: __BUILD_ID__,
+    url: typeof location !== 'undefined' ? location.href : '',
+    notificationApi: typeof Notification !== 'undefined',
+    permission:
+      typeof Notification !== 'undefined'
+        ? Notification.permission
+        : 'unsupported',
+    isStandalone: detectStandalone(),
+    hasServiceWorker:
+      typeof navigator !== 'undefined' && 'serviceWorker' in navigator,
+    swController,
+    swActive,
+    userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+    lastTest,
+  }
+  diag.value = { ...snap, primarySuspect: pickSuspect(snap) }
+}
+
 async function sendTest(): Promise<void> {
+  await refreshDiag()
   if (typeof Notification === 'undefined') {
-    alert(t('reminders.test_unsupported'))
+    await refreshDiag({ ok: false, reason: 'API_UNAVAILABLE' })
     return
   }
   const result = await reminders.sendTest({
     title: t('reminders.test_title'),
     body: t('reminders.test_body'),
   })
-  if (result.ok) return
-
-  const isStandalone =
-    typeof window !== 'undefined' &&
-    (window.matchMedia('(display-mode: standalone)').matches ||
-      // iOS Safari standalone flag
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window.navigator as any).standalone === true)
-
-  const lines = [
-    `Test notification could not be sent.`,
-    ``,
-    `Reason: ${result.reason ?? 'unknown'}`,
-    `Permission: ${reminders.permission.value}`,
-    `Standalone (PWA): ${isStandalone}`,
-    `User agent: ${navigator.userAgent}`,
-  ]
-  if (result.via) lines.push(`Detail: ${result.via}`)
-
-  if (
-    /iPhone|iPad|iPod/.test(navigator.userAgent) &&
-    !isStandalone
-  ) {
-    lines.push(
-      ``,
-      `On iPhone/iPad, notifications only work after you Add to Home Screen and open the app from that icon.`
-    )
-  }
-  if (result.reason === 'PERMISSION_DENIED') {
-    lines.push(
-      ``,
-      `Permission was denied. You'll need to re-enable notifications for this site in your browser settings, then try again.`
-    )
-  }
-  alert(lines.join('\n'))
+  await refreshDiag(result)
 }
+
+async function copyDiag(): Promise<void> {
+  if (!diagText.value) return
+  try {
+    await navigator.clipboard.writeText(diagText.value)
+  } catch {
+    // best-effort
+  }
+}
+
+// Populate the panel once on mount so the user sees status before clicking.
+onMounted(() => {
+  void refreshDiag()
+})
 
 function handleReset(): void {
   if (confirm(t('settings.reset_confirm'))) {
@@ -334,6 +454,70 @@ function handleReset(): void {
 }
 .test-btn:active {
   background: var(--bg);
+}
+.diag-panel {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.diag-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.diag-pill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: var(--card);
+  font-weight: 600;
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.diag-pill.diag-ok {
+  background: color-mix(in srgb, var(--green) 20%, var(--card));
+  color: var(--green);
+}
+.diag-pill.diag-err {
+  background: color-mix(in srgb, var(--red) 20%, var(--card));
+  color: var(--red);
+}
+.diag-copy {
+  padding: 3px 8px;
+  border: 1px solid var(--faint);
+  border-radius: 5px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+.diag-suspect {
+  padding: 8px 10px;
+  background: var(--card);
+  border-radius: 6px;
+  color: var(--text);
+  margin-bottom: 8px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+.diag-pre {
+  margin: 0;
+  font-family: inherit;
+  font-size: 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--subtle);
+  line-height: 1.6;
 }
 .permission-warning {
   margin-top: 12px;
