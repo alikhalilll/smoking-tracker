@@ -71,6 +71,7 @@
       :total-smoked="totalSmoked"
       :total-days="totalDays"
       :daily-avg="dailyAvg"
+      :sync="sync"
       @reset="handleReset"
       @reminders-changed="handleRemindersChanged"
     />
@@ -121,6 +122,8 @@ import { useStorage } from './composables/useStorage'
 import { useStats, timeAgo } from './composables/useStats'
 import { useQuitPlan } from './composables/useQuitPlan'
 import { useReminders } from './composables/useReminders'
+import { useSync } from './composables/useSync'
+import { isSupabaseConfigured } from './supabase'
 import { useI18n } from './i18n'
 import HomeView from './components/HomeView.vue'
 import HistoryView from './components/HistoryView.vue'
@@ -174,6 +177,10 @@ const {
 } = stats
 
 const quit = useQuitPlan(data, byDay, dailyAvg)
+
+// Cloud sync only initializes if Supabase env vars are present at build time;
+// otherwise the app runs purely on localStorage and `sync` is null.
+const sync = isSupabaseConfigured() ? useSync(data) : null
 
 // Update "time ago" every minute
 const tick = ref(0)
