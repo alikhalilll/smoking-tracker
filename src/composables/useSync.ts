@@ -58,35 +58,36 @@ export function useSync(data: Ref<AppData>): UseSync {
       return
     }
 
-    const localTimes = new Set(data.value.entries.map((e) => e.time))
-    const serverTimes = new Set(
-      (serverEntries as ServerEntry[] | null)?.map((e) => e.time) ?? []
+    const localIds = new Set(data.value.entries.map((e) => e.id))
+    const serverIds = new Set(
+      (serverEntries as ServerEntry[] | null)?.map((e) => e.id) ?? []
     )
 
-    // Take the union (additive merge): keep both sides' entries.
+    // Pull: add any server-only entries to local (additive merge by id).
     applyingRemote = true
     try {
       const newOnes =
         (serverEntries as ServerEntry[] | null)?.filter(
-          (e) => !localTimes.has(e.time)
+          (e) => !localIds.has(e.id)
         ) ?? []
       if (newOnes.length > 0) {
         data.value.entries = [
           ...data.value.entries,
-          ...newOnes.map((e) => ({ time: e.time, date: e.date })),
+          ...newOnes.map((e) => ({ id: e.id, time: e.time, date: e.date })),
         ].sort((a, b) => a.time.localeCompare(b.time))
       }
     } finally {
       applyingRemote = false
     }
 
-    // Push local-only entries up.
+    // Push: send any local-only entries up using their client-generated id.
     const toPush: SmokeEntry[] = data.value.entries.filter(
-      (e) => !serverTimes.has(e.time)
+      (e) => !serverIds.has(e.id)
     )
     if (toPush.length > 0) {
       const { error: insertErr } = await supabase.from('entries').insert(
         toPush.map((e) => ({
+          id: e.id,
           user_id: user.value!.id,
           time: e.time,
           date: e.date,
@@ -143,27 +144,27 @@ export function useSync(data: Ref<AppData>): UseSync {
     if (!supabase || !user.value) return
     setStatus('syncing')
 
-    // Fetch server entries to compute the diff.
+    // Fetch server ids for the diff.
     const { data: serverEntries, error } = await supabase
       .from('entries')
-      .select('id, time')
+      .select('id')
     if (error) {
       setStatus('error', error.message)
       return
     }
-    const serverByTime = new Map<string, ServerEntry>()
-    for (const e of (serverEntries as ServerEntry[] | null) ?? []) {
-      serverByTime.set(e.time, e)
-    }
-    const localTimes = new Set(data.value.entries.map((e) => e.time))
+    const serverIds = new Set(
+      ((serverEntries as { id: string }[] | null) ?? []).map((e) => e.id)
+    )
+    const localIds = new Set(data.value.entries.map((e) => e.id))
 
-    // Insert local-only.
+    // Insert local-only by id.
     const toInsert: SmokeEntry[] = data.value.entries.filter(
-      (e) => !serverByTime.has(e.time)
+      (e) => !serverIds.has(e.id)
     )
     if (toInsert.length > 0) {
       const { error: insertErr } = await supabase.from('entries').insert(
         toInsert.map((e) => ({
+          id: e.id,
           user_id: user.value!.id,
           time: e.time,
           date: e.date,
@@ -175,10 +176,10 @@ export function useSync(data: Ref<AppData>): UseSync {
       }
     }
 
-    // Delete server-only (the user undid them locally).
+    // Delete server-only ids (the user undid them locally).
     const toDeleteIds: string[] = []
-    for (const [time, srv] of serverByTime) {
-      if (!localTimes.has(time)) toDeleteIds.push(srv.id)
+    for (const id of serverIds) {
+      if (!localIds.has(id)) toDeleteIds.push(id)
     }
     if (toDeleteIds.length > 0) {
       const { error: deleteErr } = await supabase

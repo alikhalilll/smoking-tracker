@@ -1,4 +1,6 @@
 export interface SmokeEntry {
+  /** Stable client-generated UUID — the sync key. */
+  id: string
   /** ISO datetime string */
   time: string
   /** YYYY-MM-DD */
