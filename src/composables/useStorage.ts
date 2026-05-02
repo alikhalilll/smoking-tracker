@@ -27,11 +27,37 @@ export interface UseStorage {
 export function useStorage(): UseStorage {
   const data: Ref<AppData> = ref(load())
 
+  function newId(): string {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return crypto.randomUUID()
+    }
+    // Fallback for very old browsers / non-secure contexts.
+    return (
+      Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
+    )
+  }
+
   function load(): AppData {
     try {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (!raw) return getDefaultData()
-      return JSON.parse(raw) as AppData
+      const parsed = JSON.parse(raw) as AppData
+      // Backfill IDs for entries saved before the id field existed.
+      let mutated = false
+      for (const e of parsed.entries) {
+        if (!e.id) {
+          e.id = newId()
+          mutated = true
+        }
+      }
+      if (mutated) {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
+        } catch {
+          // ignore
+        }
+      }
+      return parsed
     } catch {
       return getDefaultData()
     }
@@ -49,7 +75,7 @@ export function useStorage(): UseStorage {
     const now = new Date().toISOString()
     const today = getToday()
     for (let i = 0; i < count; i++) {
-      data.value.entries.push({ time: now, date: today })
+      data.value.entries.push({ id: newId(), time: now, date: today })
     }
     save()
   }

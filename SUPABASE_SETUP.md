@@ -15,13 +15,14 @@ In the project dashboard, open **SQL Editor → New query**, paste:
 
 ```sql
 -- entries: one row per logged cigarette
+-- IDs are generated client-side (uuid) so batched logs at the same
+-- timestamp can each have a stable identity for sync.
 create table public.entries (
-  id uuid primary key default gen_random_uuid(),
+  id uuid primary key,
   user_id uuid not null references auth.users(id) on delete cascade,
   time timestamptz not null,
   date date not null,
-  created_at timestamptz default now(),
-  unique (user_id, time)
+  created_at timestamptz default now()
 );
 
 create index entries_user_time_idx on public.entries (user_id, time desc);
@@ -34,6 +35,19 @@ create policy "users insert their own entries"
   on public.entries for insert with check (auth.uid() = user_id);
 create policy "users delete their own entries"
   on public.entries for delete using (auth.uid() = user_id);
+
+-- If you set the schema up before this change you'll have a unique
+-- constraint on (user_id, time). It blocks batched logs (multiple
+-- cigarettes logged in the same tap share a timestamp). Drop it:
+--
+--   alter table public.entries
+--     drop constraint if exists entries_user_id_time_key;
+--
+-- Also remove the default on `id` if you had it; the client now
+-- supplies the uuid:
+--
+--   alter table public.entries
+--     alter column id drop default;
 
 -- quit_plans: at most one active plan per user
 create table public.quit_plans (
