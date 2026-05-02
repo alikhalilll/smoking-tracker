@@ -72,6 +72,34 @@ create policy "users update their own plan"
   on public.quit_plans for update using (auth.uid() = user_id);
 create policy "users delete their own plan"
   on public.quit_plans for delete using (auth.uid() = user_id);
+
+-- leaderboard_entries: opt-in public profile of each user's quitting stats.
+-- Anyone signed in can READ; only the owner can write their own row.
+create table public.leaderboard_entries (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  display_name text not null,
+  smoke_free_days integer not null default 0,
+  reduction_pct numeric not null default 0,
+  total_logged integer not null default 0,
+  daily_avg numeric not null default 0,
+  updated_at timestamptz default now()
+);
+
+create index leaderboard_smoke_free_idx
+  on public.leaderboard_entries (smoke_free_days desc);
+create index leaderboard_reduction_idx
+  on public.leaderboard_entries (reduction_pct desc);
+
+alter table public.leaderboard_entries enable row level security;
+
+create policy "leaderboard read"
+  on public.leaderboard_entries for select using (auth.role() = 'authenticated');
+create policy "leaderboard insert own"
+  on public.leaderboard_entries for insert with check (auth.uid() = user_id);
+create policy "leaderboard update own"
+  on public.leaderboard_entries for update using (auth.uid() = user_id);
+create policy "leaderboard delete own"
+  on public.leaderboard_entries for delete using (auth.uid() = user_id);
 ```
 
 Click **Run**.

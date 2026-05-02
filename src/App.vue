@@ -75,6 +75,12 @@
       @abandon="abandonQuitPlan"
     />
 
+    <LeaderboardView
+      v-else-if="view === 'leaderboard' && leaderboard"
+      :leaderboard="leaderboard"
+      @open-settings="view = 'settings'"
+    />
+
     <SettingsView
       v-else-if="view === 'settings'"
       :start-date="data.startDate"
@@ -82,6 +88,7 @@
       :total-days="totalDays"
       :daily-avg="dailyAvg"
       :sync="sync"
+      :leaderboard="leaderboard"
       @reset="handleReset"
       @reminders-changed="handleRemindersChanged"
     />
@@ -133,27 +140,33 @@ import { useStats, timeAgo } from './composables/useStats'
 import { useQuitPlan } from './composables/useQuitPlan'
 import { useReminders, resolvedNotificationLocale } from './composables/useReminders'
 import { useSync } from './composables/useSync'
+import { useLeaderboard } from './composables/useLeaderboard'
 import { useAuth } from './composables/useAuth'
 import { isSupabaseConfigured } from './supabase'
 import { useI18n, tIn } from './i18n'
 import HomeView from './components/HomeView.vue'
 import HistoryView from './components/HistoryView.vue'
 import QuitView from './components/QuitView.vue'
+import LeaderboardView from './components/LeaderboardView.vue'
 import SettingsView from './components/SettingsView.vue'
 import ReportView from './components/ReportView.vue'
 import LoginGate from './components/LoginGate.vue'
 import type { QuitIntensity } from './types'
 
-type TabId = 'home' | 'history' | 'quit' | 'settings'
+type TabId = 'home' | 'history' | 'quit' | 'leaderboard' | 'settings'
 
 const { t } = useI18n()
 
-const tabs: ReadonlyArray<{ id: TabId }> = [
-  { id: 'home' },
-  { id: 'history' },
-  { id: 'quit' },
-  { id: 'settings' },
-]
+const tabs = computed<ReadonlyArray<{ id: TabId }>>(() => {
+  const base: { id: TabId }[] = [
+    { id: 'home' },
+    { id: 'history' },
+    { id: 'quit' },
+  ]
+  if (supabaseConfigured) base.push({ id: 'leaderboard' })
+  base.push({ id: 'settings' })
+  return base
+})
 
 const view = ref<TabId>('home')
 const showReport = ref(false)
@@ -196,6 +209,9 @@ const quit = useQuitPlan(data, byDay, dailyAvg)
 // Cloud sync only initializes if Supabase env vars are present at build time;
 // otherwise the app runs purely on localStorage and `sync` is null.
 const sync = isSupabaseConfigured() ? useSync(data) : null
+
+// Leaderboard composable — only meaningful when Supabase is configured.
+const leaderboard = isSupabaseConfigured() ? useLeaderboard(data) : null
 
 // Update "time ago" every minute
 const tick = ref(0)
