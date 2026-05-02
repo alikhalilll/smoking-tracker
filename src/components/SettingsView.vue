@@ -257,7 +257,10 @@ const diagText = computed(() => {
         : '(none)'
     }`,
     `userAgent:       ${d.userAgent}`,
-  ].join('\n')
+    d.primarySuspect ? `\nsuspect:\n  ${d.primarySuspect}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n')
 })
 
 function detectStandalone(): boolean {
@@ -292,10 +295,13 @@ function pickSuspect(snap: Omit<DiagSnapshot, 'primarySuspect'>): string | null 
   }
   if (
     snap.permission === 'granted' &&
-    snap.lastTest?.ok &&
-    snap.lastTest.via === 'CONSTRUCTOR'
+    snap.lastTest?.ok
   ) {
-    return 'The notification was sent successfully. If you didn’t see it, check macOS System Settings → Notifications and ensure your browser is allowed.'
+    const isMac = /Mac OS X/.test(ua)
+    if (isMac) {
+      return 'The notification was sent (the browser accepted it). If nothing appeared on screen, the OS is dropping it. Check: System Settings → Notifications → your browser is on AND set to "Alerts" (not "None"); Focus / Do Not Disturb is off; the menu-bar Notification Center has it.'
+    }
+    return 'Sent successfully. If you didn’t see it, check your OS notification settings for this browser.'
   }
   return null
 }

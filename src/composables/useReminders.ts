@@ -191,8 +191,11 @@ export function useReminders(): UseReminders {
       new Notification(payload.title, {
         body: payload.body,
         icon: ICON_URL,
-        tag: 'smoke-reminder',
-      })
+        tag: 'smoke-reminder-test',
+        // Keep the test on-screen until the user dismisses it, so the
+        // "I clicked but saw nothing" debugging path is conclusive.
+        requireInteraction: true,
+      } as NotificationOptions)
       return { ok: true, via: 'CONSTRUCTOR' }
     } catch (err) {
       console.warn('[reminders] Notification ctor failed, trying SW:', err)
@@ -206,8 +209,9 @@ export function useReminders(): UseReminders {
           body: payload.body,
           icon: ICON_URL,
           badge: ICON_URL,
-          tag: 'smoke-reminder',
+          tag: 'smoke-reminder-test',
           renotify: true,
+          requireInteraction: true,
         } as NotificationOptions)
         return { ok: true, via: 'SW' }
       } catch (err) {
