@@ -85,6 +85,28 @@
       :gap-distribution="gapDistribution"
       @close="showReport = false"
     />
+
+    <!-- Footer -->
+    <footer class="app-footer">
+      <div class="made-by">{{ t('footer.made_by') }}</div>
+      <div class="footer-links">
+        <a
+          href="https://alikhalilll.github.io/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {{ t('footer.portfolio') }}
+        </a>
+        <span class="footer-dot">·</span>
+        <a
+          href="https://www.linkedin.com/in/alikhalilll/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          {{ t('footer.linkedin') }}
+        </a>
+      </div>
+    </footer>
   </div>
 </template>
 
@@ -263,5 +285,44 @@ function handleReset(): void {
   height: 1px;
   background: var(--border);
   margin-bottom: 1.5rem;
+}
+.app-footer {
+  border-top: 1px solid var(--border);
+  margin-top: 2rem;
+  padding: 1.25rem 0 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+}
+.made-by {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.footer-links {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+}
+.footer-links a {
+  color: var(--text);
+  text-decoration: none;
+  border-bottom: 1px solid var(--faint);
+  padding-bottom: 1px;
+  transition: border-color 0.15s;
+}
+.footer-links a:hover {
+  border-bottom-color: var(--text);
+}
+.footer-dot {
+  color: var(--subtle);
+}
+html[lang='ar'] .made-by {
+  text-transform: none;
+  letter-spacing: 0;
 }
 </style>

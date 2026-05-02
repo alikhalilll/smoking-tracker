@@ -100,6 +100,8 @@ export interface UseReminders {
   setGap: (minutes: number) => void
   /** Schedule the next reminder. Call after each log, or to (re)start the cycle. */
   scheduleNext: (titleAndBody: { title: string; body: string }) => void
+  /** Fire one notification immediately, regardless of the schedule. */
+  sendTest: (titleAndBody: { title: string; body: string }) => Promise<boolean>
   cancel: () => void
 }
 
@@ -142,6 +144,19 @@ export function useReminders(): UseReminders {
     clearTimer()
   }
 
+  async function sendTest(payload: {
+    title: string
+    body: string
+  }): Promise<boolean> {
+    if (typeof Notification === 'undefined') return false
+    if (permission.value !== 'granted') {
+      await requestPermission()
+    }
+    if (permission.value !== 'granted') return false
+    showNotification(payload.title, payload.body)
+    return true
+  }
+
   return {
     settings,
     permission,
@@ -149,6 +164,7 @@ export function useReminders(): UseReminders {
     setEnabled,
     setGap,
     scheduleNext,
+    sendTest,
     cancel,
   }
 }

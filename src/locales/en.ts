@@ -140,6 +140,11 @@ const en = {
     hours_minutes: '{h}h {m}m ago',
     days: '{n}d ago',
   },
+  footer: {
+    made_by: 'Made by Ali Khalil',
+    portfolio: 'Portfolio',
+    linkedin: 'LinkedIn',
+  },
   reminders: {
     section_title: 'Smoking reminders',
     enable_label: 'Don’t-smoke nudges',
@@ -152,6 +157,10 @@ const en = {
     permission_denied: 'Notifications are blocked. Enable them in your browser settings.',
     notification_title: 'Don’t reach for one',
     notification_body: '{minutes} minutes have passed — you’ve already done the hard part. Hold a bit longer.',
+    test_btn: 'Send test notification',
+    test_title: 'Test notification',
+    test_body: 'If you’re reading this, reminders will work on this device.',
+    test_unsupported: 'Notifications aren’t supported on this device or browser.',
   },
 } as const
 

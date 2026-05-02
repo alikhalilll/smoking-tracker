@@ -124,6 +124,10 @@
           </span>
         </div>
       </div>
+
+      <button class="test-btn" @click="sendTest">
+        {{ t('reminders.test_btn') }}
+      </button>
     </div>
 
     <!-- Reset -->
@@ -188,6 +192,20 @@ async function onToggleReminders(): Promise<void> {
 function onGapChange(minutes: number): void {
   reminders.setGap(minutes)
   emit('reminders-changed')
+}
+
+async function sendTest(): Promise<void> {
+  if (typeof Notification === 'undefined') {
+    alert(t('reminders.test_unsupported'))
+    return
+  }
+  const ok = await reminders.sendTest({
+    title: t('reminders.test_title'),
+    body: t('reminders.test_body'),
+  })
+  if (!ok && reminders.permission.value === 'denied') {
+    alert(t('reminders.permission_denied'))
+  }
 }
 
 function handleReset(): void {
@@ -268,6 +286,22 @@ function handleReset(): void {
   background: var(--btn-bg);
   color: var(--btn-text);
   border-color: var(--btn-bg);
+}
+.test-btn {
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px 14px;
+  border: 1.5px solid var(--faint);
+  border-radius: 8px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text);
+}
+.test-btn:active {
+  background: var(--bg);
 }
 .permission-warning {
   margin-top: 12px;

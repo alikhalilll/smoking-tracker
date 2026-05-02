@@ -140,6 +140,11 @@ const ar = {
     hours_minutes: 'قبل {h}س {m}د',
     days: 'قبل {n}ي',
   },
+  footer: {
+    made_by: 'صنع بواسطة علي خليل',
+    portfolio: 'الموقع الشخصي',
+    linkedin: 'لينكدإن',
+  },
   reminders: {
     section_title: 'تذكيرات التدخين',
     enable_label: 'دفعات «لا تدخّن»',
@@ -152,6 +157,10 @@ const ar = {
     permission_denied: 'الإشعارات محظورة. فعّلها من إعدادات المتصفح.',
     notification_title: 'لا تمد يدك لواحدة',
     notification_body: 'مرّت {minutes} دقيقة — أنت أنجزت الجزء الصعب. اصبر قليلًا أكثر.',
+    test_btn: 'إرسال إشعار تجريبي',
+    test_title: 'إشعار تجريبي',
+    test_body: 'إذا كنت ترى هذا، فالتذكيرات ستعمل على هذا الجهاز.',
+    test_unsupported: 'الإشعارات غير مدعومة على هذا الجهاز أو المتصفح.',
   },
 } as const
 
