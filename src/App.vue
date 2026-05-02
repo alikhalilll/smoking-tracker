@@ -30,9 +30,12 @@
       :total-days="totalDays"
       :best-day="bestDay"
       :has-entries="data.entries.length > 0"
+      :quit-today-target="quit.todayTarget.value"
+      :quit-today-status="quit.todayStatus.value"
       @log="handleLog"
       @undo="undoLast"
       @open-report="showReport = true"
+      @open-quit="view = 'quit'"
     />
 
     <HistoryView
@@ -44,13 +47,28 @@
       @open-report="showReport = true"
     />
 
+    <QuitView
+      v-else-if="view === 'quit'"
+      :plan="quit.plan.value"
+      :is-active="quit.isActive.value"
+      :is-complete="quit.isComplete.value"
+      :today-target="quit.todayTarget.value"
+      :today-actual="quit.todayActual.value"
+      :today-status="quit.todayStatus.value"
+      :plan-days="quit.planDays.value"
+      :progress="quit.progress.value"
+      :suggested-baseline="quit.suggestedBaseline.value"
+      @start="handleStartQuit"
+      @abandon="abandonQuitPlan"
+    />
+
     <SettingsView
       v-else-if="view === 'settings'"
       :start-date="data.startDate"
       :total-smoked="totalSmoked"
       :total-days="totalDays"
       :daily-avg="dailyAvg"
-      @reset="resetAll"
+      @reset="handleReset"
     />
 
     <!-- Full report overlay -->
@@ -73,23 +91,36 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useStorage } from './composables/useStorage'
 import { useStats, timeAgo } from './composables/useStats'
+import { useQuitPlan } from './composables/useQuitPlan'
 import HomeView from './components/HomeView.vue'
 import HistoryView from './components/HistoryView.vue'
+import QuitView from './components/QuitView.vue'
 import SettingsView from './components/SettingsView.vue'
 import ReportView from './components/ReportView.vue'
+import type { QuitIntensity } from './types'
 
-type TabId = 'home' | 'history' | 'settings'
+type TabId = 'home' | 'history' | 'quit' | 'settings'
 
 const tabs: ReadonlyArray<{ id: TabId; label: string }> = [
   { id: 'home', label: 'Home' },
   { id: 'history', label: 'History' },
+  { id: 'quit', label: 'Quit' },
   { id: 'settings', label: '···' },
 ]
 
 const view = ref<TabId>('home')
 const showReport = ref(false)
 
-const { data, addEntries, undoLast, resetAll } = useStorage()
+const {
+  data,
+  addEntries,
+  undoLast,
+  resetAll,
+  startQuitPlan,
+  abandonQuitPlan,
+} = useStorage()
+
+const stats = useStats(data)
 const {
   byDay,
   days,
@@ -107,7 +138,9 @@ const {
   hourlyDistribution,
   weekdayDistribution,
   gapDistribution,
-} = useStats(data)
+} = stats
+
+const quit = useQuitPlan(data, byDay, dailyAvg)
 
 // Update "time ago" every minute
 const tick = ref(0)
@@ -121,13 +154,24 @@ onUnmounted(() => {
 
 const lastSmokeText = computed<string | null>(() => {
   if (!lastSmoke.value) return null
-  // Touch tick to force reactivity each minute.
   void tick.value
   return timeAgo(lastSmoke.value)
 })
 
 function handleLog(count: number): void {
   addEntries(count)
+}
+
+function handleStartQuit(payload: {
+  intensity: QuitIntensity
+  baseline: number
+}): void {
+  startQuitPlan(payload.intensity, payload.baseline)
+}
+
+function handleReset(): void {
+  resetAll()
+  view.value = 'home'
 }
 </script>
 
@@ -143,6 +187,7 @@ function handleLog(count: number): void {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 8px;
 }
 .brand {
   font-size: 11px;
@@ -150,13 +195,16 @@ function handleLog(count: number): void {
   letter-spacing: 0.1em;
   text-transform: uppercase;
   font-weight: 500;
+  flex-shrink: 0;
 }
 .tabs {
   display: flex;
   gap: 2px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .tab {
-  padding: 7px 14px;
+  padding: 7px 10px;
   border: none;
   background: transparent;
   font-family: inherit;

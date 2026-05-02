@@ -1,5 +1,6 @@
 import { ref, type Ref } from 'vue'
-import type { AppData } from '../types'
+import type { AppData, QuitIntensity, QuitPlan } from '../types'
+import { generateTargets, INTENSITY_DURATIONS } from './useQuitPlan'
 
 const STORAGE_KEY = 'smoking-tracker-data'
 
@@ -19,6 +20,8 @@ export interface UseStorage {
   addEntries: (count: number) => void
   undoLast: () => void
   resetAll: () => void
+  startQuitPlan: (intensity: QuitIntensity, baseline: number) => void
+  abandonQuitPlan: () => void
 }
 
 export function useStorage(): UseStorage {
@@ -63,5 +66,31 @@ export function useStorage(): UseStorage {
     save()
   }
 
-  return { data, addEntries, undoLast, resetAll }
+  function startQuitPlan(intensity: QuitIntensity, baseline: number): void {
+    const today = getToday()
+    const durationDays = INTENSITY_DURATIONS[intensity]
+    const plan: QuitPlan = {
+      startDate: today,
+      baseline,
+      durationDays,
+      intensity,
+      targetsByDate: generateTargets(baseline, durationDays, today),
+    }
+    data.value.quitPlan = plan
+    save()
+  }
+
+  function abandonQuitPlan(): void {
+    delete data.value.quitPlan
+    save()
+  }
+
+  return {
+    data,
+    addEntries,
+    undoLast,
+    resetAll,
+    startQuitPlan,
+    abandonQuitPlan,
+  }
 }

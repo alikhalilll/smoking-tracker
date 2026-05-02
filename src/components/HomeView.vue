@@ -1,5 +1,19 @@
 <template>
   <div class="fade-in">
+    <!-- Quit-plan chip -->
+    <button
+      v-if="quitTodayTarget != null"
+      class="quit-chip"
+      :class="{
+        'chip-on': quitTodayStatus === 'on-track',
+        'chip-over': quitTodayStatus === 'over',
+      }"
+      @click="emit('open-quit')"
+    >
+      <span class="chip-label">Quit target today</span>
+      <span class="chip-value">{{ todayCount }} / {{ quitTodayTarget }}</span>
+    </button>
+
     <!-- Big counter -->
     <div class="counter-display" :class="{ pulsing: isPulsing }">
       <div class="counter-number" :style="{ color: countColor }">
@@ -118,6 +132,8 @@ interface Props {
   totalDays: number
   bestDay: number
   hasEntries: boolean
+  quitTodayTarget?: number | null
+  quitTodayStatus?: 'on-track' | 'over' | null
 }
 
 const props = defineProps<Props>()
@@ -126,6 +142,7 @@ const emit = defineEmits<{
   log: [count: number]
   undo: []
   'open-report': []
+  'open-quit': []
 }>()
 
 const logCount = ref(1)
@@ -173,9 +190,51 @@ function onPointerUp(e: PointerEvent): void {
 </script>
 
 <style scoped>
+.quit-chip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-top: 4px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--faint);
+  background: var(--card);
+  font-family: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s, transform 0.1s;
+}
+.quit-chip:active {
+  transform: scale(0.99);
+}
+.quit-chip.chip-on {
+  border-color: color-mix(in srgb, var(--green) 50%, var(--faint));
+}
+.quit-chip.chip-over {
+  border-color: color-mix(in srgb, var(--red) 50%, var(--faint));
+}
+.chip-label {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
+}
+.chip-value {
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.chip-on .chip-value {
+  color: var(--green);
+}
+.chip-over .chip-value {
+  color: var(--red);
+}
 .counter-display {
   text-align: center;
-  padding: 2.5rem 0 1.5rem;
+  padding: 2rem 0 1.5rem;
 }
 .counter-display.pulsing {
   animation: pulse 0.4s ease;

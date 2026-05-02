@@ -10,7 +10,9 @@
     <div class="info-card">
       <div class="info-label">Total entries</div>
       <div class="info-value">
-        {{ totalSmoked }} cigarettes over {{ totalDays }} day{{ totalDays > 1 ? 's' : '' }}
+        {{ totalSmoked }} cigarettes over {{ totalDays }} day{{
+          totalDays > 1 ? 's' : ''
+        }}
       </div>
     </div>
 
@@ -19,9 +21,25 @@
       <div class="info-value">{{ dailyAvg }} cigarettes</div>
     </div>
 
+    <!-- Theme picker -->
+    <div class="section-title" style="margin-top: 1.75rem">Appearance</div>
+    <div class="segmented">
+      <button
+        v-for="opt in themeOptions"
+        :key="opt.value"
+        class="segmented-btn"
+        :class="{ active: themeMode === opt.value }"
+        @click="setTheme(opt.value)"
+      >
+        {{ opt.label }}
+      </button>
+    </div>
+
+    <!-- Reset -->
     <button class="reset-btn" @click="handleReset">Reset all data</button>
     <div class="reset-warning">
-      This will permanently delete all your tracked data.
+      This will permanently delete all your tracked data, including any active
+      quit plan.
     </div>
 
     <div class="pwa-info">
@@ -35,6 +53,8 @@
 </template>
 
 <script setup lang="ts">
+import { useTheme, type ThemeMode } from '../composables/useTheme'
+
 interface Props {
   startDate: string
   totalSmoked: number
@@ -48,6 +68,14 @@ const emit = defineEmits<{
   reset: []
 }>()
 
+const { mode: themeMode, setTheme } = useTheme()
+
+const themeOptions: ReadonlyArray<{ value: ThemeMode; label: string }> = [
+  { value: 'system', label: 'System' },
+  { value: 'light', label: 'Light' },
+  { value: 'dark', label: 'Dark' },
+]
+
 function handleReset(): void {
   if (confirm('Delete all tracking data? This cannot be undone.')) {
     emit('reset')
@@ -60,7 +88,7 @@ function handleReset(): void {
   font-size: 11px;
   font-weight: 500;
   color: var(--muted);
-  margin-bottom: 20px;
+  margin-bottom: 14px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -79,9 +107,34 @@ function handleReset(): void {
   color: var(--muted);
   margin-top: 3px;
 }
+.segmented {
+  display: flex;
+  gap: 4px;
+  background: var(--card);
+  border-radius: 10px;
+  padding: 4px;
+}
+.segmented-btn {
+  flex: 1;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  color: var(--muted);
+  transition: background 0.15s, color 0.15s;
+}
+.segmented-btn.active {
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+}
 .reset-btn {
   width: 100%;
-  margin-top: 16px;
+  margin-top: 28px;
   padding: 12px 18px;
   border: 1.5px solid var(--red-border);
   border-radius: 10px;

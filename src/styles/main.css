@@ -5,7 +5,8 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-:root {
+:root,
+[data-theme='light'] {
   --bg: #fafaf6;
   --card: #f2f1eb;
   --border: #e8e6df;
@@ -25,20 +26,35 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme='light']) {
     --bg: #111110;
     --card: #1c1c1a;
     --border: #2a2a27;
     --text: #e8e6df;
-    --muted: #6a6a62;
+    --muted: #8a8a82;
     --faint: #3a3a36;
-    --subtle: #444440;
+    --subtle: #555550;
     --btn-bg: #e8e6df;
     --btn-text: #1a1a18;
     --bar-default: #555550;
     --bar-today: #e8e6df;
     --bar-empty: #2a2a27;
   }
+}
+
+[data-theme='dark'] {
+  --bg: #111110;
+  --card: #1c1c1a;
+  --border: #2a2a27;
+  --text: #e8e6df;
+  --muted: #8a8a82;
+  --faint: #3a3a36;
+  --subtle: #555550;
+  --btn-bg: #e8e6df;
+  --btn-text: #1a1a18;
+  --bar-default: #555550;
+  --bar-today: #e8e6df;
+  --bar-empty: #2a2a27;
 }
 
 body {

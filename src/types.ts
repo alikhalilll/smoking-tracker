@@ -8,6 +8,45 @@ export interface SmokeEntry {
 export interface AppData {
   entries: SmokeEntry[]
   startDate: string
+  quitPlan?: QuitPlan
+}
+
+export type QuitIntensity = 'quick' | 'standard' | 'gradual' | 'extended'
+
+export interface QuitPlan {
+  /** YYYY-MM-DD on which the plan starts (day 0). */
+  startDate: string
+  /** Daily average at the time the plan was generated. */
+  baseline: number
+  /** Total number of days in the plan, ending on the quit day (target 0). */
+  durationDays: number
+  intensity: QuitIntensity
+  /** date (YYYY-MM-DD) → target cigarette count for that day. */
+  targetsByDate: Record<string, number>
+}
+
+export interface QuitDay {
+  date: string
+  /** Day index, 0-based. */
+  dayIndex: number
+  target: number
+  /** Actual logged count for that date (0 if none). */
+  actual: number
+  /** 'future' | 'today' | 'past'. */
+  when: 'future' | 'today' | 'past'
+  /** 'on-track' if actual <= target, 'over' otherwise. null for future days. */
+  status: 'on-track' | 'over' | null
+}
+
+export interface QuitProgress {
+  daysElapsed: number
+  daysRemaining: number
+  daysOnTrack: number
+  daysOver: number
+  /** 0..1 percentage of completed days that were on-track. */
+  successRate: number
+  /** Current streak of consecutive on-track days ending today (or yesterday if today is incomplete). */
+  currentStreak: number
 }
 
 export interface AnnotatedEntry extends SmokeEntry {
