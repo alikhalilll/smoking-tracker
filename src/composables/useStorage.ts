@@ -42,11 +42,16 @@ export function useStorage(): UseStorage {
       const raw = localStorage.getItem(STORAGE_KEY)
       if (!raw) return getDefaultData()
       const parsed = JSON.parse(raw) as AppData
-      // Backfill IDs for entries saved before the id field existed.
+      // Backfill IDs and assume previously-stored entries are unsynced
+      // (the next pull will reconcile them with the server).
       let mutated = false
       for (const e of parsed.entries) {
         if (!e.id) {
           e.id = newId()
+          mutated = true
+        }
+        if (e.synced === undefined) {
+          e.synced = false
           mutated = true
         }
       }
@@ -75,7 +80,12 @@ export function useStorage(): UseStorage {
     const now = new Date().toISOString()
     const today = getToday()
     for (let i = 0; i < count; i++) {
-      data.value.entries.push({ id: newId(), time: now, date: today })
+      data.value.entries.push({
+        id: newId(),
+        time: now,
+        date: today,
+        synced: false,
+      })
     }
     save()
   }
