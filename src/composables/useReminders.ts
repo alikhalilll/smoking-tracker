@@ -66,6 +66,42 @@ function clearTimer(): void {
 
 const ICON_URL = `${import.meta.env.BASE_URL}icon-192.png`
 
+// Soft two-note chime (C5 → E5, sine wave with a gentle envelope).
+// Synthesised on the fly so there's no audio file to ship or cache.
+function playChime(): void {
+  if (typeof window === 'undefined') return
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const Ctx = (window.AudioContext ||
+    (window as any).webkitAudioContext) as typeof AudioContext | undefined
+  if (!Ctx) return
+  let ctx: AudioContext
+  try {
+    ctx = new Ctx()
+  } catch {
+    return
+  }
+  const now = ctx.currentTime
+  const playNote = (freq: number, start: number, duration: number): void => {
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.type = 'sine'
+    osc.frequency.value = freq
+    gain.gain.setValueAtTime(0, start)
+    gain.gain.linearRampToValueAtTime(0.12, start + 0.05)
+    gain.gain.exponentialRampToValueAtTime(0.001, start + duration)
+    osc.connect(gain).connect(ctx.destination)
+    osc.start(start)
+    osc.stop(start + duration)
+  }
+  // C5, then E5 a beat later — gentle major-third chime.
+  playNote(523.25, now, 0.7)
+  playNote(659.25, now + 0.18, 0.85)
+  // Best-effort cleanup once the sound is done.
+  setTimeout(() => {
+    void ctx.close().catch(() => undefined)
+  }, 1500)
+}
+
 async function showNotification(
   title: string,
   body: string
@@ -78,6 +114,10 @@ async function showNotification(
     console.warn('[reminders] permission not granted:', permission.value)
     return false
   }
+
+  // Always chime — independent of OS notification settings, so the user
+  // hears something even if macOS suppresses the visual banner.
+  playChime()
 
   // Prefer the service worker path. iOS Safari (16.4+ in PWA mode) ONLY
   // supports notifications via ServiceWorkerRegistration.showNotification —
@@ -185,6 +225,10 @@ export function useReminders(): UseReminders {
     if (permission.value !== 'granted') {
       return { ok: false, reason: `PERMISSION_${permission.value.toUpperCase()}` }
     }
+
+    // Chime first so the user can verify audio works even before the
+    // notification banner is checked.
+    playChime()
 
     // Try plain Notification first — works on macOS Safari/Chrome/Firefox tabs.
     try {
