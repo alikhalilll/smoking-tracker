@@ -79,8 +79,9 @@ In **URL Configuration**, set:
 Project Settings → **API** → copy these two values:
 
 - **Project URL** → `VITE_SUPABASE_URL`
-- **anon public key** → `VITE_SUPABASE_ANON_KEY` (this is meant to be public;
-  Row Level Security is what protects data)
+- **publishable key** (older projects call this the "anon public key") →
+  `VITE_SUPABASE_PUBLISHABLE_KEY`. This value is meant to be public; Row
+  Level Security is what protects data.
 
 ### Local dev
 
@@ -95,7 +96,7 @@ npm run dev
 Repo → **Settings → Secrets and variables → Actions → New repository secret**:
 
 - `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+- `VITE_SUPABASE_PUBLISHABLE_KEY`
 
 The deploy workflow already passes them through to the build.
 
