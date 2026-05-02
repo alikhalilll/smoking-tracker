@@ -33,7 +33,7 @@
 
     <!-- Undo -->
     <div v-if="hasEntries" class="undo-wrap">
-      <button class="undo-btn" @click="$emit('undo')">Undo last</button>
+      <button class="undo-btn" @click="emit('undo')">Undo last</button>
     </div>
 
     <!-- 7-day chart -->
@@ -41,17 +41,31 @@
       <div class="section-title">Last 7 days</div>
       <div class="bar-chart">
         <div v-for="(d, i) in last7" :key="i" class="bar-col">
-          <div class="bar-value" :style="{ color: d.count > 0 ? 'var(--text)' : 'var(--subtle)' }">
+          <div
+            class="bar-value"
+            :style="{ color: d.count > 0 ? 'var(--text)' : 'var(--subtle)' }"
+          >
             {{ d.count || '·' }}
           </div>
           <div
             class="bar"
             :style="{
               height: barHeight(d.count) + 'px',
-              background: d.count === 0 ? 'var(--bar-empty)' : isToday(d.date) ? 'var(--bar-today)' : 'var(--bar-default)',
+              background:
+                d.count === 0
+                  ? 'var(--bar-empty)'
+                  : isToday(d.date)
+                    ? 'var(--bar-today)'
+                    : 'var(--bar-default)',
             }"
           />
-          <div class="bar-label" :style="{ fontWeight: isToday(d.date) ? 600 : 400, color: isToday(d.date) ? 'var(--text)' : 'var(--subtle)' }">
+          <div
+            class="bar-label"
+            :style="{
+              fontWeight: isToday(d.date) ? 600 : 400,
+              color: isToday(d.date) ? 'var(--text)' : 'var(--subtle)',
+            }"
+          >
             {{ dayAbbr(d.date) }}
           </div>
         </div>
@@ -77,68 +91,84 @@
         <div class="stat-value">{{ bestDay }}</div>
       </div>
     </div>
+
+    <!-- Generate report -->
+    <button
+      v-if="hasEntries"
+      class="report-btn"
+      @click="emit('open-report')"
+    >
+      Generate full report
+    </button>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 import { getColor } from '../composables/useStats'
+import type { DayBucket } from '../types'
 
-const props = defineProps({
-  todayCount: Number,
-  lastSmokeText: String,
-  last7: Array,
-  maxLast7: Number,
-  dailyAvg: Number,
-  totalSmoked: Number,
-  totalDays: Number,
-  bestDay: Number,
-  hasEntries: Boolean,
-})
+interface Props {
+  todayCount: number
+  lastSmokeText?: string
+  last7: DayBucket[]
+  maxLast7: number
+  dailyAvg: number
+  totalSmoked: number
+  totalDays: number
+  bestDay: number
+  hasEntries: boolean
+}
 
-const emit = defineEmits(['log', 'undo'])
+const props = defineProps<Props>()
+
+const emit = defineEmits<{
+  log: [count: number]
+  undo: []
+  'open-report': []
+}>()
 
 const logCount = ref(1)
 const isPulsing = ref(false)
-const btnEl = ref(null)
 
 const countColor = computed(() => getColor(props.todayCount))
 
-function increment() {
+function increment(): void {
   if (logCount.value < 10) logCount.value++
 }
 
-function decrement() {
+function decrement(): void {
   if (logCount.value > 1) logCount.value--
 }
 
-function handleLog() {
+function handleLog(): void {
   emit('log', logCount.value)
   isPulsing.value = true
   setTimeout(() => (isPulsing.value = false), 500)
   logCount.value = 1
 }
 
-function barHeight(count) {
+function barHeight(count: number): number {
   if (count === 0) return 4
   return Math.max(14, (count / props.maxLast7) * 95)
 }
 
-function isToday(dateStr) {
+function isToday(dateStr: string): boolean {
   return dateStr === new Date().toISOString().split('T')[0]
 }
 
-function dayAbbr(dateStr) {
+function dayAbbr(dateStr: string): string {
   return new Date(dateStr + 'T00:00:00')
     .toLocaleDateString('en-US', { weekday: 'short' })
     .slice(0, 2)
 }
 
-function onPointerDown(e) {
-  e.currentTarget.style.transform = 'scale(0.97)'
+function onPointerDown(e: PointerEvent): void {
+  ;(e.currentTarget as HTMLElement).style.transform = 'scale(0.97)'
 }
-function onPointerUp(e) {
-  e.currentTarget.style.transform = 'scale(1)'
+
+function onPointerUp(e: PointerEvent): void {
+  ;(e.currentTarget as HTMLElement).style.transform = 'scale(1)'
 }
 </script>
 
@@ -268,7 +298,7 @@ function onPointerUp(e) {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin: 1.75rem 0 2rem;
+  margin: 1.75rem 0 1rem;
 }
 .stat-card {
   background: var(--card);
@@ -283,5 +313,22 @@ function onPointerUp(e) {
   font-size: 22px;
   font-weight: 600;
   margin-top: 3px;
+}
+.report-btn {
+  width: 100%;
+  padding: 14px;
+  margin: 8px 0 2rem;
+  border: 1.5px solid var(--faint);
+  border-radius: 10px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+.report-btn:active {
+  background: var(--card);
 }
 </style>

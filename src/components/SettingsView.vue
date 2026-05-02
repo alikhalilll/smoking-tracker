@@ -9,7 +9,9 @@
 
     <div class="info-card">
       <div class="info-label">Total entries</div>
-      <div class="info-value">{{ totalSmoked }} cigarettes over {{ totalDays }} day{{ totalDays > 1 ? 's' : '' }}</div>
+      <div class="info-value">
+        {{ totalSmoked }} cigarettes over {{ totalDays }} day{{ totalDays > 1 ? 's' : '' }}
+      </div>
     </div>
 
     <div class="info-card">
@@ -17,31 +19,36 @@
       <div class="info-value">{{ dailyAvg }} cigarettes</div>
     </div>
 
-    <button class="reset-btn" @click="handleReset">
-      Reset all data
-    </button>
+    <button class="reset-btn" @click="handleReset">Reset all data</button>
     <div class="reset-warning">
       This will permanently delete all your tracked data.
     </div>
 
     <div class="pwa-info">
       <div class="info-label">Offline mode</div>
-      <div class="info-value">This app works offline as a PWA. Add it to your home screen for the best experience.</div>
+      <div class="info-value">
+        This app works offline as a PWA. Add it to your home screen for the best
+        experience.
+      </div>
     </div>
   </div>
 </template>
 
-<script setup>
-const props = defineProps({
-  startDate: String,
-  totalSmoked: Number,
-  totalDays: Number,
-  dailyAvg: Number,
-})
+<script setup lang="ts">
+interface Props {
+  startDate: string
+  totalSmoked: number
+  totalDays: number
+  dailyAvg: number
+}
 
-const emit = defineEmits(['reset'])
+defineProps<Props>()
 
-function handleReset() {
+const emit = defineEmits<{
+  reset: []
+}>()
+
+function handleReset(): void {
   if (confirm('Delete all tracking data? This cannot be undone.')) {
     emit('reset')
   }

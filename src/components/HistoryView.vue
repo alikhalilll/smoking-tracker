@@ -6,7 +6,12 @@
 
     <template v-else>
       <!-- Overall gap report -->
-      <div class="section-title">Gap report</div>
+      <div class="report-header">
+        <div class="section-title" style="margin-bottom: 0">Gap report</div>
+        <button class="report-btn" @click="emit('open-report')">
+          Generate full report
+        </button>
+      </div>
       <div class="report-grid">
         <div class="report-card">
           <div class="report-label">Average gap</div>
@@ -75,7 +80,7 @@
           >
             <div class="entry-time">{{ formatTime(e.time) }}</div>
             <div class="entry-gap">
-              <span v-if="e.gapMs == null" class="gap-muted">first</span>
+              <span v-if="e.gapMs == null" class="gap-muted">first ever</span>
               <span v-else>+{{ formatDuration(e.gapMs) }}</span>
             </div>
           </div>
@@ -87,7 +92,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import {
   getDayLabel,
@@ -95,20 +100,28 @@ import {
   formatDuration,
   formatTime,
 } from '../composables/useStats'
+import type { DayReport, GapStats } from '../types'
 
-const props = defineProps({
-  days: Array,
-  byDay: Object,
-  gapStats: Object,
-  dayReports: Object,
-})
+interface Props {
+  days: string[]
+  byDay: Record<string, number>
+  gapStats: GapStats
+  dayReports: Record<string, DayReport>
+}
 
-const expanded = ref({})
-function toggle(d) {
+const props = defineProps<Props>()
+
+const emit = defineEmits<{
+  'open-report': []
+}>()
+
+const expanded = ref<Record<string, boolean>>({})
+
+function toggle(d: string): void {
   expanded.value[d] = !expanded.value[d]
 }
 
-function barWidth(count) {
+function barWidth(count: number): number {
   const maxCount = Math.max(...Object.values(props.byDay), 1)
   return Math.max(20, (count / maxCount) * 80)
 }
@@ -122,6 +135,27 @@ function barWidth(count) {
   margin-bottom: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+.report-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.report-btn {
+  padding: 6px 12px;
+  border: 1.5px solid var(--faint);
+  border-radius: 8px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text);
+  letter-spacing: 0.02em;
+}
+.report-btn:active {
+  background: var(--card);
 }
 .empty-state {
   color: var(--subtle);
