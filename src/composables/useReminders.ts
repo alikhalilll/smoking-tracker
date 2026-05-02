@@ -1,4 +1,5 @@
 import { ref, type Ref } from 'vue'
+import { currentLocale } from '../i18n'
 
 export interface ReminderSettings {
   enabled: boolean
@@ -125,6 +126,10 @@ async function playChime(): Promise<void> {
 /** Tab the app should switch to when the user clicks a reminder notification. */
 const REMINDER_ROUTE = 'quit'
 
+function localeDir(): 'rtl' | 'ltr' {
+  return currentLocale.value === 'ar' ? 'rtl' : 'ltr'
+}
+
 function emitNotificationClick(): void {
   if (typeof window === 'undefined') return
   try {
@@ -174,6 +179,8 @@ async function showNotification(
         badge: ICON_URL,
         tag: 'smoke-reminder',
         renotify: true,
+        dir: localeDir(),
+        lang: currentLocale.value,
         data: { route: REMINDER_ROUTE },
       } as NotificationOptions)
       return true
@@ -187,6 +194,8 @@ async function showNotification(
       body,
       icon: ICON_URL,
       tag: 'smoke-reminder',
+      dir: localeDir(),
+      lang: currentLocale.value,
     })
     attachClickHandler(n)
     return true
@@ -288,6 +297,8 @@ export function useReminders(): UseReminders {
         // Keep the test on-screen until the user dismisses it, so the
         // "I clicked but saw nothing" debugging path is conclusive.
         requireInteraction: true,
+        dir: localeDir(),
+        lang: currentLocale.value,
       } as NotificationOptions)
       attachClickHandler(n)
       return { ok: true, via: 'CONSTRUCTOR' }
@@ -306,6 +317,8 @@ export function useReminders(): UseReminders {
           tag: 'smoke-reminder-test',
           renotify: true,
           requireInteraction: true,
+          dir: localeDir(),
+          lang: currentLocale.value,
           data: { route: REMINDER_ROUTE },
         } as NotificationOptions)
         return { ok: true, via: 'SW' }
