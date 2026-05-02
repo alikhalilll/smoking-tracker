@@ -169,26 +169,58 @@
         <div class="info-value" style="margin-bottom: 12px">
           {{ t('cloud.description') }}
         </div>
-        <div class="cloud-form">
+
+        <!-- Step 1: email -->
+        <div v-if="!codeSent" class="cloud-form">
           <input
             v-model="emailInput"
             type="email"
+            inputmode="email"
+            autocomplete="email"
             class="email-input"
             :placeholder="t('cloud.email_placeholder')"
             :disabled="signingIn"
-            @keydown.enter="onSendLink"
+            @keydown.enter="onSendCode"
           />
           <button
             class="primary-btn"
             :disabled="signingIn || !emailInput"
-            @click="onSendLink"
+            @click="onSendCode"
           >
-            {{ signingIn ? t('cloud.sending') : t('cloud.send_link') }}
+            {{ signingIn ? t('cloud.sending') : t('cloud.send_code') }}
           </button>
         </div>
-        <div v-if="linkSent" class="link-sent-msg">
-          {{ t('cloud.link_sent') }}
+
+        <!-- Step 2: OTP code -->
+        <div v-else>
+          <div class="link-sent-msg" style="margin-top: 0; margin-bottom: 10px">
+            {{ t('cloud.code_sent', { email: emailInput }) }}
+          </div>
+          <div class="cloud-form">
+            <input
+              v-model="codeInput"
+              type="text"
+              inputmode="numeric"
+              autocomplete="one-time-code"
+              maxlength="6"
+              class="email-input"
+              :placeholder="t('cloud.code_placeholder')"
+              :disabled="verifying"
+              @keydown.enter="onVerifyCode"
+            />
+            <button
+              class="primary-btn"
+              :disabled="verifying || codeInput.length < 6"
+              @click="onVerifyCode"
+            >
+              {{ verifying ? t('cloud.verifying') : t('cloud.verify') }}
+            </button>
+          </div>
+          <button class="link-btn" style="margin-top: 8px" @click="onResetFlow">
+            {{ t('cloud.use_different_email') }}
+          </button>
         </div>
+
         <div v-if="signInError" class="link-sent-msg" style="color: var(--red)">
           {{ signInError }}
         </div>
@@ -439,22 +471,45 @@ onMounted(() => {
 const auth = useAuth()
 const supabaseConfigured = isSupabaseConfigured()
 const emailInput = ref('')
+const codeInput = ref('')
+const codeSent = ref(false)
 const signingIn = ref(false)
-const linkSent = ref(false)
+const verifying = ref(false)
 const signInError = ref<string | null>(null)
 
-async function onSendLink(): Promise<void> {
+async function onSendCode(): Promise<void> {
   if (!emailInput.value) return
   signingIn.value = true
   signInError.value = null
-  linkSent.value = false
-  const result = await auth.signIn(emailInput.value.trim())
+  const result = await auth.sendOtp(emailInput.value.trim())
   signingIn.value = false
   if (result.ok) {
-    linkSent.value = true
+    codeSent.value = true
   } else {
     signInError.value = result.error ?? 'Sign-in failed'
   }
+}
+
+async function onVerifyCode(): Promise<void> {
+  if (!codeInput.value) return
+  verifying.value = true
+  signInError.value = null
+  const result = await auth.verifyOtp(
+    emailInput.value.trim(),
+    codeInput.value.trim()
+  )
+  verifying.value = false
+  if (!result.ok) {
+    signInError.value = result.error ?? 'Verification failed'
+  }
+  // On success the auth state listener flips isAuthed and the UI swaps
+  // to the signed-in view automatically.
+}
+
+function onResetFlow(): void {
+  codeSent.value = false
+  codeInput.value = ''
+  signInError.value = null
 }
 
 async function onSyncNow(): Promise<void> {

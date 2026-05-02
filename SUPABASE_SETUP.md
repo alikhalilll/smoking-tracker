@@ -62,17 +62,29 @@ create policy "users delete their own plan"
 
 Click **Run**.
 
-## 3. Configure auth (magic link)
+## 3. Configure auth (OTP code)
 
-Authentication → **Providers** → **Email** is on by default. Make sure
-"Enable email confirmations" is **off** for first run if you want
-zero-friction sign-in.
+Authentication → **Providers** → **Email** is on by default.
 
-In **URL Configuration**, set:
+The app uses a **6-digit OTP code** instead of a magic link, because
+magic links open in the system browser instead of the installed PWA.
+Two settings need to be aligned for this to work:
 
-- **Site URL**: `https://alikhalilll.github.io/smoking-tracker/`
-- **Redirect URLs**: add the same URL plus `http://localhost:5173/smoking-tracker/`
-  for local dev.
+1. Authentication → **Email Templates** → **Magic Link** template.
+   Replace the body so it sends the OTP token instead of (or alongside)
+   the link. The minimum is one line:
+
+   ```
+   Your sign-in code: {{ .Token }}
+   ```
+
+   You can keep the link too if you also want desktop browser users to
+   click — the app will work either way.
+2. Authentication → **URL Configuration** — Site URL and Redirect URLs
+   are still useful for the link flow on desktop:
+   - **Site URL**: `https://alikhalilll.github.io/smoking-tracker/`
+   - **Redirect URLs**: add the same URL plus
+     `http://localhost:5173/smoking-tracker/` for local dev.
 
 ## 4. Wire env vars
 

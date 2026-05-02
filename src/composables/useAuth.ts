@@ -26,7 +26,12 @@ export interface UseAuth {
   user: ComputedRef<User | null>
   isAuthed: ComputedRef<boolean>
   loading: ComputedRef<boolean>
-  signIn: (email: string) => Promise<{ ok: boolean; error?: string }>
+  /** Send a 6-digit OTP code to the email. PWA-friendly (no link redirect). */
+  sendOtp: (email: string) => Promise<{ ok: boolean; error?: string }>
+  verifyOtp: (
+    email: string,
+    token: string
+  ) => Promise<{ ok: boolean; error?: string }>
   signOut: () => Promise<void>
 }
 
@@ -36,16 +41,29 @@ export function useAuth(): UseAuth {
     isAuthed: computed(() => user.value !== null),
     loading: computed(() => loading.value),
 
-    async signIn(
+    async sendOtp(
       email: string
     ): Promise<{ ok: boolean; error?: string }> {
       if (!supabase) return { ok: false, error: 'Supabase not configured' }
+      // No emailRedirectTo → Supabase sends the OTP code rather than a
+      // clickable link, so the PWA never has to follow a URL out of the
+      // installed app context.
       const { error } = await supabase.auth.signInWithOtp({
         email,
-        options: {
-          emailRedirectTo:
-            typeof window !== 'undefined' ? window.location.href : undefined,
-        },
+        options: { shouldCreateUser: true },
+      })
+      return error ? { ok: false, error: error.message } : { ok: true }
+    },
+
+    async verifyOtp(
+      email: string,
+      token: string
+    ): Promise<{ ok: boolean; error?: string }> {
+      if (!supabase) return { ok: false, error: 'Supabase not configured' }
+      const { error } = await supabase.auth.verifyOtp({
+        email,
+        token: token.trim(),
+        type: 'email',
       })
       return error ? { ok: false, error: error.message } : { ok: true }
     },
