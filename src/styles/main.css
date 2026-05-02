@@ -7,72 +7,232 @@
 
 :root,
 [data-theme='light'] {
-  --bg: #fafaf6;
-  --card: #f2f1eb;
-  --border: #e8e6df;
+  /* Surfaces */
+  --bg: #fff6ee;
+  --bg-elevated: #ffffff;
+  --card: #ffffff;
+  --surface-tint: #ffe9d6;
+  --border: #f0e3d4;
+  --hairline: rgba(20, 20, 20, 0.06);
+
+  /* Text */
   --text: #1a1a18;
-  --muted: #888780;
-  --faint: #d3d1c7;
-  --subtle: #b4b2a9;
+  --muted: #7a7065;
+  --faint: #d8c9b8;
+  --subtle: #b8a999;
+
+  /* Brand (coral / warm) */
+  --brand: #ff7a3d;
+  --brand-soft: #fff0e3;
+  --brand-grad-from: #ff7a3d;
+  --brand-grad-to: #ffb070;
+  --brand-shadow: 0 8px 24px rgba(255, 122, 61, 0.32);
+
+  /* Secondary accents */
+  --accent: #7c5cff;
+  --accent-soft: #efeaff;
+  --success: #22c55e;
+  --success-soft: #dcfce7;
+  --warning: #f59e0b;
+  --warning-soft: #fef3c7;
+  --danger: #ef4444;
+  --danger-soft: #fee2e2;
+  --accent-warm: #fbbf24;
+
+  /* Tinted card variants for stat cards */
+  --tint-peach-bg: #ffe4d1;
+  --tint-peach-fg: #b54416;
+  --tint-mint-bg: #d8f5e3;
+  --tint-mint-fg: #156a39;
+  --tint-lavender-bg: #ece4ff;
+  --tint-lavender-fg: #4d3aa3;
+  --tint-sun-bg: #fff1c2;
+  --tint-sun-fg: #8a5a00;
+
+  /* Buttons */
   --btn-bg: #1a1a18;
-  --btn-text: #f5f4ee;
-  --bar-default: #b4b2a9;
-  --bar-today: #1a1a18;
-  --bar-empty: #e8e6df;
-  --green: #1D9E75;
-  --amber: #BA7517;
-  --red: #A32D2D;
-  --red-border: #F09595;
+  --btn-text: #ffffff;
+  --btn-ghost-bg: rgba(20, 20, 20, 0.04);
+
+  /* Charts */
+  --bar-default: #ffd2b3;
+  --bar-today: #ff7a3d;
+  --bar-empty: #f0e3d4;
+
+  /* Legacy aliases (back-compat with existing code) */
+  --green: var(--success);
+  --amber: var(--warning);
+  --red: var(--danger);
+  --red-border: #fecaca;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.10);
+
+  /* Liquid Glass — only used on the floating nav and full-screen modals */
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-bg-strong: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.45);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  --glass-shadow: 0 8px 32px rgba(15, 23, 42, 0.10),
+    0 2px 6px rgba(15, 23, 42, 0.06);
+  --glass-blur: saturate(180%) blur(28px);
+
+  /* Geometry */
+  --radius-card: 24px;
+  --radius-btn: 16px;
+  --radius-pill: 999px;
+  --radius-input: 14px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #111110;
-    --card: #1c1c1a;
-    --border: #2a2a27;
-    --text: #e8e6df;
-    --muted: #8a8a82;
-    --faint: #3a3a36;
-    --subtle: #555550;
-    --btn-bg: #e8e6df;
-    --btn-text: #1a1a18;
-    --bar-default: #555550;
-    --bar-today: #e8e6df;
-    --bar-empty: #2a2a27;
+    --bg: #14110d;
+    --bg-elevated: #1f1b16;
+    --card: #1f1b16;
+    --surface-tint: #2a241d;
+    --border: #2e2820;
+    --hairline: rgba(255, 255, 255, 0.06);
+
+    --text: #f3ebde;
+    --muted: #b09e8a;
+    --faint: #4d4338;
+    --subtle: #7a6a59;
+
+    --brand: #ff8e5c;
+    --brand-soft: #2a1c12;
+    --brand-grad-from: #ff8e5c;
+    --brand-grad-to: #ffba84;
+    --brand-shadow: 0 8px 24px rgba(255, 142, 92, 0.36);
+
+    --accent: #9b85ff;
+    --accent-soft: #1f1a3a;
+    --success: #34d670;
+    --success-soft: #0d2c19;
+    --warning: #fbbf24;
+    --warning-soft: #2a1f08;
+    --danger: #f87171;
+    --danger-soft: #2a1313;
+    --accent-warm: #fbbf24;
+
+    --tint-peach-bg: #3a2519;
+    --tint-peach-fg: #ffb38a;
+    --tint-mint-bg: #163320;
+    --tint-mint-fg: #80e9a8;
+    --tint-lavender-bg: #221a3a;
+    --tint-lavender-fg: #b8a8ff;
+    --tint-sun-bg: #2f2510;
+    --tint-sun-fg: #ffd874;
+
+    --btn-bg: #f3ebde;
+    --btn-text: #14110d;
+    --btn-ghost-bg: rgba(255, 255, 255, 0.05);
+
+    --bar-default: #5a4030;
+    --bar-today: #ff8e5c;
+    --bar-empty: #2e2820;
+
+    --red-border: #5a2424;
+
+    --glass-bg: rgba(28, 25, 21, 0.55);
+    --glass-bg-strong: rgba(28, 25, 21, 0.72);
+    --glass-border: rgba(255, 255, 255, 0.10);
+    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45),
+      0 2px 6px rgba(0, 0, 0, 0.25);
   }
 }
 
 [data-theme='dark'] {
-  --bg: #111110;
-  --card: #1c1c1a;
-  --border: #2a2a27;
-  --text: #e8e6df;
-  --muted: #8a8a82;
-  --faint: #3a3a36;
-  --subtle: #555550;
-  --btn-bg: #e8e6df;
-  --btn-text: #1a1a18;
-  --bar-default: #555550;
-  --bar-today: #e8e6df;
-  --bar-empty: #2a2a27;
+  --bg: #14110d;
+  --bg-elevated: #1f1b16;
+  --card: #1f1b16;
+  --surface-tint: #2a241d;
+  --border: #2e2820;
+  --hairline: rgba(255, 255, 255, 0.06);
+
+  --text: #f3ebde;
+  --muted: #b09e8a;
+  --faint: #4d4338;
+  --subtle: #7a6a59;
+
+  --brand: #ff8e5c;
+  --brand-soft: #2a1c12;
+  --brand-grad-from: #ff8e5c;
+  --brand-grad-to: #ffba84;
+  --brand-shadow: 0 8px 24px rgba(255, 142, 92, 0.36);
+
+  --accent: #9b85ff;
+  --accent-soft: #1f1a3a;
+  --success: #34d670;
+  --success-soft: #0d2c19;
+  --warning: #fbbf24;
+  --warning-soft: #2a1f08;
+  --danger: #f87171;
+  --danger-soft: #2a1313;
+  --accent-warm: #fbbf24;
+
+  --tint-peach-bg: #3a2519;
+  --tint-peach-fg: #ffb38a;
+  --tint-mint-bg: #163320;
+  --tint-mint-fg: #80e9a8;
+  --tint-lavender-bg: #221a3a;
+  --tint-lavender-fg: #b8a8ff;
+  --tint-sun-bg: #2f2510;
+  --tint-sun-fg: #ffd874;
+
+  --btn-bg: #f3ebde;
+  --btn-text: #14110d;
+  --btn-ghost-bg: rgba(255, 255, 255, 0.05);
+
+  --bar-default: #5a4030;
+  --bar-today: #ff8e5c;
+  --bar-empty: #2e2820;
+
+  --red-border: #5a2424;
+
+  --glass-bg: rgba(28, 25, 21, 0.55);
+  --glass-bg-strong: rgba(28, 25, 21, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.10);
+  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+html,
+body {
+  background: var(--bg);
 }
 
 body {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  background: var(--bg);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-feature-settings: 'cv11', 'ss01', 'ss03';
+  background:
+    radial-gradient(1200px 600px at 100% -10%, color-mix(in srgb, var(--brand) 10%, transparent), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
   color: var(--text);
   min-height: 100dvh;
   overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Cairo for Arabic, on the html and body so all descendants inherit. */
+/* Arabic uses Cairo — overrides Inter */
 html[lang='ar'],
 html[lang='ar'] body {
   font-family: 'Cairo', system-ui, -apple-system, sans-serif;
 }
 
-/* Section/stat labels look heavy in uppercase Arabic — disable the transform
-   so the original text reads naturally. */
+/* Numerics in either language stay tabular mono */
+.tabular {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Section labels — friendlier (no longer uppercase by default) */
 html[lang='ar'] .section-title,
 html[lang='ar'] .baseline-label,
 html[lang='ar'] .summary-label,
@@ -83,20 +243,36 @@ html[lang='ar'] .brand {
   letter-spacing: 0;
 }
 
+/* Animations */
 @keyframes pulse {
   0% { transform: scale(1); }
   50% { transform: scale(1.06); }
   100% { transform: scale(1); }
 }
-
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+@keyframes pop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255, 122, 61, 0); }
+  50% { box-shadow: 0 0 0 8px rgba(255, 122, 61, 0.18); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes confetti-fall {
+  0% { transform: translate(var(--x0, 0), 0) rotate(0); opacity: 1; }
+  100% { transform: translate(var(--x1, 60px), 240px) rotate(540deg); opacity: 0; }
 }
 
 .fade-in {

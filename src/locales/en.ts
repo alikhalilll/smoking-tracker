@@ -1,6 +1,10 @@
 const en = {
   app: {
     brand: 'Smoke tracker',
+    greet_morning: 'Good morning',
+    greet_afternoon: 'Good afternoon',
+    greet_evening: 'Good evening',
+    greet_friend: 'friend',
   },
   tabs: {
     home: 'Home',
@@ -22,6 +26,7 @@ const en = {
     smoke_free_many: '{n} days',
     reduction_value: '{pct}% lower',
     you: 'you',
+    you_rank_label: 'Your position',
     loading: 'Loading…',
     empty: 'No one’s on the board yet — be the first.',
     refresh: 'Refresh',
@@ -212,6 +217,13 @@ const en = {
     signup_confirm_sent: 'Account created. Check {email} to confirm before signing in.',
     signed_in_as: 'Signed in as {email}',
     sign_out: 'Sign out',
+    signed_in_toast: 'Signed in. Your data will sync.',
+    signed_out_toast: 'Signed out.',
+    needs_signin_headline: 'Sign in to continue',
+    needs_signin_body: 'Sign in once and your logs sync across all your devices, plus you can join the leaderboard.',
+    needs_signin_cta: 'Continue',
+    smart_signup_prompt: "Looks like you don't have an account. Create one with this password?",
+    smart_signup_confirm: 'Create account',
     status_idle: 'Not syncing',
     status_syncing: 'Syncing…',
     status_synced: 'Synced',

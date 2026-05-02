@@ -1,0 +1,213 @@
+/* Shared utility classes used across views.
+   Imported once from main.ts so every component can use them without
+   redefining the same primitives. */
+
+/* === Cards === */
+.card {
+  background: var(--card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-md);
+  padding: 18px;
+}
+.card-flat {
+  background: var(--card);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--hairline);
+  padding: 18px;
+}
+
+/* Tinted stat cards (e-learning skill-card vibe) */
+.tinted-card {
+  border-radius: var(--radius-card);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tinted-peach { background: var(--tint-peach-bg); color: var(--tint-peach-fg); }
+.tinted-mint { background: var(--tint-mint-bg); color: var(--tint-mint-fg); }
+.tinted-lavender { background: var(--tint-lavender-bg); color: var(--tint-lavender-fg); }
+.tinted-sun { background: var(--tint-sun-bg); color: var(--tint-sun-fg); }
+
+/* === Liquid Glass surfaces === */
+.glass {
+  background: var(--glass-bg);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+}
+.glass-strong {
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+}
+
+/* === Buttons === */
+.btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-btn);
+  transition: transform 0.1s ease, box-shadow 0.2s ease, background 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 20px;
+  font-size: 14px;
+  line-height: 1;
+}
+.btn:active {
+  transform: scale(0.97);
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--brand-grad-from), var(--brand-grad-to));
+  color: #fff;
+  box-shadow: var(--brand-shadow);
+}
+.btn-primary:disabled {
+  box-shadow: none;
+}
+
+.btn-ghost {
+  background: var(--btn-ghost-bg);
+  color: var(--text);
+}
+
+.btn-pill {
+  border-radius: var(--radius-pill);
+}
+
+.btn-icon {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--btn-ghost-bg);
+  color: var(--text);
+}
+
+/* === Chips === */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--surface-tint);
+  color: var(--text);
+}
+.chip-mint { background: var(--success-soft); color: var(--success); }
+.chip-warn { background: var(--warning-soft); color: var(--warning); }
+.chip-danger { background: var(--danger-soft); color: var(--danger); }
+.chip-brand { background: var(--brand-soft); color: var(--brand); }
+.chip-accent { background: var(--accent-soft); color: var(--accent); }
+
+/* === Avatar === */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 13px;
+  color: #fff;
+  flex-shrink: 0;
+}
+.avatar-lg { width: 56px; height: 56px; font-size: 18px; }
+.avatar-sm { width: 28px; height: 28px; font-size: 11px; }
+
+/* === Skeleton (shimmer) === */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--surface-tint) 0%,
+    color-mix(in srgb, var(--surface-tint) 60%, var(--card)) 50%,
+    var(--surface-tint) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+  border-radius: 12px;
+}
+
+/* === Section heading (no longer uppercase) === */
+.h-section {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+.h-section-sub {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+/* === Field (input wrappers with icon prefix) === */
+.field {
+  position: relative;
+}
+.field-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--hairline);
+  border-radius: var(--radius-input);
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.field-input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px var(--brand-soft);
+}
+.field-input.with-icon {
+  padding-inline-start: 42px;
+}
+.field-icon {
+  position: absolute;
+  inset-inline-start: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--muted);
+  pointer-events: none;
+}
+
+/* === Hairline divider === */
+.hairline {
+  height: 1px;
+  background: var(--hairline);
+}
+
+/* === Spinner === */
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

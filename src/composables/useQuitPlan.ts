@@ -7,24 +7,12 @@ import type {
   QuitProgress,
 } from '../types'
 
-function formatDate(d: Date): string {
-  return d.toISOString().split('T')[0]
-}
-
-function getToday(): string {
-  return formatDate(new Date())
-}
+import { formatLocalDate as formatDate, getToday, daysBetween } from './useDate'
 
 function addDays(dateStr: string, n: number): string {
   const d = new Date(dateStr + 'T00:00:00')
   d.setDate(d.getDate() + n)
   return formatDate(d)
-}
-
-function daysBetween(fromDate: string, toDate: string): number {
-  const from = new Date(fromDate + 'T00:00:00').getTime()
-  const to = new Date(toDate + 'T00:00:00').getTime()
-  return Math.round((to - from) / 86_400_000)
 }
 
 export const INTENSITY_DURATIONS: Record<QuitIntensity, number> = {

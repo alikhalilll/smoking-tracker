@@ -1,6 +1,10 @@
 const ar = {
   app: {
     brand: 'متعقّب التدخين',
+    greet_morning: 'صباح الخير',
+    greet_afternoon: 'مساء الخير',
+    greet_evening: 'مساء الخير',
+    greet_friend: 'صديقي',
   },
   tabs: {
     home: 'الرئيسية',
@@ -22,6 +26,7 @@ const ar = {
     smoke_free_many: '{n} أيام',
     reduction_value: 'أقل بنسبة {pct}٪',
     you: 'أنت',
+    you_rank_label: 'ترتيبك',
     loading: 'يتم التحميل…',
     empty: 'لا يوجد أحد على اللوحة بعد — كن الأول.',
     refresh: 'تحديث',
@@ -212,6 +217,13 @@ const ar = {
     signup_confirm_sent: 'تم إنشاء الحساب. افتح {email} للتأكيد قبل تسجيل الدخول.',
     signed_in_as: 'تم الدخول باسم {email}',
     sign_out: 'تسجيل الخروج',
+    signed_in_toast: 'تم تسجيل الدخول. ستبدأ المزامنة.',
+    signed_out_toast: 'تم تسجيل الخروج.',
+    needs_signin_headline: 'سجّل الدخول للمتابعة',
+    needs_signin_body: 'سجّل الدخول مرة واحدة وسجلاتك تُزامن بين كل أجهزتك، ويمكنك أيضًا الانضمام إلى لوحة الترتيب.',
+    needs_signin_cta: 'متابعة',
+    smart_signup_prompt: 'يبدو أنه ليس لديك حساب. هل تريد إنشاء حساب بكلمة السر هذه؟',
+    smart_signup_confirm: 'إنشاء الحساب',
     status_idle: 'لا توجد مزامنة',
     status_syncing: 'يتم المزامنة…',
     status_synced: 'تمت المزامنة',

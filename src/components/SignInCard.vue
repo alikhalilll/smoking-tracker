@@ -1,12 +1,20 @@
 <template>
   <div>
-    <!-- Method tabs -->
-    <div class="segmented" style="margin-bottom: 12px">
+    <!-- Animated method tabs -->
+    <div class="tab-pills" role="tablist">
+      <div
+        class="tab-pill-indicator"
+        :style="{
+          width: `${100 / authMethods.length}%`,
+          transform: `translateX(${authMethods.indexOf(authMethod) * 100}%)`,
+        }"
+      />
       <button
         v-for="m in authMethods"
         :key="m"
-        class="segmented-btn"
+        class="tab-pill"
         :class="{ active: authMethod === m }"
+        role="tab"
         @click="setAuthMethod(m)"
       >
         {{ t(`cloud.method_${m}`) }}
@@ -15,51 +23,63 @@
 
     <!-- OTP flow -->
     <template v-if="authMethod === 'otp'">
-      <div v-if="!codeSent" class="cloud-form">
-        <input
-          v-model="emailInput"
-          type="email"
-          inputmode="email"
-          autocomplete="email"
-          class="email-input"
-          :placeholder="t('cloud.email_placeholder')"
-          :disabled="signingIn"
-          @keydown.enter="onSendCode"
-        />
+      <div v-if="!codeSent">
+        <div class="field">
+          <span class="field-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 7l9 6 9-6"/></svg>
+          </span>
+          <input
+            v-model="emailInput"
+            type="email"
+            inputmode="email"
+            autocomplete="email"
+            class="field-input with-icon"
+            :placeholder="t('cloud.email_placeholder')"
+            :disabled="signingIn"
+            @keydown.enter="onSendCode"
+          />
+        </div>
         <button
-          class="primary-btn"
+          class="btn btn-primary block"
           :disabled="signingIn || !emailInput"
           @click="onSendCode"
         >
+          <span v-if="signingIn" class="spinner"></span>
           {{ signingIn ? t('cloud.sending') : t('cloud.send_code') }}
         </button>
       </div>
 
       <div v-else>
-        <div class="hint-msg" style="margin-top: 0; margin-bottom: 10px">
+        <div class="hint-msg">
           {{ t('cloud.code_sent', { email: emailInput }) }}
         </div>
-        <div class="cloud-form">
+
+        <div class="otp-row" :dir="isRtl ? 'ltr' : undefined">
           <input
-            v-model="codeInput"
+            v-for="(_, i) in 6"
+            :key="i"
+            ref="otpRefs"
             type="text"
             inputmode="numeric"
             autocomplete="one-time-code"
-            maxlength="6"
-            class="email-input"
-            :placeholder="t('cloud.code_placeholder')"
-            :disabled="verifying"
-            @keydown.enter="onVerifyCode"
+            maxlength="1"
+            class="otp-box"
+            :value="codeChars[i] || ''"
+            @input="onOtpInput(i, $event)"
+            @keydown="onOtpKey(i, $event)"
+            @paste="onOtpPaste"
           />
-          <button
-            class="primary-btn"
-            :disabled="verifying || codeInput.length < 6"
-            @click="onVerifyCode"
-          >
-            {{ verifying ? t('cloud.verifying') : t('cloud.verify') }}
-          </button>
         </div>
-        <button class="link-btn" style="margin-top: 8px" @click="onResetFlow">
+
+        <button
+          class="btn btn-primary block"
+          :disabled="verifying || codeInput.length < 6"
+          @click="onVerifyCode"
+        >
+          <span v-if="verifying" class="spinner"></span>
+          {{ verifying ? t('cloud.verifying') : t('cloud.verify') }}
+        </button>
+        <button class="btn btn-ghost block-secondary" @click="onResetFlow">
           {{ t('cloud.use_different_email') }}
         </button>
       </div>
@@ -67,60 +87,53 @@
 
     <!-- Password flow -->
     <template v-else>
-      <div class="password-form">
+      <div class="field">
+        <span class="field-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M3 7l9 6 9-6"/></svg>
+        </span>
         <input
           v-model="emailInput"
           type="email"
           inputmode="email"
           autocomplete="email"
-          class="email-input"
+          class="field-input with-icon"
           :placeholder="t('cloud.email_placeholder')"
           :disabled="signingIn"
         />
+      </div>
+      <div class="field">
+        <span class="field-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 1 1 8 0v4"/></svg>
+        </span>
         <input
           v-model="passwordInput"
           type="password"
-          :autocomplete="
-            passwordMode === 'signup' ? 'new-password' : 'current-password'
-          "
-          class="email-input"
+          autocomplete="current-password"
+          class="field-input with-icon"
           :placeholder="t('cloud.password_placeholder')"
           :disabled="signingIn"
           @keydown.enter="onPasswordSubmit"
         />
-        <button
-          class="primary-btn"
-          :disabled="signingIn || !emailInput || passwordInput.length < 6"
-          @click="onPasswordSubmit"
-        >
-          {{
-            signingIn
-              ? t('cloud.sending')
-              : passwordMode === 'signup'
-                ? t('cloud.create_account')
-                : t('cloud.sign_in')
-          }}
-        </button>
       </div>
-      <div class="password-toggle">
-        <span class="muted-line">
-          {{
-            passwordMode === 'signup'
-              ? t('cloud.have_account')
-              : t('cloud.no_account')
-          }}
+
+      <button
+        class="btn btn-primary block"
+        :disabled="signingIn || !emailInput || passwordInput.length < 6"
+        @click="onPasswordSubmit"
+      >
+        <span v-if="signingIn" class="spinner"></span>
+        {{ signingIn ? t('cloud.sending') : t('cloud.sign_in') }}
+      </button>
+
+      <!-- Smart prompt: appears when sign-in failed because the user
+           doesn't exist yet. One tap creates the account. -->
+      <div v-if="suggestSignUp" class="hint-msg signup-prompt chip chip-brand block-secondary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        <span style="flex: 1; text-align: start">
+          {{ t('cloud.smart_signup_prompt') }}
         </span>
-        <button
-          class="link-btn"
-          @click="
-            passwordMode = passwordMode === 'signup' ? 'signin' : 'signup'
-          "
-        >
-          {{
-            passwordMode === 'signup'
-              ? t('cloud.sign_in')
-              : t('cloud.create_account')
-          }}
+        <button class="chip-cta" @click="onConfirmSignUp">
+          {{ t('cloud.smart_signup_confirm') }}
         </button>
       </div>
       <div v-if="signupNeedsConfirm" class="hint-msg">
@@ -128,18 +141,23 @@
       </div>
     </template>
 
-    <div v-if="signInError" class="hint-msg" style="color: var(--red)">
-      {{ signInError }}
+    <div v-if="signInError && !suggestSignUp" class="hint-msg error-chip">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+      <span>{{ signInError }}</span>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { useI18n } from '../i18n'
 import { useAuth } from '../composables/useAuth'
 
-const { t } = useI18n()
+const emit = defineEmits<{
+  'signed-in': []
+}>()
+
+const { t, isRtl } = useI18n()
 const auth = useAuth()
 
 type AuthMethod = 'otp' | 'password'
@@ -149,19 +167,23 @@ const authMethod = ref<AuthMethod>('otp')
 const emailInput = ref('')
 const codeInput = ref('')
 const codeSent = ref(false)
+const otpRefs = ref<HTMLInputElement[]>([])
 
 const passwordInput = ref('')
-const passwordMode = ref<'signin' | 'signup'>('signin')
+const suggestSignUp = ref(false)
 const signupNeedsConfirm = ref(false)
 
 const signingIn = ref(false)
 const verifying = ref(false)
 const signInError = ref<string | null>(null)
 
+const codeChars = computed(() => codeInput.value.split(''))
+
 function setAuthMethod(m: AuthMethod): void {
   authMethod.value = m
   signInError.value = null
   signupNeedsConfirm.value = false
+  suggestSignUp.value = false
 }
 
 async function onSendCode(): Promise<void> {
@@ -170,8 +192,58 @@ async function onSendCode(): Promise<void> {
   signInError.value = null
   const result = await auth.sendOtp(emailInput.value.trim())
   signingIn.value = false
-  if (result.ok) codeSent.value = true
-  else signInError.value = result.error ?? 'Sign-in failed'
+  if (result.ok) {
+    codeSent.value = true
+    nextTick(() => otpRefs.value[0]?.focus())
+  } else {
+    signInError.value = result.error ?? 'Sign-in failed'
+  }
+}
+
+function setOtpDigit(i: number, ch: string): void {
+  const arr = codeInput.value.split('')
+  while (arr.length < 6) arr.push('')
+  arr[i] = ch
+  codeInput.value = arr.join('').slice(0, 6).replace(/\s+$/, '')
+}
+
+function onOtpInput(i: number, e: Event): void {
+  const value = (e.target as HTMLInputElement).value.replace(/\D/g, '')
+  if (!value) {
+    setOtpDigit(i, '')
+    return
+  }
+  // If a multi-char value got pasted into one box, distribute it.
+  for (let k = 0; k < value.length && i + k < 6; k++) {
+    setOtpDigit(i + k, value[k])
+  }
+  const nextIdx = Math.min(5, i + value.length)
+  otpRefs.value[nextIdx]?.focus()
+}
+
+function onOtpKey(i: number, e: KeyboardEvent): void {
+  if (e.key === 'Backspace') {
+    if (codeChars.value[i]) {
+      setOtpDigit(i, '')
+    } else if (i > 0) {
+      otpRefs.value[i - 1]?.focus()
+      setOtpDigit(i - 1, '')
+    }
+    e.preventDefault()
+  } else if (e.key === 'ArrowLeft' && i > 0) {
+    otpRefs.value[i - 1]?.focus()
+  } else if (e.key === 'ArrowRight' && i < 5) {
+    otpRefs.value[i + 1]?.focus()
+  }
+}
+
+function onOtpPaste(e: ClipboardEvent): void {
+  const text = e.clipboardData?.getData('text') ?? ''
+  const digits = text.replace(/\D/g, '').slice(0, 6)
+  if (!digits) return
+  e.preventDefault()
+  codeInput.value = digits
+  nextTick(() => otpRefs.value[Math.min(5, digits.length)]?.focus())
 }
 
 async function onVerifyCode(): Promise<void> {
@@ -184,6 +256,7 @@ async function onVerifyCode(): Promise<void> {
   )
   verifying.value = false
   if (!result.ok) signInError.value = result.error ?? 'Verification failed'
+  else emit('signed-in')
 }
 
 async function onPasswordSubmit(): Promise<void> {
@@ -191,24 +264,42 @@ async function onPasswordSubmit(): Promise<void> {
   signingIn.value = true
   signInError.value = null
   signupNeedsConfirm.value = false
-  if (passwordMode.value === 'signup') {
-    const result = await auth.signUpPassword(
-      emailInput.value.trim(),
-      passwordInput.value
-    )
-    signingIn.value = false
-    if (!result.ok) {
-      signInError.value = result.error ?? 'Sign-up failed'
-    } else if (result.needsConfirm) {
-      signupNeedsConfirm.value = true
-    }
+  suggestSignUp.value = false
+
+  const result = await auth.signInPassword(
+    emailInput.value.trim(),
+    passwordInput.value
+  )
+  signingIn.value = false
+  if (result.ok) {
+    emit('signed-in')
+    return
+  }
+  // Heuristic — if Supabase says "Invalid login credentials", offer to sign
+  // up with the same password. Other errors surface raw.
+  const msg = (result.error ?? '').toLowerCase()
+  if (msg.includes('invalid login') || msg.includes('credentials')) {
+    suggestSignUp.value = true
   } else {
-    const result = await auth.signInPassword(
-      emailInput.value.trim(),
-      passwordInput.value
-    )
-    signingIn.value = false
-    if (!result.ok) signInError.value = result.error ?? 'Sign-in failed'
+    signInError.value = result.error ?? 'Sign-in failed'
+  }
+}
+
+async function onConfirmSignUp(): Promise<void> {
+  signingIn.value = true
+  signInError.value = null
+  suggestSignUp.value = false
+  const result = await auth.signUpPassword(
+    emailInput.value.trim(),
+    passwordInput.value
+  )
+  signingIn.value = false
+  if (!result.ok) {
+    signInError.value = result.error ?? 'Sign-up failed'
+  } else if (result.needsConfirm) {
+    signupNeedsConfirm.value = true
+  } else {
+    emit('signed-in')
   }
 }
 
@@ -220,98 +311,120 @@ function onResetFlow(): void {
 </script>
 
 <style scoped>
-.segmented {
+.tab-pills {
+  position: relative;
   display: flex;
-  gap: 4px;
-  background: var(--card);
-  border-radius: 10px;
+  gap: 0;
+  background: var(--btn-ghost-bg);
+  border-radius: var(--radius-pill);
   padding: 4px;
+  margin-bottom: 18px;
 }
-.segmented-btn {
+.tab-pill-indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  inset-inline-start: 4px;
+  background: var(--card);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  width: calc((100% - 8px) / 2);
+}
+.tab-pill {
+  position: relative;
   flex: 1;
-  padding: 9px 12px;
+  padding: 10px 12px;
   border: none;
-  border-radius: 7px;
   background: transparent;
   font-family: inherit;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
   color: var(--muted);
-  transition: background 0.15s, color 0.15s;
+  border-radius: var(--radius-pill);
+  z-index: 1;
 }
-.segmented-btn.active {
-  background: var(--bg);
+.tab-pill.active {
   color: var(--text);
-  font-weight: 600;
 }
-.cloud-form {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+
+.field {
+  margin-bottom: 10px;
 }
-.password-form {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+
+.block {
+  width: 100%;
+  margin-top: 6px;
 }
-.password-toggle {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 10px;
+.block-secondary {
+  width: 100%;
   margin-top: 8px;
-}
-.email-input {
-  flex: 1;
-  min-width: 0;
-  padding: 9px 12px;
-  border: 1.5px solid var(--faint);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--text);
-  font-family: inherit;
-  font-size: 13px;
-}
-.email-input:focus {
-  outline: none;
-  border-color: var(--text);
-}
-.primary-btn {
-  padding: 9px 14px;
-  border: none;
-  border-radius: 8px;
-  background: var(--btn-bg);
-  color: var(--btn-text);
-  font-family: inherit;
   font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  flex-shrink: 0;
+  padding: 10px;
 }
-.primary-btn:disabled {
-  opacity: 0.5;
-  cursor: default;
+
+.otp-row {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0 14px;
+  justify-content: space-between;
 }
-.link-btn {
-  padding: 5px 10px;
-  border: 1.5px solid var(--faint);
-  border-radius: 6px;
-  background: transparent;
-  font-family: inherit;
-  font-size: 11px;
+.otp-box {
+  width: 100%;
+  max-width: 48px;
+  aspect-ratio: 1;
+  text-align: center;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 22px;
   font-weight: 600;
-  cursor: pointer;
+  border: 1.5px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--card);
   color: var(--text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-.muted-line {
-  font-size: 11px;
-  color: var(--subtle);
+.otp-box:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px var(--brand-soft);
 }
+
 .hint-msg {
   margin-top: 10px;
   font-size: 12px;
   color: var(--muted);
   line-height: 1.5;
+}
+.signup-prompt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.chip-cta {
+  appearance: none;
+  border: none;
+  background: var(--brand);
+  color: #fff;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 5px 10px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.error-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  border-radius: 12px;
+  font-weight: 500;
 }
 </style>
