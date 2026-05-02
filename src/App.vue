@@ -38,6 +38,8 @@
       v-else-if="view === 'history'"
       :days="days"
       :by-day="byDay"
+      :gap-stats="gapStats"
+      :day-reports="dayReports"
     />
 
     <SettingsView
@@ -78,6 +80,8 @@ const {
   last7,
   maxLast7,
   bestDay,
+  gapStats,
+  dayReports,
 } = useStats(data)
 
 // Update "time ago" every minute
