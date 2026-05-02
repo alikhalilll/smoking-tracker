@@ -317,8 +317,15 @@
           </button>
         </div>
         <div class="sync-row">
-          <span class="sync-pill" :class="`sync-${sync?.status.value ?? 'idle'}`">
-            {{ t(`cloud.status_${sync?.status.value ?? 'idle'}`) }}
+          <span
+            v-if="visibleSyncStatus"
+            class="sync-pill"
+            :class="`sync-${visibleSyncStatus}`"
+          >
+            {{ t(`cloud.status_${visibleSyncStatus}`) }}
+          </span>
+          <span v-else class="muted-line">
+            {{ t('cloud.background_sync') }}
           </span>
           <button class="link-btn" @click="onSyncNow">
             {{ t('cloud.sync_now') }}
@@ -635,6 +642,15 @@ function onResetFlow(): void {
 async function onSyncNow(): Promise<void> {
   await props.sync?.syncNow()
 }
+
+// Hide the noisy "synced" pill — the background loop ticks every minute
+// so "synced" would be the steady state. Only surface things the user
+// can act on: an error, an offline state, or an active sync in progress.
+const visibleSyncStatus = computed(() => {
+  const s = props.sync?.status.value
+  if (s === 'error' || s === 'offline' || s === 'syncing') return s
+  return null
+})
 
 function handleReset(): void {
   if (confirm(t('settings.reset_confirm'))) {

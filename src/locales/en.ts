@@ -180,6 +180,7 @@ const en = {
     status_offline: 'Offline',
     last_synced: 'Last sync {ago}',
     sync_now: 'Sync now',
+    background_sync: 'Syncing in the background',
   },
   reminders: {
     section_title: 'Smoking reminders',

@@ -258,7 +258,8 @@ export function useSync(data: Ref<AppData>): UseSync {
     { deep: true }
   )
 
-  // Mark offline when the device goes offline.
+  // Background sync triggers — keep things in sync without the user
+  // ever noticing or having to press a button.
   if (typeof window !== 'undefined') {
     window.addEventListener('online', () => {
       if (isAuthed.value) void pull()
@@ -266,6 +267,23 @@ export function useSync(data: Ref<AppData>): UseSync {
     window.addEventListener('offline', () => {
       if (status.value !== 'idle') setStatus('offline')
     })
+
+    // Re-pull whenever the app comes back to the foreground (tab focus,
+    // PWA resume, switch back from another window).
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && isAuthed.value) {
+        void pull()
+      }
+    })
+
+    // Periodic poll while the app is visible. 60s is a sensible
+    // compromise between freshness and Supabase request volume.
+    const POLL_MS = 60_000
+    setInterval(() => {
+      if (document.visibilityState !== 'visible') return
+      if (!isAuthed.value) return
+      void pull()
+    }, POLL_MS)
   }
 
   async function syncNow(): Promise<void> {

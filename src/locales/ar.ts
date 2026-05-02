@@ -180,6 +180,7 @@ const ar = {
     status_offline: 'دون اتصال',
     last_synced: 'آخر مزامنة {ago}',
     sync_now: 'مزامنة الآن',
+    background_sync: 'تتم المزامنة في الخلفية',
   },
   reminders: {
     section_title: 'تذكيرات التدخين',
