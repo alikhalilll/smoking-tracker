@@ -129,14 +129,16 @@
       </div>
     </div>
 
-    <!-- Generate report -->
-    <button
-      v-if="hasEntries"
-      class="report-btn"
-      @click="emit('open-report')"
-    >
-      {{ t('home.generate_report') }}
-    </button>
+    <!-- Generate report + Share -->
+    <div v-if="hasEntries" class="bottom-actions">
+      <button class="report-btn" @click="emit('open-report')">
+        {{ t('home.generate_report') }}
+      </button>
+      <button class="report-btn" @click="onShare">
+        {{ t('share.btn') }}
+      </button>
+    </div>
+    <div v-if="shareToast" class="share-toast">{{ shareToast }}</div>
   </div>
 </template>
 
@@ -144,6 +146,7 @@
 import { ref, computed } from 'vue'
 import { getColor } from '../composables/useStats'
 import { useI18n, intlLocale } from '../i18n'
+import { share } from '../composables/useShare'
 import type { DayBucket } from '../types'
 
 const { t } = useI18n()
@@ -218,6 +221,29 @@ function onPointerDown(e: PointerEvent): void {
 
 function onPointerUp(e: PointerEvent): void {
   ;(e.currentTarget as HTMLElement).style.transform = 'scale(1)'
+}
+
+const shareToast = ref<string | null>(null)
+
+function shareText(): string {
+  if (props.quitIsComplete && (props.smokeFreeDays ?? 0) > 0) {
+    return t('share.smoke_free', { n: props.smokeFreeDays! })
+  }
+  if (props.totalSmoked === 0) return t('share.nothing_yet')
+  return t('share.summary', {
+    total: props.totalSmoked,
+    days: props.totalDays,
+    avg: props.dailyAvg,
+    longest: '—',
+  })
+}
+
+async function onShare(): Promise<void> {
+  const result = await share({ title: 'Smoke Tracker', text: shareText() })
+  if (result.via === 'clipboard' && result.ok) {
+    shareToast.value = t('share.copied')
+    setTimeout(() => (shareToast.value = null), 2500)
+  }
 }
 </script>
 
@@ -405,10 +431,14 @@ function onPointerUp(e: PointerEvent): void {
   font-weight: 600;
   margin-top: 3px;
 }
-.report-btn {
-  width: 100%;
-  padding: 14px;
+.bottom-actions {
+  display: flex;
+  gap: 8px;
   margin: 8px 0 2rem;
+}
+.report-btn {
+  flex: 1;
+  padding: 14px;
   border: 1.5px solid var(--faint);
   border-radius: 10px;
   background: transparent;
@@ -421,5 +451,11 @@ function onPointerUp(e: PointerEvent): void {
 }
 .report-btn:active {
   background: var(--card);
+}
+.share-toast {
+  text-align: center;
+  font-size: 12px;
+  color: var(--green);
+  margin: -1rem 0 1.25rem;
 }
 </style>

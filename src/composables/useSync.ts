@@ -51,44 +51,12 @@ export function useSync(data: Ref<AppData>): UseSync {
     if (!supabase || !user.value) return
     setStatus('syncing')
 
-    const { data: serverEntries, error: entriesErr } = await supabase
-      .from('entries')
-      .select('id, time, date')
-      .order('time')
-    if (entriesErr) {
-      setStatus('error', entriesErr.message)
-      return
-    }
-
-    const localIds = new Set(data.value.entries.map((e) => e.id))
-    const serverIds = new Set(
-      (serverEntries as ServerEntry[] | null)?.map((e) => e.id) ?? []
-    )
-
-    // Pull: add any server-only entries to local (additive merge by id).
-    applyingRemote = true
-    try {
-      const newOnes =
-        (serverEntries as ServerEntry[] | null)?.filter(
-          (e) => !localIds.has(e.id)
-        ) ?? []
-      if (newOnes.length > 0) {
-        data.value.entries = [
-          ...data.value.entries,
-          ...newOnes.map((e) => ({ id: e.id, time: e.time, date: e.date })),
-        ].sort((a, b) => a.time.localeCompare(b.time))
-      }
-    } finally {
-      applyingRemote = false
-    }
-
-    // Push: send any local-only entries up using their client-generated id.
-    const toPush: SmokeEntry[] = data.value.entries.filter(
-      (e) => !serverIds.has(e.id)
-    )
-    if (toPush.length > 0) {
+    // Step 1 — push any not-yet-synced local entries first, so offline
+    // writes don't get wiped by the authoritative replace below.
+    const unsyncedLocal = data.value.entries.filter((e) => !e.synced)
+    if (unsyncedLocal.length > 0) {
       const { error: insertErr } = await supabase.from('entries').insert(
-        toPush.map((e) => ({
+        unsyncedLocal.map((e) => ({
           id: e.id,
           user_id: user.value!.id,
           time: e.time,
@@ -99,6 +67,33 @@ export function useSync(data: Ref<AppData>): UseSync {
         setStatus('error', insertErr.message)
         return
       }
+    }
+
+    // Step 2 — re-fetch the canonical server set.
+    const { data: serverEntries, error: entriesErr } = await supabase
+      .from('entries')
+      .select('id, time, date')
+      .order('time')
+    if (entriesErr) {
+      setStatus('error', entriesErr.message)
+      return
+    }
+
+    // Step 3 — REPLACE local entries with the server snapshot. The DB
+    // is the source of truth; an entry deleted on another device is
+    // gone here too once the pull lands.
+    applyingRemote = true
+    try {
+      data.value.entries = (
+        (serverEntries as ServerEntry[] | null) ?? []
+      ).map((e) => ({
+        id: e.id,
+        time: e.time,
+        date: e.date,
+        synced: true,
+      }))
+    } finally {
+      applyingRemote = false
     }
 
     // Sync the quit plan: server version wins if its updated_at is newer
@@ -159,7 +154,7 @@ export function useSync(data: Ref<AppData>): UseSync {
     )
     const localIds = new Set(data.value.entries.map((e) => e.id))
 
-    // Insert local-only by id.
+    // Insert local-only by id and mark them as synced once the server confirms.
     const toInsert: SmokeEntry[] = data.value.entries.filter(
       (e) => !serverIds.has(e.id)
     )
@@ -175,6 +170,15 @@ export function useSync(data: Ref<AppData>): UseSync {
       if (insertErr) {
         setStatus('error', insertErr.message)
         return
+      }
+      const insertedIds = new Set(toInsert.map((e) => e.id))
+      applyingRemote = true
+      try {
+        for (const e of data.value.entries) {
+          if (insertedIds.has(e.id)) e.synced = true
+        }
+      } finally {
+        applyingRemote = false
       }
     }
 

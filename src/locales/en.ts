@@ -155,6 +155,14 @@ const en = {
     subtitle: 'Your logs and quit plan are saved to your account so they’re available on every device.',
     offline_hint: 'Already signed in? You can use the app offline — sync resumes the moment you’re back online.',
   },
+  share: {
+    btn: 'Share',
+    copied: 'Copied to clipboard',
+    smoke_free: 'I’ve gone {n} days smoke-free with Smoke Tracker.',
+    quit_progress: 'Day {day} of my {duration}-day quit plan — averaging {avg} cigarettes/day.',
+    summary: '{total} logged over {days} days, averaging {avg}/day. Longest gap: {longest}.',
+    nothing_yet: 'I just started tracking my smoking habits with Smoke Tracker.',
+  },
   cloud: {
     section: 'Cloud sync',
     not_configured: 'Cloud sync isn’t set up for this build. See SUPABASE_SETUP.md to enable it.',

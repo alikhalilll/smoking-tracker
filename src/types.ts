@@ -5,6 +5,12 @@ export interface SmokeEntry {
   time: string
   /** YYYY-MM-DD */
   date: string
+  /**
+   * True once this entry is confirmed to live on the server. Local-only
+   * (offline-created) entries have synced=false until the next push.
+   * Optional for backward compatibility with pre-sync local data.
+   */
+  synced?: boolean
 }
 
 export interface AppData {
