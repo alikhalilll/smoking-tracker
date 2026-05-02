@@ -150,6 +150,11 @@ const en = {
     github: 'GitHub',
     linkedin: 'LinkedIn',
   },
+  login: {
+    title: 'Sign in to continue',
+    subtitle: 'Your logs and quit plan are saved to your account so they’re available on every device.',
+    offline_hint: 'Already signed in? You can use the app offline — sync resumes the moment you’re back online.',
+  },
   cloud: {
     section: 'Cloud sync',
     not_configured: 'Cloud sync isn’t set up for this build. See SUPABASE_SETUP.md to enable it.',
@@ -198,6 +203,10 @@ const en = {
     test_title: 'Test notification',
     test_body: 'If you’re reading this, reminders will work on this device.',
     test_unsupported: 'Notifications aren’t supported on this device or browser.',
+    language_label: 'Notification language',
+    lang_auto: 'Auto',
+    lang_en: 'English',
+    lang_ar: 'العربية',
   },
 } as const
 
