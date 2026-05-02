@@ -32,6 +32,14 @@ export interface UseAuth {
     email: string,
     token: string
   ) => Promise<{ ok: boolean; error?: string }>
+  signInPassword: (
+    email: string,
+    password: string
+  ) => Promise<{ ok: boolean; error?: string }>
+  signUpPassword: (
+    email: string,
+    password: string
+  ) => Promise<{ ok: boolean; error?: string; needsConfirm?: boolean }>
   signOut: () => Promise<void>
 }
 
@@ -66,6 +74,34 @@ export function useAuth(): UseAuth {
         type: 'email',
       })
       return error ? { ok: false, error: error.message } : { ok: true }
+    },
+
+    async signInPassword(
+      email: string,
+      password: string
+    ): Promise<{ ok: boolean; error?: string }> {
+      if (!supabase) return { ok: false, error: 'Supabase not configured' }
+      const { error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
+      return error ? { ok: false, error: error.message } : { ok: true }
+    },
+
+    async signUpPassword(
+      email: string,
+      password: string
+    ): Promise<{ ok: boolean; error?: string; needsConfirm?: boolean }> {
+      if (!supabase) return { ok: false, error: 'Supabase not configured' }
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+      })
+      if (error) return { ok: false, error: error.message }
+      // If email confirmation is enabled in the Supabase project, the user
+      // is created but no session is returned until they confirm.
+      const needsConfirm = !data.session
+      return { ok: true, needsConfirm }
     },
 
     async signOut(): Promise<void> {
