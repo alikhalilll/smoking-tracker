@@ -221,6 +221,18 @@ export function useStats(data: Ref<AppData>) {
 
   const last30 = computed<DayBucket[]>(() => recentDays(30))
 
+  // Days since the last logged cigarette (i.e. consecutive smoke-free days
+  // ending today). Returns 0 if they smoked today or haven't logged yet.
+  const smokeFreeDays = computed<number>(() => {
+    if (sortedEntries.value.length === 0) return 0
+    const lastDate = sortedEntries.value[sortedEntries.value.length - 1].date
+    const today = getToday()
+    if (lastDate >= today) return 0
+    const a = new Date(lastDate + 'T00:00:00').getTime()
+    const b = new Date(today + 'T00:00:00').getTime()
+    return Math.round((b - a) / 86_400_000)
+  })
+
   return {
     byDay,
     days,
@@ -238,6 +250,7 @@ export function useStats(data: Ref<AppData>) {
     hourlyDistribution,
     weekdayDistribution,
     gapDistribution,
+    smokeFreeDays,
   }
 }
 

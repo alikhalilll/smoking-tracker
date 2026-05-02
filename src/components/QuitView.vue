@@ -98,7 +98,19 @@
       </div>
 
       <div v-else-if="isComplete" class="today-card complete-card">
-        <div class="complete-headline">
+        <div class="smoke-free-hero">
+          <div class="smoke-free-number">{{ smokeFreeDays }}</div>
+          <div class="smoke-free-label">
+            {{
+              smokeFreeDays === 1
+                ? t('quit.smoke_free_days_one')
+                : t('quit.smoke_free_days_many', { n: smokeFreeDays })
+            }}
+          </div>
+          <div class="smoke-free-sub">{{ t('quit.smoke_free_since') }}</div>
+        </div>
+
+        <div class="complete-headline" style="margin-top: 1rem">
           {{
             (progress?.successRate ?? 0) >= 0.7
               ? t('quit.complete_strong')
@@ -227,6 +239,7 @@ interface Props {
   planDays: QuitDay[]
   progress: QuitProgress | null
   suggestedBaseline: number
+  smokeFreeDays: number
 }
 
 const props = defineProps<Props>()
@@ -574,8 +587,29 @@ function shortDate(dateStr: string): string {
   text-align: center;
   padding: 28px 18px;
 }
+.smoke-free-hero {
+  padding: 12px 0 6px;
+}
+.smoke-free-number {
+  font-size: 64px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+}
+.smoke-free-label {
+  font-size: 13px;
+  color: var(--text);
+  margin-top: 6px;
+  font-weight: 500;
+}
+.smoke-free-sub {
+  font-size: 11px;
+  color: var(--subtle);
+  margin-top: 2px;
+}
 .complete-headline {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 600;
 }
 .complete-sub {

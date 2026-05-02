@@ -199,13 +199,45 @@ async function sendTest(): Promise<void> {
     alert(t('reminders.test_unsupported'))
     return
   }
-  const ok = await reminders.sendTest({
+  const result = await reminders.sendTest({
     title: t('reminders.test_title'),
     body: t('reminders.test_body'),
   })
-  if (!ok && reminders.permission.value === 'denied') {
-    alert(t('reminders.permission_denied'))
+  if (result.ok) return
+
+  const isStandalone =
+    typeof window !== 'undefined' &&
+    (window.matchMedia('(display-mode: standalone)').matches ||
+      // iOS Safari standalone flag
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (window.navigator as any).standalone === true)
+
+  const lines = [
+    `Test notification could not be sent.`,
+    ``,
+    `Reason: ${result.reason ?? 'unknown'}`,
+    `Permission: ${reminders.permission.value}`,
+    `Standalone (PWA): ${isStandalone}`,
+    `User agent: ${navigator.userAgent}`,
+  ]
+  if (result.via) lines.push(`Detail: ${result.via}`)
+
+  if (
+    /iPhone|iPad|iPod/.test(navigator.userAgent) &&
+    !isStandalone
+  ) {
+    lines.push(
+      ``,
+      `On iPhone/iPad, notifications only work after you Add to Home Screen and open the app from that icon.`
+    )
   }
+  if (result.reason === 'PERMISSION_DENIED') {
+    lines.push(
+      ``,
+      `Permission was denied. You'll need to re-enable notifications for this site in your browser settings, then try again.`
+    )
+  }
+  alert(lines.join('\n'))
 }
 
 function handleReset(): void {

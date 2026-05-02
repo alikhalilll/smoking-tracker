@@ -1,8 +1,25 @@
 <template>
   <div class="fade-in">
+    <!-- Smoke-free chip (after a finished plan) -->
+    <button
+      v-if="quitIsComplete && (smokeFreeDays ?? 0) > 0"
+      class="quit-chip chip-on"
+      @click="emit('open-quit')"
+    >
+      <span class="chip-label">{{ t('quit.smoke_free_chip') }}</span>
+      <span class="chip-value">
+        {{ smokeFreeDays }}
+        {{
+          smokeFreeDays === 1
+            ? t('quit.smoke_free_days_one')
+            : t('quit.smoke_free_days_many')
+        }}
+      </span>
+    </button>
+
     <!-- Quit-plan chip -->
     <button
-      v-if="quitTodayTarget != null"
+      v-else-if="quitTodayTarget != null"
       class="quit-chip"
       :class="{
         'chip-on': quitTodayStatus === 'on-track',
@@ -143,6 +160,8 @@ interface Props {
   hasEntries: boolean
   quitTodayTarget?: number | null
   quitTodayStatus?: 'on-track' | 'over' | null
+  quitIsComplete?: boolean
+  smokeFreeDays?: number
 }
 
 const props = defineProps<Props>()

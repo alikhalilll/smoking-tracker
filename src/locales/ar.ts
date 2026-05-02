@@ -78,6 +78,10 @@ const ar = {
     target_short: 'الهدف {n}',
     week_label: 'الأسبوع {n}',
     week_summary: 'الأهداف {first}→{last}',
+    smoke_free_days_one: 'يوم بدون تدخين',
+    smoke_free_days_many: 'أيام بدون تدخين',
+    smoke_free_since: 'منذ إنهاء خطتك',
+    smoke_free_chip: 'بدون تدخين',
     intensities: {
       quick: { label: 'سريع — ٧ أيام', blurb: 'تدرّج حاد. للذين يريدون الانتهاء بسرعة.' },
       standard: { label: 'قياسي — ١٤ يومًا', blurb: 'تخفيض متساوٍ على مدار أسبوعين. الخيار الافتراضي.' },
@@ -141,8 +145,9 @@ const ar = {
     days: 'قبل {n}ي',
   },
   footer: {
-    made_by: 'صنع بواسطة علي خليل',
+    copyright: '© {from}–{to} علي خليل',
     portfolio: 'الموقع الشخصي',
+    github: 'جيت‌هاب',
     linkedin: 'لينكدإن',
   },
   reminders: {

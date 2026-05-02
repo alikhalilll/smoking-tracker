@@ -64,31 +64,46 @@ function clearTimer(): void {
   }
 }
 
-function showNotification(title: string, body: string): void {
-  if (typeof Notification === 'undefined') return
-  if (permission.value !== 'granted') return
-  try {
-    if (
-      typeof navigator !== 'undefined' &&
-      navigator.serviceWorker?.controller
-    ) {
-      navigator.serviceWorker.ready
-        .then((reg) =>
-          reg.showNotification(title, {
-            body,
-            icon: '/smoking-tracker/icon-192.png',
-            badge: '/smoking-tracker/icon-192.png',
-            tag: 'smoke-reminder',
-          })
-        )
-        .catch(() => {
-          new Notification(title, { body, icon: '/smoking-tracker/icon-192.png', tag: 'smoke-reminder' })
-        })
-    } else {
-      new Notification(title, { body, icon: '/smoking-tracker/icon-192.png', tag: 'smoke-reminder' })
+const ICON_URL = `${import.meta.env.BASE_URL}icon-192.png`
+
+async function showNotification(
+  title: string,
+  body: string
+): Promise<boolean> {
+  if (typeof Notification === 'undefined') {
+    console.warn('[reminders] Notification API not available')
+    return false
+  }
+  if (permission.value !== 'granted') {
+    console.warn('[reminders] permission not granted:', permission.value)
+    return false
+  }
+
+  // Prefer the service worker path. iOS Safari (16.4+ in PWA mode) ONLY
+  // supports notifications via ServiceWorkerRegistration.showNotification —
+  // calling `new Notification()` directly throws there.
+  if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.ready
+      await reg.showNotification(title, {
+        body,
+        icon: ICON_URL,
+        badge: ICON_URL,
+        tag: 'smoke-reminder',
+        renotify: true,
+      } as NotificationOptions)
+      return true
+    } catch (err) {
+      console.warn('[reminders] SW notification failed, falling back:', err)
     }
-  } catch {
-    // ignore notification errors
+  }
+
+  try {
+    new Notification(title, { body, icon: ICON_URL, tag: 'smoke-reminder' })
+    return true
+  } catch (err) {
+    console.warn('[reminders] Notification constructor failed:', err)
+    return false
   }
 }
 
@@ -100,8 +115,12 @@ export interface UseReminders {
   setGap: (minutes: number) => void
   /** Schedule the next reminder. Call after each log, or to (re)start the cycle. */
   scheduleNext: (titleAndBody: { title: string; body: string }) => void
-  /** Fire one notification immediately, regardless of the schedule. */
-  sendTest: (titleAndBody: { title: string; body: string }) => Promise<boolean>
+  /** Fire one notification immediately. Returns a diagnostic object so the UI can show a meaningful error. */
+  sendTest: (titleAndBody: { title: string; body: string }) => Promise<{
+    ok: boolean
+    reason?: string
+    via?: string
+  }>
   cancel: () => void
 }
 
@@ -134,7 +153,7 @@ export function useReminders(): UseReminders {
     if (permission.value !== 'granted') return
     const ms = settings.value.gapMinutes * 60_000
     timerId = setTimeout(() => {
-      showNotification(payload.title, payload.body)
+      void showNotification(payload.title, payload.body)
       // Re-arm so reminders continue while the app is open.
       scheduleNext(payload)
     }, ms)
@@ -147,14 +166,56 @@ export function useReminders(): UseReminders {
   async function sendTest(payload: {
     title: string
     body: string
-  }): Promise<boolean> {
-    if (typeof Notification === 'undefined') return false
-    if (permission.value !== 'granted') {
-      await requestPermission()
+  }): Promise<{ ok: boolean; reason?: string; via?: string }> {
+    if (typeof Notification === 'undefined') {
+      return { ok: false, reason: 'API_UNAVAILABLE' }
     }
-    if (permission.value !== 'granted') return false
-    showNotification(payload.title, payload.body)
-    return true
+    // Always re-read live permission in case it changed in browser settings.
+    permission.value = Notification.permission
+
+    if (permission.value !== 'granted') {
+      try {
+        const result = await Notification.requestPermission()
+        permission.value = result
+      } catch (err) {
+        console.error('[reminders] requestPermission threw:', err)
+        return { ok: false, reason: 'REQUEST_THREW' }
+      }
+    }
+    if (permission.value !== 'granted') {
+      return { ok: false, reason: `PERMISSION_${permission.value.toUpperCase()}` }
+    }
+
+    // Try plain Notification first — works on macOS Safari/Chrome/Firefox tabs.
+    try {
+      new Notification(payload.title, {
+        body: payload.body,
+        icon: ICON_URL,
+        tag: 'smoke-reminder',
+      })
+      return { ok: true, via: 'CONSTRUCTOR' }
+    } catch (err) {
+      console.warn('[reminders] Notification ctor failed, trying SW:', err)
+    }
+
+    // Fall back to service worker — required on iOS Safari PWA.
+    if ('serviceWorker' in navigator) {
+      try {
+        const reg = await navigator.serviceWorker.ready
+        await reg.showNotification(payload.title, {
+          body: payload.body,
+          icon: ICON_URL,
+          badge: ICON_URL,
+          tag: 'smoke-reminder',
+          renotify: true,
+        } as NotificationOptions)
+        return { ok: true, via: 'SW' }
+      } catch (err) {
+        console.error('[reminders] SW showNotification failed:', err)
+        return { ok: false, reason: 'SW_FAILED', via: String(err) }
+      }
+    }
+    return { ok: false, reason: 'NO_PATH' }
   }
 
   return {

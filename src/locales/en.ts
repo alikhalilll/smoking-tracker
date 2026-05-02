@@ -78,6 +78,10 @@ const en = {
     target_short: 'target {n}',
     week_label: 'Week {n}',
     week_summary: 'targets {first}→{last}',
+    smoke_free_days_one: 'day smoke-free',
+    smoke_free_days_many: 'days smoke-free',
+    smoke_free_since: 'since you finished your plan',
+    smoke_free_chip: 'Smoke-free',
     intensities: {
       quick: { label: 'Quick — 7 days', blurb: 'Steepest taper. For when you want to be done fast.' },
       standard: { label: 'Standard — 14 days', blurb: 'Even reduction over two weeks. A solid default.' },
@@ -141,8 +145,9 @@ const en = {
     days: '{n}d ago',
   },
   footer: {
-    made_by: 'Made by Ali Khalil',
+    copyright: '© {from}–{to} Ali Khalil',
     portfolio: 'Portfolio',
+    github: 'GitHub',
     linkedin: 'LinkedIn',
   },
   reminders: {

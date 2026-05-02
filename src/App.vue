@@ -32,6 +32,8 @@
       :has-entries="data.entries.length > 0"
       :quit-today-target="quit.todayTarget.value"
       :quit-today-status="quit.todayStatus.value"
+      :quit-is-complete="quit.isComplete.value"
+      :smoke-free-days="smokeFreeDays"
       @log="handleLog"
       @undo="undoLast"
       @open-report="showReport = true"
@@ -58,6 +60,7 @@
       :plan-days="quit.planDays.value"
       :progress="quit.progress.value"
       :suggested-baseline="quit.suggestedBaseline.value"
+      :smoke-free-days="smokeFreeDays"
       @start="handleStartQuit"
       @abandon="abandonQuitPlan"
     />
@@ -86,25 +89,27 @@
       @close="showReport = false"
     />
 
-    <!-- Footer -->
+    <!-- Footer (matches portfolio style: copyright left, links right) -->
     <footer class="app-footer">
-      <div class="made-by">{{ t('footer.made_by') }}</div>
+      <div class="copyright">
+        {{ t('footer.copyright', { from: 2019, to: currentYear }) }}
+      </div>
       <div class="footer-links">
         <a
           href="https://alikhalilll.github.io/"
           target="_blank"
           rel="noopener noreferrer"
-        >
-          {{ t('footer.portfolio') }}
-        </a>
-        <span class="footer-dot">·</span>
+        >{{ t('footer.portfolio') }}</a>
+        <a
+          href="https://github.com/alikhalilll"
+          target="_blank"
+          rel="noopener noreferrer"
+        >{{ t('footer.github') }}</a>
         <a
           href="https://www.linkedin.com/in/alikhalilll/"
           target="_blank"
           rel="noopener noreferrer"
-        >
-          {{ t('footer.linkedin') }}
-        </a>
+        >{{ t('footer.linkedin') }}</a>
       </div>
     </footer>
   </div>
@@ -165,6 +170,7 @@ const {
   hourlyDistribution,
   weekdayDistribution,
   gapDistribution,
+  smokeFreeDays,
 } = stats
 
 const quit = useQuitPlan(data, byDay, dailyAvg)
@@ -235,6 +241,8 @@ function handleReset(): void {
   resetAll()
   view.value = 'home'
 }
+
+const currentYear = new Date().getFullYear()
 </script>
 
 <style scoped>
@@ -291,38 +299,32 @@ function handleReset(): void {
   margin-top: 2rem;
   padding: 1.25rem 0 1.5rem;
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
   align-items: center;
-  gap: 6px;
-  text-align: center;
+  gap: 12px;
+  font-size: 12px;
+  flex-wrap: wrap;
 }
-.made-by {
-  font-size: 11px;
+.copyright {
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 .footer-links {
   display: flex;
-  gap: 8px;
+  gap: 14px;
   align-items: center;
-  font-size: 12px;
 }
 .footer-links a {
   color: var(--text);
   text-decoration: none;
-  border-bottom: 1px solid var(--faint);
-  padding-bottom: 1px;
-  transition: border-color 0.15s;
+  transition: color 0.15s;
 }
 .footer-links a:hover {
-  border-bottom-color: var(--text);
+  color: var(--muted);
 }
-.footer-dot {
-  color: var(--subtle);
-}
-html[lang='ar'] .made-by {
-  text-transform: none;
-  letter-spacing: 0;
+@media (max-width: 380px) {
+  .app-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 </style>
