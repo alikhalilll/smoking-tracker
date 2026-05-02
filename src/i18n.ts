@@ -62,6 +62,18 @@ export function t(
   return interpolate(found, params)
 }
 
+/** Look up a key in a specific locale, regardless of the current app locale. */
+export function tIn(
+  loc: Locale,
+  key: string,
+  params?: Record<string, string | number>
+): string {
+  const dict = LOCALES[loc]
+  const found = getPath(dict, key)
+  if (typeof found !== 'string') return key
+  return interpolate(found, params)
+}
+
 export function tArray(key: string): readonly string[] {
   const dict = LOCALES[currentLocale.value]
   const found = getPath(dict, key)

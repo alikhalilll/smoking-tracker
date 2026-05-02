@@ -1,5 +1,15 @@
 <template>
-  <div class="app-shell">
+  <!-- Mandatory login screen when Supabase is configured -->
+  <LoginGate
+    v-if="supabaseConfigured && !auth.isAuthed.value && !auth.loading.value"
+  />
+
+  <!-- Brief splash while we check the persisted session -->
+  <div v-else-if="supabaseConfigured && auth.loading.value" class="splash">
+    <div class="splash-brand">{{ t('app.brand') }}</div>
+  </div>
+
+  <div v-else class="app-shell">
     <!-- Header -->
     <div class="header">
       <div class="brand">{{ t('app.brand') }}</div>
@@ -121,15 +131,17 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useStorage } from './composables/useStorage'
 import { useStats, timeAgo } from './composables/useStats'
 import { useQuitPlan } from './composables/useQuitPlan'
-import { useReminders } from './composables/useReminders'
+import { useReminders, resolvedNotificationLocale } from './composables/useReminders'
 import { useSync } from './composables/useSync'
+import { useAuth } from './composables/useAuth'
 import { isSupabaseConfigured } from './supabase'
-import { useI18n } from './i18n'
+import { useI18n, tIn } from './i18n'
 import HomeView from './components/HomeView.vue'
 import HistoryView from './components/HistoryView.vue'
 import QuitView from './components/QuitView.vue'
 import SettingsView from './components/SettingsView.vue'
 import ReportView from './components/ReportView.vue'
+import LoginGate from './components/LoginGate.vue'
 import type { QuitIntensity } from './types'
 
 type TabId = 'home' | 'history' | 'quit' | 'settings'
@@ -145,6 +157,9 @@ const tabs: ReadonlyArray<{ id: TabId }> = [
 
 const view = ref<TabId>('home')
 const showReport = ref(false)
+
+const auth = useAuth()
+const supabaseConfigured = isSupabaseConfigured()
 
 const {
   data,
@@ -201,9 +216,12 @@ const lastSmokeText = computed<string | null>(() => {
 const reminders = useReminders()
 
 function reminderPayload(): { title: string; body: string } {
+  // Use the user's notification-language preference, which can be 'auto'
+  // (follow app locale), 'en', or 'ar'.
+  const loc = resolvedNotificationLocale()
   return {
-    title: t('reminders.notification_title'),
-    body: t('reminders.notification_body', {
+    title: tIn(loc, 'reminders.notification_title'),
+    body: tIn(loc, 'reminders.notification_body', {
       minutes: reminders.settings.value.gapMinutes,
     }),
   }
@@ -269,7 +287,16 @@ function handleStartQuit(payload: {
   startQuitPlan(payload.intensity, payload.baseline)
 }
 
-function handleReset(): void {
+async function handleReset(): Promise<void> {
+  // Wipe the server first so background pulls don't re-hydrate the data
+  // we're about to clear locally.
+  if (sync) {
+    try {
+      await sync.clearServer()
+    } catch (err) {
+      console.error('[reset] clearServer failed:', err)
+    }
+  }
   resetAll()
   view.value = 'home'
 }
@@ -325,6 +352,18 @@ const currentYear = new Date().getFullYear()
   height: 1px;
   background: var(--border);
   margin-bottom: 1.5rem;
+}
+.splash {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.splash-brand {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 .app-footer {
   border-top: 1px solid var(--border);

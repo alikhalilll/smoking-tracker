@@ -27,6 +27,8 @@ export interface UseSync {
   lastError: Ref<string | null>
   /** Force a full pull + push pass. */
   syncNow: () => Promise<void>
+  /** Immediate server-side wipe — used by the Reset action. */
+  clearServer: () => Promise<void>
 }
 
 export function useSync(data: Ref<AppData>): UseSync {
@@ -290,5 +292,33 @@ export function useSync(data: Ref<AppData>): UseSync {
     await pull()
   }
 
-  return { status, lastSyncedAt, lastError, syncNow }
+  /**
+   * Wipe the user's data on the server immediately. Called from the Reset
+   * action so the DB clear happens BEFORE any background pull can re-pull
+   * the old rows down.
+   */
+  async function clearServer(): Promise<void> {
+    if (!supabase || !user.value) return
+    setStatus('syncing')
+    const { error: entriesErr } = await supabase
+      .from('entries')
+      .delete()
+      .eq('user_id', user.value.id)
+    if (entriesErr) {
+      setStatus('error', entriesErr.message)
+      return
+    }
+    const { error: planErr } = await supabase
+      .from('quit_plans')
+      .delete()
+      .eq('user_id', user.value.id)
+    if (planErr) {
+      setStatus('error', planErr.message)
+      return
+    }
+    setStatus('synced')
+    lastSyncedAt.value = Date.now()
+  }
+
+  return { status, lastSyncedAt, lastError, syncNow, clearServer }
 }

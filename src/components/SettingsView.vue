@@ -103,6 +103,24 @@
           </button>
         </div>
 
+        <div class="info-label" style="margin: 14px 0 8px">
+          {{ t('reminders.language_label') }}
+        </div>
+        <div class="segmented">
+          <button
+            v-for="opt in NOTIFICATION_LOCALE_OPTIONS"
+            :key="opt.value"
+            class="segmented-btn"
+            :class="{
+              active:
+                reminders.settings.value.notificationLocale === opt.value,
+            }"
+            @click="onNotificationLocaleChange(opt.value)"
+          >
+            {{ t(`reminders.lang_${opt.value}`) }}
+          </button>
+        </div>
+
         <div
           v-if="reminders.permission.value !== 'granted'"
           class="permission-warning"
@@ -357,10 +375,15 @@ import { useTheme, type ThemeMode } from '../composables/useTheme'
 import {
   useReminders,
   REMINDER_GAP_OPTIONS,
+  type NotificationLocale,
 } from '../composables/useReminders'
 import { useAuth } from '../composables/useAuth'
 import { isSupabaseConfigured } from '../supabase'
 import type { UseSync } from '../composables/useSync'
+
+const NOTIFICATION_LOCALE_OPTIONS: ReadonlyArray<{
+  value: NotificationLocale
+}> = [{ value: 'auto' }, { value: 'en' }, { value: 'ar' }]
 
 interface Props {
   startDate: string
@@ -403,6 +426,11 @@ async function onToggleReminders(): Promise<void> {
 
 function onGapChange(minutes: number): void {
   reminders.setGap(minutes)
+  emit('reminders-changed')
+}
+
+function onNotificationLocaleChange(loc: NotificationLocale): void {
+  reminders.setNotificationLocale(loc)
   emit('reminders-changed')
 }
 

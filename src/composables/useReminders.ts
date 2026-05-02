@@ -1,10 +1,14 @@
 import { ref, type Ref } from 'vue'
-import { currentLocale } from '../i18n'
+import { currentLocale, type Locale } from '../i18n'
+
+export type NotificationLocale = 'auto' | Locale
 
 export interface ReminderSettings {
   enabled: boolean
   /** Minutes to wait between reminders / since last log. */
   gapMinutes: number
+  /** Language for notification text. 'auto' follows the app locale. */
+  notificationLocale: NotificationLocale
 }
 
 const STORAGE_KEY = 'smoking-tracker-reminders'
@@ -12,6 +16,7 @@ const STORAGE_KEY = 'smoking-tracker-reminders'
 const DEFAULT_SETTINGS: ReminderSettings = {
   enabled: false,
   gapMinutes: 30,
+  notificationLocale: 'auto',
 }
 
 function load(): ReminderSettings {
@@ -19,12 +24,16 @@ function load(): ReminderSettings {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...DEFAULT_SETTINGS }
     const parsed = JSON.parse(raw) as Partial<ReminderSettings>
+    const loc = parsed.notificationLocale
+    const validLoc: NotificationLocale =
+      loc === 'auto' || loc === 'en' || loc === 'ar' ? loc : 'auto'
     return {
       enabled: !!parsed.enabled,
       gapMinutes:
         typeof parsed.gapMinutes === 'number' && parsed.gapMinutes > 0
           ? parsed.gapMinutes
           : DEFAULT_SETTINGS.gapMinutes,
+      notificationLocale: validLoc,
     }
   } catch {
     return { ...DEFAULT_SETTINGS }
@@ -126,8 +135,15 @@ async function playChime(): Promise<void> {
 /** Tab the app should switch to when the user clicks a reminder notification. */
 const REMINDER_ROUTE = 'quit'
 
+/** Resolve the user's notification locale preference to a concrete locale. */
+export function resolvedNotificationLocale(): Locale {
+  const pref = settings.value.notificationLocale
+  if (pref === 'en' || pref === 'ar') return pref
+  return currentLocale.value
+}
+
 function localeDir(): 'rtl' | 'ltr' {
-  return currentLocale.value === 'ar' ? 'rtl' : 'ltr'
+  return resolvedNotificationLocale() === 'ar' ? 'rtl' : 'ltr'
 }
 
 function emitNotificationClick(): void {
@@ -211,6 +227,7 @@ export interface UseReminders {
   requestPermission: () => Promise<void>
   setEnabled: (b: boolean) => void
   setGap: (minutes: number) => void
+  setNotificationLocale: (loc: NotificationLocale) => void
   /** Schedule the next reminder. Call after each log, or to (re)start the cycle. */
   scheduleNext: (titleAndBody: { title: string; body: string }) => void
   /** Fire one notification immediately. Returns a diagnostic object so the UI can show a meaningful error. */
@@ -243,6 +260,11 @@ export function useReminders(): UseReminders {
     settings.value = { ...settings.value, gapMinutes: minutes }
     save(settings.value)
     // Caller is expected to scheduleNext to restart the cycle with the new gap.
+  }
+
+  function setNotificationLocale(loc: NotificationLocale): void {
+    settings.value = { ...settings.value, notificationLocale: loc }
+    save(settings.value)
   }
 
   function scheduleNext(payload: { title: string; body: string }): void {
@@ -336,6 +358,7 @@ export function useReminders(): UseReminders {
     requestPermission,
     setEnabled,
     setGap,
+    setNotificationLocale,
     scheduleNext,
     sendTest,
     cancel,
