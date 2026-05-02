@@ -34,6 +34,16 @@ export const INTENSITY_DURATIONS: Record<QuitIntensity, number> = {
   extended: 50,
 }
 
+export const ALL_INTENSITIES: ReadonlyArray<QuitIntensity> = [
+  'quick',
+  'standard',
+  'gradual',
+  'extended',
+]
+
+// Kept for backward-compatibility with components that haven't been
+// migrated to the i18n dict yet. New code should prefer
+// t(`quit.intensities.${intensity}.label`) and t(`...blurb`).
 export const INTENSITY_LABELS: Record<QuitIntensity, string> = {
   quick: 'Quick — 7 days',
   standard: 'Standard — 14 days',

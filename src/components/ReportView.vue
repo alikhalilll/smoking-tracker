@@ -3,40 +3,44 @@
     <div class="report-panel">
       <div class="report-top">
         <div>
-          <div class="brand">Full report</div>
-          <div class="generated-at">Generated {{ generatedAt }}</div>
+          <div class="brand">{{ t('report.title') }}</div>
+          <div class="generated-at">
+            {{ t('report.generated_at', { when: generatedAt }) }}
+          </div>
         </div>
-        <button class="close-btn" @click="emit('close')">Close</button>
+        <button class="close-btn" @click="emit('close')">
+          {{ t('report.close') }}
+        </button>
       </div>
 
       <!-- Summary -->
       <section class="report-section">
-        <div class="section-title">Summary</div>
+        <div class="section-title">{{ t('report.summary') }}</div>
         <div class="summary-grid">
           <div class="summary-card">
-            <div class="summary-label">Total logged</div>
+            <div class="summary-label">{{ t('home.total_logged') }}</div>
             <div class="summary-value">{{ totalSmoked }}</div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Days tracked</div>
+            <div class="summary-label">{{ t('home.days_tracked') }}</div>
             <div class="summary-value">{{ totalDays }}</div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Daily avg</div>
+            <div class="summary-label">{{ t('home.daily_avg') }}</div>
             <div class="summary-value">{{ dailyAvg }}</div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Logged gaps</div>
+            <div class="summary-label">{{ t('report.logged_gaps') }}</div>
             <div class="summary-value">{{ gapStats.count }}</div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Avg gap</div>
+            <div class="summary-label">{{ t('history.avg_gap') }}</div>
             <div class="summary-value">
               {{ formatDuration(gapStats.avg) }}
             </div>
           </div>
           <div class="summary-card">
-            <div class="summary-label">Longest gap</div>
+            <div class="summary-label">{{ t('history.longest_gap') }}</div>
             <div class="summary-value">
               {{ formatDuration(gapStats.longest) }}
             </div>
@@ -46,7 +50,7 @@
 
       <!-- Daily timeline -->
       <section class="report-section">
-        <div class="section-title">Last 30 days</div>
+        <div class="section-title">{{ t('report.last_30_days') }}</div>
         <div class="daily-chart">
           <div
             v-for="d in last30"
@@ -76,7 +80,7 @@
 
       <!-- Hourly distribution -->
       <section class="report-section">
-        <div class="section-title">By hour of day</div>
+        <div class="section-title">{{ t('report.by_hour') }}</div>
         <div class="hour-chart">
           <div v-for="b in hourlyDistribution" :key="b.hour" class="hour-col">
             <div
@@ -96,14 +100,14 @@
           <span>23</span>
         </div>
         <div class="muted-line">
-          Peak hour:
+          {{ t('report.peak_hour') }}
           <strong>{{ peakHourLabel }}</strong>
         </div>
       </section>
 
       <!-- Weekday distribution -->
       <section class="report-section">
-        <div class="section-title">By weekday (avg)</div>
+        <div class="section-title">{{ t('report.by_weekday') }}</div>
         <div class="weekday-chart">
           <div
             v-for="b in weekdayDistribution"
@@ -125,7 +129,7 @@
 
       <!-- Gap distribution -->
       <section class="report-section">
-        <div class="section-title">Gap distribution</div>
+        <div class="section-title">{{ t('report.gap_distribution') }}</div>
         <div class="gap-rows">
           <div v-for="b in gapDistribution" :key="b.label" class="gap-row">
             <div class="gap-row-label">{{ b.label }}</div>
@@ -139,7 +143,7 @@
           </div>
         </div>
         <div v-if="gapStats.count === 0" class="muted-line">
-          Not enough data yet — log a couple more entries to see gap patterns.
+          {{ t('report.not_enough_data') }}
         </div>
       </section>
 
@@ -151,6 +155,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatDuration } from '../composables/useStats'
+import { useI18n, intlLocale } from '../i18n'
 import type {
   DayBucket,
   GapDistributionBucket,
@@ -158,6 +163,8 @@ import type {
   HourBucket,
   WeekdayBucket,
 } from '../types'
+
+const { t } = useI18n()
 
 interface Props {
   totalSmoked: number
@@ -177,7 +184,7 @@ const emit = defineEmits<{
 }>()
 
 const generatedAt = computed(() =>
-  new Date().toLocaleString('en-US', {
+  new Date().toLocaleString(intlLocale(), {
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -237,7 +244,7 @@ function isToday(dateStr: string): boolean {
 }
 
 function shortDate(dateStr: string): string {
-  return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', {
+  return new Date(dateStr + 'T00:00:00').toLocaleDateString(intlLocale(), {
     month: 'short',
     day: 'numeric',
   })

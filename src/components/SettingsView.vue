@@ -1,28 +1,52 @@
 <template>
   <div class="fade-in">
-    <div class="section-title">Settings</div>
+    <div class="section-title">{{ t('settings.title') }}</div>
 
     <div class="info-card">
-      <div class="info-label">Tracking since</div>
+      <div class="info-label">{{ t('settings.tracking_since') }}</div>
       <div class="info-value">{{ startDate }}</div>
     </div>
 
     <div class="info-card">
-      <div class="info-label">Total entries</div>
+      <div class="info-label">{{ t('settings.total_entries') }}</div>
       <div class="info-value">
-        {{ totalSmoked }} cigarettes over {{ totalDays }} day{{
-          totalDays > 1 ? 's' : ''
+        {{
+          t('settings.entries_summary', {
+            smoked: totalSmoked,
+            days: totalDays,
+            s: totalDays > 1 ? 's' : '',
+          })
         }}
       </div>
     </div>
 
     <div class="info-card">
-      <div class="info-label">Average per day</div>
-      <div class="info-value">{{ dailyAvg }} cigarettes</div>
+      <div class="info-label">{{ t('settings.avg_per_day') }}</div>
+      <div class="info-value">
+        {{ t('settings.avg_value', { avg: dailyAvg }) }}
+      </div>
     </div>
 
-    <!-- Theme picker -->
-    <div class="section-title" style="margin-top: 1.75rem">Appearance</div>
+    <!-- Language -->
+    <div class="section-title" style="margin-top: 1.75rem">
+      {{ t('settings.language') }}
+    </div>
+    <div class="segmented">
+      <button
+        v-for="opt in localeOptions"
+        :key="opt.value"
+        class="segmented-btn"
+        :class="{ active: locale === opt.value }"
+        @click="setLocale(opt.value)"
+      >
+        {{ opt.label }}
+      </button>
+    </div>
+
+    <!-- Theme -->
+    <div class="section-title" style="margin-top: 1.5rem">
+      {{ t('settings.appearance') }}
+    </div>
     <div class="segmented">
       <button
         v-for="opt in themeOptions"
@@ -31,29 +55,97 @@
         :class="{ active: themeMode === opt.value }"
         @click="setTheme(opt.value)"
       >
-        {{ opt.label }}
+        {{ t(`settings.theme_${opt.value}`) }}
       </button>
     </div>
 
-    <!-- Reset -->
-    <button class="reset-btn" @click="handleReset">Reset all data</button>
-    <div class="reset-warning">
-      This will permanently delete all your tracked data, including any active
-      quit plan.
+    <!-- Reminders -->
+    <div class="section-title" style="margin-top: 1.5rem">
+      {{ t('reminders.section_title') }}
+    </div>
+    <div class="info-card">
+      <div class="reminder-row">
+        <div>
+          <div class="info-label">{{ t('reminders.enable_label') }}</div>
+          <div class="info-value">{{ t('reminders.enable_help') }}</div>
+        </div>
+        <button
+          class="toggle-btn"
+          :class="{ on: reminders.settings.value.enabled }"
+          @click="onToggleReminders"
+        >
+          {{
+            reminders.settings.value.enabled
+              ? t('reminders.on')
+              : t('reminders.off')
+          }}
+        </button>
+      </div>
+
+      <div
+        v-if="reminders.settings.value.enabled"
+        style="margin-top: 14px"
+      >
+        <div class="info-label" style="margin-bottom: 8px">
+          {{ t('reminders.gap_label') }}
+        </div>
+        <div class="segmented">
+          <button
+            v-for="opt in REMINDER_GAP_OPTIONS"
+            :key="opt.minutes"
+            class="segmented-btn"
+            :class="{
+              active: reminders.settings.value.gapMinutes === opt.minutes,
+            }"
+            @click="onGapChange(opt.minutes)"
+          >
+            {{ opt.label }}
+          </button>
+        </div>
+
+        <div
+          v-if="reminders.permission.value !== 'granted'"
+          class="permission-warning"
+        >
+          {{ t('reminders.permission_required') }}
+          <button
+            v-if="reminders.permission.value === 'default'"
+            class="link-btn"
+            @click="reminders.requestPermission()"
+          >
+            {{ t('reminders.allow_btn') }}
+          </button>
+          <span
+            v-else-if="reminders.permission.value === 'denied'"
+            class="muted-line"
+            style="margin-top: 4px"
+          >
+            {{ t('reminders.permission_denied') }}
+          </span>
+        </div>
+      </div>
     </div>
 
+    <!-- Reset -->
+    <button class="reset-btn" @click="handleReset">
+      {{ t('settings.reset_btn') }}
+    </button>
+    <div class="reset-warning">{{ t('settings.reset_warning') }}</div>
+
     <div class="pwa-info">
-      <div class="info-label">Offline mode</div>
-      <div class="info-value">
-        This app works offline as a PWA. Add it to your home screen for the best
-        experience.
-      </div>
+      <div class="info-label">{{ t('settings.offline_label') }}</div>
+      <div class="info-value">{{ t('settings.offline_value') }}</div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { useI18n, type Locale } from '../i18n'
 import { useTheme, type ThemeMode } from '../composables/useTheme'
+import {
+  useReminders,
+  REMINDER_GAP_OPTIONS,
+} from '../composables/useReminders'
 
 interface Props {
   startDate: string
@@ -66,18 +158,40 @@ defineProps<Props>()
 
 const emit = defineEmits<{
   reset: []
+  'reminders-changed': []
 }>()
 
+const { t, locale, setLocale } = useI18n()
 const { mode: themeMode, setTheme } = useTheme()
+const reminders = useReminders()
 
-const themeOptions: ReadonlyArray<{ value: ThemeMode; label: string }> = [
-  { value: 'system', label: 'System' },
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
+const localeOptions: ReadonlyArray<{ value: Locale; label: string }> = [
+  { value: 'en', label: 'English' },
+  { value: 'ar', label: 'العربية' },
 ]
 
+const themeOptions: ReadonlyArray<{ value: ThemeMode; label: string }> = [
+  { value: 'system', label: '' },
+  { value: 'light', label: '' },
+  { value: 'dark', label: '' },
+]
+
+async function onToggleReminders(): Promise<void> {
+  const next = !reminders.settings.value.enabled
+  if (next && reminders.permission.value !== 'granted') {
+    await reminders.requestPermission()
+  }
+  reminders.setEnabled(next)
+  emit('reminders-changed')
+}
+
+function onGapChange(minutes: number): void {
+  reminders.setGap(minutes)
+  emit('reminders-changed')
+}
+
 function handleReset(): void {
-  if (confirm('Delete all tracking data? This cannot be undone.')) {
+  if (confirm(t('settings.reset_confirm'))) {
     emit('reset')
   }
 }
@@ -131,6 +245,56 @@ function handleReset(): void {
   background: var(--bg);
   color: var(--text);
   font-weight: 600;
+}
+.reminder-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+.toggle-btn {
+  padding: 7px 14px;
+  border: 1.5px solid var(--faint);
+  border-radius: 8px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.toggle-btn.on {
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  border-color: var(--btn-bg);
+}
+.permission-warning {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 12px;
+  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.link-btn {
+  padding: 5px 10px;
+  border: 1.5px solid var(--faint);
+  border-radius: 6px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text);
+}
+.muted-line {
+  font-size: 11px;
+  color: var(--subtle);
 }
 .reset-btn {
   width: 100%;

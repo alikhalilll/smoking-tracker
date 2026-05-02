@@ -2,7 +2,7 @@
   <div class="app-shell">
     <!-- Header -->
     <div class="header">
-      <div class="brand">Smoke tracker</div>
+      <div class="brand">{{ t('app.brand') }}</div>
       <div class="tabs">
         <button
           v-for="tab in tabs"
@@ -11,7 +11,7 @@
           :class="{ active: view === tab.id }"
           @click="view = tab.id"
         >
-          {{ tab.label }}
+          {{ t(`tabs.${tab.id}`) }}
         </button>
       </div>
     </div>
@@ -69,6 +69,7 @@
       :total-days="totalDays"
       :daily-avg="dailyAvg"
       @reset="handleReset"
+      @reminders-changed="handleRemindersChanged"
     />
 
     <!-- Full report overlay -->
@@ -92,6 +93,8 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useStorage } from './composables/useStorage'
 import { useStats, timeAgo } from './composables/useStats'
 import { useQuitPlan } from './composables/useQuitPlan'
+import { useReminders } from './composables/useReminders'
+import { useI18n } from './i18n'
 import HomeView from './components/HomeView.vue'
 import HistoryView from './components/HistoryView.vue'
 import QuitView from './components/QuitView.vue'
@@ -101,11 +104,13 @@ import type { QuitIntensity } from './types'
 
 type TabId = 'home' | 'history' | 'quit' | 'settings'
 
-const tabs: ReadonlyArray<{ id: TabId; label: string }> = [
-  { id: 'home', label: 'Home' },
-  { id: 'history', label: 'History' },
-  { id: 'quit', label: 'Quit' },
-  { id: 'settings', label: '···' },
+const { t } = useI18n()
+
+const tabs: ReadonlyArray<{ id: TabId }> = [
+  { id: 'home' },
+  { id: 'history' },
+  { id: 'quit' },
+  { id: 'settings' },
 ]
 
 const view = ref<TabId>('home')
@@ -158,9 +163,44 @@ const lastSmokeText = computed<string | null>(() => {
   return timeAgo(lastSmoke.value)
 })
 
+const reminders = useReminders()
+
+function reminderPayload(): { title: string; body: string } {
+  return {
+    title: t('reminders.notification_title'),
+    body: t('reminders.notification_body', {
+      minutes: reminders.settings.value.gapMinutes,
+    }),
+  }
+}
+
 function handleLog(count: number): void {
   addEntries(count)
+  // Each new log resets the wait — schedule the next nudge from now.
+  reminders.scheduleNext(reminderPayload())
 }
+
+function handleRemindersChanged(): void {
+  if (reminders.settings.value.enabled) {
+    reminders.scheduleNext(reminderPayload())
+  } else {
+    reminders.cancel()
+  }
+}
+
+// Pick up a previously-enabled reminder cycle on app load.
+onMounted(() => {
+  if (
+    reminders.settings.value.enabled &&
+    reminders.permission.value === 'granted'
+  ) {
+    reminders.scheduleNext(reminderPayload())
+  }
+})
+
+onUnmounted(() => {
+  reminders.cancel()
+})
 
 function handleStartQuit(payload: {
   intensity: QuitIntensity

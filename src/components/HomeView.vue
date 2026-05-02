@@ -10,7 +10,7 @@
       }"
       @click="emit('open-quit')"
     >
-      <span class="chip-label">Quit target today</span>
+      <span class="chip-label">{{ t('home.quit_target_today') }}</span>
       <span class="chip-value">{{ todayCount }} / {{ quitTodayTarget }}</span>
     </button>
 
@@ -19,12 +19,12 @@
       <div class="counter-number" :style="{ color: countColor }">
         {{ todayCount }}
       </div>
-      <div class="counter-label">cigarettes today</div>
+      <div class="counter-label">{{ t('home.cigarettes_today') }}</div>
     </div>
 
     <!-- Last smoke -->
     <div v-if="lastSmokeText" class="last-smoke">
-      last one {{ lastSmokeText }}
+      {{ t('home.last_one', { ago: lastSmokeText }) }}
     </div>
 
     <!-- Counter selector -->
@@ -42,17 +42,23 @@
       @pointerleave="onPointerUp"
       @click="handleLog"
     >
-      Log {{ logCount }} cigarette{{ logCount > 1 ? 's' : '' }}
+      {{
+        logCount === 1
+          ? t('home.log_one')
+          : t('home.log_many', { n: logCount })
+      }}
     </button>
 
     <!-- Undo -->
     <div v-if="hasEntries" class="undo-wrap">
-      <button class="undo-btn" @click="emit('undo')">Undo last</button>
+      <button class="undo-btn" @click="emit('undo')">
+        {{ t('home.undo_last') }}
+      </button>
     </div>
 
     <!-- 7-day chart -->
     <div class="chart-section">
-      <div class="section-title">Last 7 days</div>
+      <div class="section-title">{{ t('home.last_7_days') }}</div>
       <div class="bar-chart">
         <div v-for="(d, i) in last7" :key="i" class="bar-col">
           <div
@@ -89,19 +95,19 @@
     <!-- Stats -->
     <div class="stats-grid">
       <div class="stat-card">
-        <div class="stat-label">Daily avg</div>
+        <div class="stat-label">{{ t('home.daily_avg') }}</div>
         <div class="stat-value">{{ dailyAvg }}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Total logged</div>
+        <div class="stat-label">{{ t('home.total_logged') }}</div>
         <div class="stat-value">{{ totalSmoked }}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Days tracked</div>
+        <div class="stat-label">{{ t('home.days_tracked') }}</div>
         <div class="stat-value">{{ totalDays }}</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Best day</div>
+        <div class="stat-label">{{ t('home.best_day') }}</div>
         <div class="stat-value">{{ bestDay }}</div>
       </div>
     </div>
@@ -112,7 +118,7 @@
       class="report-btn"
       @click="emit('open-report')"
     >
-      Generate full report
+      {{ t('home.generate_report') }}
     </button>
   </div>
 </template>
@@ -120,7 +126,10 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { getColor } from '../composables/useStats'
+import { useI18n, intlLocale } from '../i18n'
 import type { DayBucket } from '../types'
+
+const { t } = useI18n()
 
 interface Props {
   todayCount: number
@@ -175,9 +184,13 @@ function isToday(dateStr: string): boolean {
 }
 
 function dayAbbr(dateStr: string): string {
-  return new Date(dateStr + 'T00:00:00')
-    .toLocaleDateString('en-US', { weekday: 'short' })
-    .slice(0, 2)
+  const out = new Date(dateStr + 'T00:00:00').toLocaleDateString(
+    intlLocale(),
+    { weekday: 'short' }
+  )
+  // English already gives "Mon" — slice to two chars for compactness.
+  // Arabic short weekday names are already short, leave as-is.
+  return out.length > 3 ? out : out.slice(0, 2)
 }
 
 function onPointerDown(e: PointerEvent): void {

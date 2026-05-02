@@ -58,11 +58,29 @@
 }
 
 body {
-  font-family: 'IBM Plex Mono', monospace;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
   background: var(--bg);
   color: var(--text);
   min-height: 100dvh;
   overflow-x: hidden;
+}
+
+/* Cairo for Arabic, on the html and body so all descendants inherit. */
+html[lang='ar'],
+html[lang='ar'] body {
+  font-family: 'Cairo', system-ui, -apple-system, sans-serif;
+}
+
+/* Section/stat labels look heavy in uppercase Arabic — disable the transform
+   so the original text reads naturally. */
+html[lang='ar'] .section-title,
+html[lang='ar'] .baseline-label,
+html[lang='ar'] .summary-label,
+html[lang='ar'] .stat-label,
+html[lang='ar'] .chip-label,
+html[lang='ar'] .brand {
+  text-transform: none;
+  letter-spacing: 0;
 }
 
 @keyframes pulse {

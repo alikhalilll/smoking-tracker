@@ -241,34 +241,45 @@ export function useStats(data: Ref<AppData>) {
   }
 }
 
+import { t, intlLocale } from '../i18n'
+
 export function timeAgo(isoStr: string): string {
   const diff = Date.now() - new Date(isoStr).getTime()
   const mins = Math.floor(diff / 60_000)
-  if (mins < 1) return 'just now'
-  if (mins < 60) return `${mins}m ago`
+  if (mins < 1) return t('time_ago.just_now')
+  if (mins < 60) return t('time_ago.minutes', { n: mins })
   const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h ${mins % 60}m ago`
-  return `${Math.floor(hrs / 24)}d ago`
+  if (hrs < 24)
+    return t('time_ago.hours_minutes', { h: hrs, m: mins % 60 })
+  return t('time_ago.days', { n: Math.floor(hrs / 24) })
 }
 
 export function formatDuration(ms: number | null | undefined): string {
-  if (ms == null || isNaN(ms)) return '—'
-  if (ms < 1000) return '0s'
+  if (ms == null || isNaN(ms)) return t('duration.none')
+  if (ms < 1000) return t('duration.seconds', { n: 0 })
   const secs = Math.round(ms / 1000)
-  if (secs < 60) return `${secs}s`
+  if (secs < 60) return t('duration.seconds', { n: secs })
   const mins = Math.round(ms / 60_000)
-  if (mins < 60) return `${mins}m`
+  if (mins < 60) return t('duration.minutes', { n: mins })
   const hrs = Math.floor(mins / 60)
   const remM = mins % 60
-  if (hrs < 24) return remM > 0 ? `${hrs}h ${remM}m` : `${hrs}h`
+  if (hrs < 24) {
+    return remM > 0
+      ? t('duration.hours_minutes', { h: hrs, m: remM })
+      : t('duration.hours_only', { h: hrs })
+  }
   const days = Math.floor(hrs / 24)
   const remH = hrs % 24
-  return remH > 0 ? `${days}d ${remH}h` : `${days}d`
+  return remH > 0
+    ? t('duration.days_hours', { d: days, h: remH })
+    : t('duration.days_only', { d: days })
 }
 
 export function formatTime(isoStr: string): string {
   const d = new Date(isoStr)
-  return d.toLocaleTimeString('en-US', {
+  // hour12 in both locales — English renders "10:00 PM", Arabic renders
+  // "١٠:٠٠ ص / م" via the Arabic numbering system.
+  return d.toLocaleTimeString(intlLocale(), {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
@@ -278,10 +289,10 @@ export function formatTime(isoStr: string): string {
 export function getDayLabel(dateStr: string): string {
   const today = getToday()
   const yesterday = formatDate(new Date(Date.now() - 86_400_000))
-  if (dateStr === today) return 'Today'
-  if (dateStr === yesterday) return 'Yesterday'
+  if (dateStr === today) return t('history.today')
+  if (dateStr === yesterday) return t('history.yesterday')
   const d = new Date(dateStr + 'T00:00:00')
-  return d.toLocaleDateString('en-US', {
+  return d.toLocaleDateString(intlLocale(), {
     weekday: 'short',
     month: 'short',
     day: 'numeric',

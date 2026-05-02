@@ -1,39 +1,41 @@
 <template>
   <div class="fade-in">
     <div v-if="days.length === 0" class="empty-state">
-      No data yet. Start logging!
+      {{ t('history.empty') }}
     </div>
 
     <template v-else>
       <!-- Overall gap report -->
       <div class="report-header">
-        <div class="section-title" style="margin-bottom: 0">Gap report</div>
+        <div class="section-title" style="margin-bottom: 0">
+          {{ t('history.gap_report') }}
+        </div>
         <button class="report-btn" @click="emit('open-report')">
-          Generate full report
+          {{ t('home.generate_report') }}
         </button>
       </div>
       <div class="report-grid">
         <div class="report-card">
-          <div class="report-label">Average gap</div>
+          <div class="report-label">{{ t('history.avg_gap') }}</div>
           <div class="report-value">{{ formatDuration(gapStats.avg) }}</div>
         </div>
         <div class="report-card">
-          <div class="report-label">Median gap</div>
+          <div class="report-label">{{ t('history.median_gap') }}</div>
           <div class="report-value">{{ formatDuration(gapStats.median) }}</div>
         </div>
         <div class="report-card">
-          <div class="report-label">Longest gap</div>
+          <div class="report-label">{{ t('history.longest_gap') }}</div>
           <div class="report-value">{{ formatDuration(gapStats.longest) }}</div>
         </div>
         <div class="report-card">
-          <div class="report-label">Shortest gap</div>
+          <div class="report-label">{{ t('history.shortest_gap') }}</div>
           <div class="report-value">{{ formatDuration(gapStats.shortest) }}</div>
         </div>
       </div>
 
       <!-- Per-day breakdown -->
       <div class="section-title" style="margin-top: 1.75rem">
-        Daily breakdown
+        {{ t('history.daily_breakdown') }}
       </div>
 
       <div
@@ -63,12 +65,12 @@
         </div>
 
         <div class="day-meta">
-          <span>First {{ formatTime(dayReports[d].first) }}</span>
+          <span>{{ t('history.first_at', { time: formatTime(dayReports[d].first) }) }}</span>
           <span>·</span>
-          <span>Last {{ formatTime(dayReports[d].last) }}</span>
+          <span>{{ t('history.last_at', { time: formatTime(dayReports[d].last) }) }}</span>
           <span v-if="dayReports[d].avgGap != null">·</span>
           <span v-if="dayReports[d].avgGap != null">
-            Avg gap {{ formatDuration(dayReports[d].avgGap) }}
+            {{ t('history.avg_gap_inline', { duration: formatDuration(dayReports[d].avgGap) }) }}
           </span>
         </div>
 
@@ -80,7 +82,9 @@
           >
             <div class="entry-time">{{ formatTime(e.time) }}</div>
             <div class="entry-gap">
-              <span v-if="e.gapMs == null" class="gap-muted">first ever</span>
+              <span v-if="e.gapMs == null" class="gap-muted">
+                {{ t('history.first_ever') }}
+              </span>
               <span v-else>+{{ formatDuration(e.gapMs) }}</span>
             </div>
           </div>
@@ -100,7 +104,10 @@ import {
   formatDuration,
   formatTime,
 } from '../composables/useStats'
+import { useI18n } from '../i18n'
 import type { DayReport, GapStats } from '../types'
+
+const { t } = useI18n()
 
 interface Props {
   days: string[]
