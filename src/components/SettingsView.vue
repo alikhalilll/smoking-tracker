@@ -156,6 +156,71 @@
       </div>
     </div>
 
+    <!-- Cloud sync -->
+    <div class="section-title" style="margin-top: 1.75rem">
+      {{ t('cloud.section') }}
+    </div>
+    <div class="info-card">
+      <div v-if="!supabaseConfigured" class="info-value">
+        {{ t('cloud.not_configured') }}
+      </div>
+
+      <template v-else-if="!auth.isAuthed.value">
+        <div class="info-value" style="margin-bottom: 12px">
+          {{ t('cloud.description') }}
+        </div>
+        <div class="cloud-form">
+          <input
+            v-model="emailInput"
+            type="email"
+            class="email-input"
+            :placeholder="t('cloud.email_placeholder')"
+            :disabled="signingIn"
+            @keydown.enter="onSendLink"
+          />
+          <button
+            class="primary-btn"
+            :disabled="signingIn || !emailInput"
+            @click="onSendLink"
+          >
+            {{ signingIn ? t('cloud.sending') : t('cloud.send_link') }}
+          </button>
+        </div>
+        <div v-if="linkSent" class="link-sent-msg">
+          {{ t('cloud.link_sent') }}
+        </div>
+        <div v-if="signInError" class="link-sent-msg" style="color: var(--red)">
+          {{ signInError }}
+        </div>
+      </template>
+
+      <template v-else>
+        <div class="signed-in-row">
+          <div class="info-value">
+            {{
+              t('cloud.signed_in_as', {
+                email: auth.user.value?.email ?? '',
+              })
+            }}
+          </div>
+          <button class="link-btn" @click="auth.signOut">
+            {{ t('cloud.sign_out') }}
+          </button>
+        </div>
+        <div class="sync-row">
+          <span class="sync-pill" :class="`sync-${sync?.status.value ?? 'idle'}`">
+            {{ t(`cloud.status_${sync?.status.value ?? 'idle'}`) }}
+          </span>
+          <button class="link-btn" @click="onSyncNow">
+            {{ t('cloud.sync_now') }}
+          </button>
+        </div>
+        <div v-if="sync?.lastError.value" class="link-sent-msg" style="color: var(--red)">
+          {{ sync.lastError.value }}
+        </div>
+      </template>
+    </div>
+
     <!-- Reset -->
     <button class="reset-btn" @click="handleReset">
       {{ t('settings.reset_btn') }}
@@ -177,15 +242,19 @@ import {
   useReminders,
   REMINDER_GAP_OPTIONS,
 } from '../composables/useReminders'
+import { useAuth } from '../composables/useAuth'
+import { isSupabaseConfigured } from '../supabase'
+import type { UseSync } from '../composables/useSync'
 
 interface Props {
   startDate: string
   totalSmoked: number
   totalDays: number
   dailyAvg: number
+  sync?: UseSync | null
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 
 const emit = defineEmits<{
   reset: []
@@ -366,6 +435,32 @@ onMounted(() => {
   void refreshDiag()
 })
 
+// --- Cloud sync ---
+const auth = useAuth()
+const supabaseConfigured = isSupabaseConfigured()
+const emailInput = ref('')
+const signingIn = ref(false)
+const linkSent = ref(false)
+const signInError = ref<string | null>(null)
+
+async function onSendLink(): Promise<void> {
+  if (!emailInput.value) return
+  signingIn.value = true
+  signInError.value = null
+  linkSent.value = false
+  const result = await auth.signIn(emailInput.value.trim())
+  signingIn.value = false
+  if (result.ok) {
+    linkSent.value = true
+  } else {
+    signInError.value = result.error ?? 'Sign-in failed'
+  }
+}
+
+async function onSyncNow(): Promise<void> {
+  await props.sync?.syncNow()
+}
+
 function handleReset(): void {
   if (confirm(t('settings.reset_confirm'))) {
     emit('reset')
@@ -524,6 +619,83 @@ function handleReset(): void {
   word-break: break-all;
   color: var(--subtle);
   line-height: 1.6;
+}
+
+/* Cloud sync */
+.cloud-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.email-input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1.5px solid var(--faint);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 13px;
+}
+.email-input:focus {
+  outline: none;
+  border-color: var(--text);
+}
+.primary-btn {
+  padding: 9px 14px;
+  border: none;
+  border-radius: 8px;
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.primary-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.link-sent-msg {
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.signed-in-row,
+.sync-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.sync-row {
+  margin-top: 12px;
+}
+.sync-pill {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 5px;
+  background: var(--bg);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.sync-pill.sync-syncing {
+  color: var(--amber);
+}
+.sync-pill.sync-synced {
+  color: var(--green);
+}
+.sync-pill.sync-error {
+  color: var(--red);
+}
+.sync-pill.sync-offline {
+  color: var(--subtle);
 }
 .permission-warning {
   margin-top: 12px;
