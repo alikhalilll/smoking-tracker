@@ -1,6 +1,7 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { supabase } from '../supabase'
 import { useAuth } from './useAuth'
+import { formatLocalDate, getToday } from './useDate'
 import type { AppData, LeaderboardEntry } from '../types'
 
 const STORAGE_KEY = 'smoking-tracker-leaderboard-prefs'
@@ -64,7 +65,7 @@ function computeMetrics(data: AppData): ComputedMetrics {
       a.time.localeCompare(b.time)
     )
     const lastDate = sorted[sorted.length - 1].date
-    const today = new Date().toISOString().split('T')[0]
+    const today = getToday()
     if (lastDate < today) {
       const a = new Date(lastDate + 'T00:00:00').getTime()
       const b = new Date(today + 'T00:00:00').getTime()
@@ -86,12 +87,9 @@ function computeMetrics(data: AppData): ComputedMetrics {
 
   let recent = 0
   if (sortedDates.length > 0) {
-    const today = new Date()
     const last7 = []
     for (let i = 0; i < 7; i++) {
-      const d = new Date(today.getTime() - i * 86_400_000)
-        .toISOString()
-        .split('T')[0]
+      const d = formatLocalDate(new Date(Date.now() - i * 86_400_000))
       last7.push(byDay[d] ?? 0)
     }
     recent = last7.reduce((s, n) => s + n, 0) / 7

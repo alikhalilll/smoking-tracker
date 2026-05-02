@@ -147,6 +147,7 @@ import { ref, computed } from 'vue'
 import { getColor } from '../composables/useStats'
 import { useI18n, intlLocale } from '../i18n'
 import { share } from '../composables/useShare'
+import { getToday } from '../composables/useDate'
 import type { DayBucket } from '../types'
 
 const { t } = useI18n()
@@ -202,7 +203,7 @@ function barHeight(count: number): number {
 }
 
 function isToday(dateStr: string): boolean {
-  return dateStr === new Date().toISOString().split('T')[0]
+  return dateStr === getToday()
 }
 
 function dayAbbr(dateStr: string): string {

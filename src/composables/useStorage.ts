@@ -1,12 +1,9 @@
 import { ref, type Ref } from 'vue'
 import type { AppData, QuitIntensity, QuitPlan } from '../types'
 import { generateTargets, INTENSITY_DURATIONS } from './useQuitPlan'
+import { getToday } from './useDate'
 
 const STORAGE_KEY = 'smoking-tracker-data'
-
-function getToday(): string {
-  return new Date().toISOString().split('T')[0]
-}
 
 function getDefaultData(): AppData {
   return {

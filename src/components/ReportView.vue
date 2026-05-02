@@ -156,6 +156,7 @@
 import { computed } from 'vue'
 import { formatDuration } from '../composables/useStats'
 import { useI18n, intlLocale } from '../i18n'
+import { getToday } from '../composables/useDate'
 import type {
   DayBucket,
   GapDistributionBucket,
@@ -240,7 +241,7 @@ function gapRowWidth(count: number): number {
 }
 
 function isToday(dateStr: string): boolean {
-  return dateStr === new Date().toISOString().split('T')[0]
+  return dateStr === getToday()
 }
 
 function shortDate(dateStr: string): string {

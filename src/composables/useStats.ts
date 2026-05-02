@@ -10,13 +10,7 @@ import type {
   WeekdayBucket,
 } from '../types'
 
-function formatDate(d: Date): string {
-  return d.toISOString().split('T')[0]
-}
-
-function getToday(): string {
-  return formatDate(new Date())
-}
+import { formatLocalDate as formatDate, getToday } from './useDate'
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 

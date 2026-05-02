@@ -183,144 +183,17 @@
         {{ t('cloud.not_configured') }}
       </div>
 
-      <template v-else-if="!auth.isAuthed.value">
+      <!-- Not signed in: gated state -->
+      <template v-else-if="!isAuthed">
         <div class="info-value" style="margin-bottom: 12px">
           {{ t('cloud.description') }}
         </div>
-
-        <!-- Method tabs -->
-        <div class="segmented" style="margin-bottom: 12px">
-          <button
-            v-for="m in authMethods"
-            :key="m"
-            class="segmented-btn"
-            :class="{ active: authMethod === m }"
-            @click="setAuthMethod(m)"
-          >
-            {{ t(`cloud.method_${m}`) }}
-          </button>
-        </div>
-
-        <!-- OTP flow -->
-        <template v-if="authMethod === 'otp'">
-          <div v-if="!codeSent" class="cloud-form">
-            <input
-              v-model="emailInput"
-              type="email"
-              inputmode="email"
-              autocomplete="email"
-              class="email-input"
-              :placeholder="t('cloud.email_placeholder')"
-              :disabled="signingIn"
-              @keydown.enter="onSendCode"
-            />
-            <button
-              class="primary-btn"
-              :disabled="signingIn || !emailInput"
-              @click="onSendCode"
-            >
-              {{ signingIn ? t('cloud.sending') : t('cloud.send_code') }}
-            </button>
-          </div>
-
-          <div v-else>
-            <div class="link-sent-msg" style="margin-top: 0; margin-bottom: 10px">
-              {{ t('cloud.code_sent', { email: emailInput }) }}
-            </div>
-            <div class="cloud-form">
-              <input
-                v-model="codeInput"
-                type="text"
-                inputmode="numeric"
-                autocomplete="one-time-code"
-                maxlength="6"
-                class="email-input"
-                :placeholder="t('cloud.code_placeholder')"
-                :disabled="verifying"
-                @keydown.enter="onVerifyCode"
-              />
-              <button
-                class="primary-btn"
-                :disabled="verifying || codeInput.length < 6"
-                @click="onVerifyCode"
-              >
-                {{ verifying ? t('cloud.verifying') : t('cloud.verify') }}
-              </button>
-            </div>
-            <button class="link-btn" style="margin-top: 8px" @click="onResetFlow">
-              {{ t('cloud.use_different_email') }}
-            </button>
-          </div>
-        </template>
-
-        <!-- Password flow -->
-        <template v-else>
-          <div class="password-form">
-            <input
-              v-model="emailInput"
-              type="email"
-              inputmode="email"
-              autocomplete="email"
-              class="email-input"
-              :placeholder="t('cloud.email_placeholder')"
-              :disabled="signingIn"
-            />
-            <input
-              v-model="passwordInput"
-              type="password"
-              :autocomplete="passwordMode === 'signup' ? 'new-password' : 'current-password'"
-              class="email-input"
-              :placeholder="t('cloud.password_placeholder')"
-              :disabled="signingIn"
-              @keydown.enter="onPasswordSubmit"
-            />
-            <button
-              class="primary-btn"
-              :disabled="
-                signingIn || !emailInput || passwordInput.length < 6
-              "
-              @click="onPasswordSubmit"
-            >
-              {{
-                signingIn
-                  ? t('cloud.sending')
-                  : passwordMode === 'signup'
-                    ? t('cloud.create_account')
-                    : t('cloud.sign_in')
-              }}
-            </button>
-          </div>
-          <div class="password-toggle">
-            <span class="muted-line">
-              {{
-                passwordMode === 'signup'
-                  ? t('cloud.have_account')
-                  : t('cloud.no_account')
-              }}
-            </span>
-            <button
-              class="link-btn"
-              @click="
-                passwordMode = passwordMode === 'signup' ? 'signin' : 'signup'
-              "
-            >
-              {{
-                passwordMode === 'signup'
-                  ? t('cloud.sign_in')
-                  : t('cloud.create_account')
-              }}
-            </button>
-          </div>
-          <div v-if="signupNeedsConfirm" class="link-sent-msg">
-            {{ t('cloud.signup_confirm_sent', { email: emailInput }) }}
-          </div>
-        </template>
-
-        <div v-if="signInError" class="link-sent-msg" style="color: var(--red)">
-          {{ signInError }}
-        </div>
+        <button class="btn btn-primary block" @click="emit('open-auth')">
+          {{ t('cloud.needs_signin_cta') }}
+        </button>
       </template>
 
+      <!-- Signed in -->
       <template v-else>
         <div class="signed-in-row">
           <div class="info-value">
@@ -355,8 +228,8 @@
       </template>
     </div>
 
-    <!-- Leaderboard -->
-    <template v-if="leaderboard">
+    <!-- Leaderboard (only shown when signed in) -->
+    <template v-if="leaderboard && isAuthed">
       <div class="section-title" style="margin-top: 1.5rem">
         {{ t('leaderboard_settings.section') }}
       </div>
@@ -437,6 +310,7 @@ interface Props {
   dailyAvg: number
   sync?: UseSync | null
   leaderboard?: UseLeaderboard | null
+  isAuthed?: boolean
 }
 
 const props = defineProps<Props>()
@@ -444,7 +318,12 @@ const props = defineProps<Props>()
 const emit = defineEmits<{
   reset: []
   'reminders-changed': []
+  'open-auth': []
 }>()
+
+// Treat undefined as `false` so the gated state is the safe default
+// when this prop isn't passed.
+const isAuthed = computed(() => props.isAuthed ?? false)
 
 const { t, locale, setLocale } = useI18n()
 const { mode: themeMode, setTheme } = useTheme()
@@ -629,92 +508,11 @@ onMounted(() => {
 })
 
 // --- Cloud sync ---
+// Auth UI lives in <AuthModal> now; this view only shows the
+// signed-in summary + sync status, or a "Continue" button that
+// opens the modal via the parent's @open-auth handler.
 const auth = useAuth()
 const supabaseConfigured = isSupabaseConfigured()
-
-type AuthMethod = 'otp' | 'password'
-const authMethods: ReadonlyArray<AuthMethod> = ['otp', 'password']
-const authMethod = ref<AuthMethod>('otp')
-
-const emailInput = ref('')
-const codeInput = ref('')
-const codeSent = ref(false)
-
-const passwordInput = ref('')
-const passwordMode = ref<'signin' | 'signup'>('signin')
-const signupNeedsConfirm = ref(false)
-
-const signingIn = ref(false)
-const verifying = ref(false)
-const signInError = ref<string | null>(null)
-
-function setAuthMethod(m: AuthMethod): void {
-  authMethod.value = m
-  signInError.value = null
-  signupNeedsConfirm.value = false
-}
-
-async function onSendCode(): Promise<void> {
-  if (!emailInput.value) return
-  signingIn.value = true
-  signInError.value = null
-  const result = await auth.sendOtp(emailInput.value.trim())
-  signingIn.value = false
-  if (result.ok) {
-    codeSent.value = true
-  } else {
-    signInError.value = result.error ?? 'Sign-in failed'
-  }
-}
-
-async function onVerifyCode(): Promise<void> {
-  if (!codeInput.value) return
-  verifying.value = true
-  signInError.value = null
-  const result = await auth.verifyOtp(
-    emailInput.value.trim(),
-    codeInput.value.trim()
-  )
-  verifying.value = false
-  if (!result.ok) {
-    signInError.value = result.error ?? 'Verification failed'
-  }
-}
-
-async function onPasswordSubmit(): Promise<void> {
-  if (!emailInput.value || passwordInput.value.length < 6) return
-  signingIn.value = true
-  signInError.value = null
-  signupNeedsConfirm.value = false
-  if (passwordMode.value === 'signup') {
-    const result = await auth.signUpPassword(
-      emailInput.value.trim(),
-      passwordInput.value
-    )
-    signingIn.value = false
-    if (!result.ok) {
-      signInError.value = result.error ?? 'Sign-up failed'
-    } else if (result.needsConfirm) {
-      // Project has email confirmation on; tell the user to check inbox.
-      signupNeedsConfirm.value = true
-    }
-  } else {
-    const result = await auth.signInPassword(
-      emailInput.value.trim(),
-      passwordInput.value
-    )
-    signingIn.value = false
-    if (!result.ok) {
-      signInError.value = result.error ?? 'Sign-in failed'
-    }
-  }
-}
-
-function onResetFlow(): void {
-  codeSent.value = false
-  codeInput.value = ''
-  signInError.value = null
-}
 
 async function onSyncNow(): Promise<void> {
   await props.sync?.syncNow()
