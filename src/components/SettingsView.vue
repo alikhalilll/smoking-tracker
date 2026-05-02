@@ -370,11 +370,12 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useI18n, type Locale } from '../i18n'
+import { useI18n, tIn, type Locale } from '../i18n'
 import { useTheme, type ThemeMode } from '../composables/useTheme'
 import {
   useReminders,
   REMINDER_GAP_OPTIONS,
+  resolvedNotificationLocale,
   type NotificationLocale,
 } from '../composables/useReminders'
 import { useAuth } from '../composables/useAuth'
@@ -558,9 +559,12 @@ async function sendTest(): Promise<void> {
     await refreshDiag({ ok: false, reason: 'API_UNAVAILABLE' })
     return
   }
+  // Use the notification-language preference (Auto / EN / AR), not the
+  // app locale, so the test mirrors what real reminders will look like.
+  const loc = resolvedNotificationLocale()
   const result = await reminders.sendTest({
-    title: t('reminders.test_title'),
-    body: t('reminders.test_body'),
+    title: tIn(loc, 'reminders.test_title'),
+    body: tIn(loc, 'reminders.test_body'),
   })
   await refreshDiag(result)
 }
