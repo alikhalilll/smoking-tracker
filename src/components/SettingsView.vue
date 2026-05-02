@@ -355,6 +355,49 @@
       </template>
     </div>
 
+    <!-- Leaderboard -->
+    <template v-if="leaderboard">
+      <div class="section-title" style="margin-top: 1.5rem">
+        {{ t('leaderboard_settings.section') }}
+      </div>
+      <div class="info-card">
+        <div class="info-value" style="margin-bottom: 12px">
+          {{ t('leaderboard_settings.description') }}
+        </div>
+        <input
+          v-model="leaderboardName"
+          type="text"
+          class="email-input"
+          :placeholder="t('leaderboard_settings.display_name_placeholder')"
+          @blur="onDisplayNameBlur"
+        />
+        <div class="reminder-row" style="margin-top: 14px">
+          <div class="info-label">
+            {{ t('leaderboard_settings.enable') }}
+          </div>
+          <button
+            class="toggle-btn"
+            :class="{ on: leaderboard.prefs.value.optedIn }"
+            :disabled="!leaderboardName.trim() && !leaderboard.prefs.value.optedIn"
+            @click="onLeaderboardToggle"
+          >
+            {{
+              leaderboard.prefs.value.optedIn
+                ? t('reminders.on')
+                : t('reminders.off')
+            }}
+          </button>
+        </div>
+        <div
+          v-if="!leaderboardName.trim() && !leaderboard.prefs.value.optedIn"
+          class="muted-line"
+          style="margin-top: 8px"
+        >
+          {{ t('leaderboard_settings.enable_first') }}
+        </div>
+      </div>
+    </template>
+
     <!-- Reset -->
     <button class="reset-btn" @click="handleReset">
       {{ t('settings.reset_btn') }}
@@ -381,6 +424,7 @@ import {
 import { useAuth } from '../composables/useAuth'
 import { isSupabaseConfigured } from '../supabase'
 import type { UseSync } from '../composables/useSync'
+import type { UseLeaderboard } from '../composables/useLeaderboard'
 
 const NOTIFICATION_LOCALE_OPTIONS: ReadonlyArray<{
   value: NotificationLocale
@@ -392,6 +436,7 @@ interface Props {
   totalDays: number
   dailyAvg: number
   sync?: UseSync | null
+  leaderboard?: UseLeaderboard | null
 }
 
 const props = defineProps<Props>()
@@ -673,6 +718,28 @@ function onResetFlow(): void {
 
 async function onSyncNow(): Promise<void> {
   await props.sync?.syncNow()
+}
+
+// --- Leaderboard ---
+const leaderboardName = ref(
+  props.leaderboard?.prefs.value.displayName ?? ''
+)
+
+function onDisplayNameBlur(): void {
+  if (!props.leaderboard) return
+  const trimmed = leaderboardName.value.trim()
+  if (trimmed !== props.leaderboard.prefs.value.displayName) {
+    props.leaderboard.setDisplayName(trimmed)
+  }
+}
+
+async function onLeaderboardToggle(): Promise<void> {
+  if (!props.leaderboard) return
+  const next = !props.leaderboard.prefs.value.optedIn
+  if (next && !leaderboardName.value.trim()) return
+  // Make sure the latest typed name is saved before opting in.
+  if (next) props.leaderboard.setDisplayName(leaderboardName.value.trim())
+  await props.leaderboard.setOptIn(next)
 }
 
 // Hide the noisy "synced" pill — the background loop ticks every minute

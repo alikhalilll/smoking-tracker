@@ -46,6 +46,18 @@ export interface QuitDay {
   status: 'on-track' | 'over' | null
 }
 
+export interface LeaderboardEntry {
+  user_id: string
+  display_name: string
+  smoke_free_days: number
+  reduction_pct: number
+  total_logged: number
+  daily_avg: number
+  updated_at: string
+}
+
+export type LeaderboardMetric = 'smoke_free' | 'reduction'
+
 export interface QuitProgress {
   daysElapsed: number
   daysRemaining: number
