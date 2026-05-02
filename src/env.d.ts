@@ -11,6 +11,9 @@ declare const __BUILD_ID__: string
 
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL?: string
+  /** Newer Supabase naming — preferred. */
+  readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string
+  /** Legacy alias kept for backward compatibility. */
   readonly VITE_SUPABASE_ANON_KEY?: string
 }
 
