@@ -66,20 +66,44 @@ function clearTimer(): void {
 
 const ICON_URL = `${import.meta.env.BASE_URL}icon-192.png`
 
-// Soft two-note chime (C5 → E5, sine wave with a gentle envelope).
-// Synthesised on the fly so there's no audio file to ship or cache.
-function playChime(): void {
-  if (typeof window === 'undefined') return
+// Single shared AudioContext so iOS doesn't have to re-acquire audio focus
+// every time. Lazy-created on first call inside a user gesture.
+let chimeCtx: AudioContext | null = null
+
+function getCtx(): AudioContext | null {
+  if (typeof window === 'undefined') return null
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const Ctx = (window.AudioContext ||
     (window as any).webkitAudioContext) as typeof AudioContext | undefined
-  if (!Ctx) return
-  let ctx: AudioContext
-  try {
-    ctx = new Ctx()
-  } catch {
-    return
+  if (!Ctx) return null
+  if (!chimeCtx) {
+    try {
+      chimeCtx = new Ctx()
+    } catch {
+      return null
+    }
   }
+  return chimeCtx
+}
+
+// Soft two-note chime (C5 → E5, sine wave with a gentle envelope).
+// Synthesised on the fly so there's no audio file to ship or cache.
+async function playChime(): Promise<void> {
+  const ctx = getCtx()
+  if (!ctx) return
+
+  // iOS Safari starts the AudioContext suspended until a user gesture
+  // resumes it. Calling resume() inside a click handler thaws the
+  // context for the rest of the session.
+  if (ctx.state === 'suspended') {
+    try {
+      await ctx.resume()
+    } catch (err) {
+      console.warn('[reminders] AudioContext resume failed:', err)
+      return
+    }
+  }
+
   const now = ctx.currentTime
   const playNote = (freq: number, start: number, duration: number): void => {
     const osc = ctx.createOscillator()
@@ -87,7 +111,7 @@ function playChime(): void {
     osc.type = 'sine'
     osc.frequency.value = freq
     gain.gain.setValueAtTime(0, start)
-    gain.gain.linearRampToValueAtTime(0.12, start + 0.05)
+    gain.gain.linearRampToValueAtTime(0.18, start + 0.05)
     gain.gain.exponentialRampToValueAtTime(0.001, start + duration)
     osc.connect(gain).connect(ctx.destination)
     osc.start(start)
@@ -96,10 +120,6 @@ function playChime(): void {
   // C5, then E5 a beat later — gentle major-third chime.
   playNote(523.25, now, 0.7)
   playNote(659.25, now + 0.18, 0.85)
-  // Best-effort cleanup once the sound is done.
-  setTimeout(() => {
-    void ctx.close().catch(() => undefined)
-  }, 1500)
 }
 
 /** Tab the app should switch to when the user clicks a reminder notification. */
@@ -140,7 +160,7 @@ async function showNotification(
 
   // Always chime — independent of OS notification settings, so the user
   // hears something even if macOS suppresses the visual banner.
-  playChime()
+  void playChime()
 
   // Prefer the service worker path. iOS Safari (16.4+ in PWA mode) ONLY
   // supports notifications via ServiceWorkerRegistration.showNotification —
