@@ -29,20 +29,54 @@
 .tinted-lavender { background: var(--tint-lavender-bg); color: var(--tint-lavender-fg); }
 .tinted-sun { background: var(--tint-sun-bg); color: var(--tint-sun-fg); }
 
-/* === Liquid Glass surfaces === */
+/* === Liquid Glass surfaces ===
+   The :before pseudo-element paints a top-light "sheen" that
+   approximates how iOS 26's lensed surfaces refract incoming light.
+   The blurred backdrop + saturate boost is what does the heavy
+   lifting; the sheen and inset highlight are the finishing touches. */
 .glass {
+  position: relative;
   background: var(--glass-bg);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-highlight), var(--glass-shadow);
+  isolation: isolate;
+}
+.glass::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--glass-sheen);
+  pointer-events: none;
+  z-index: 0;
+}
+.glass > * {
+  position: relative;
+  z-index: 1;
 }
 .glass-strong {
+  position: relative;
   background: var(--glass-bg-strong);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-highlight), var(--glass-shadow);
+  isolation: isolate;
+}
+.glass-strong::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--glass-sheen);
+  pointer-events: none;
+  z-index: 0;
+}
+.glass-strong > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* === Buttons === */

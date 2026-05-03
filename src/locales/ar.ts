@@ -30,6 +30,7 @@ const ar = {
     loading: 'يتم التحميل…',
     empty: 'لا يوجد أحد على اللوحة بعد — كن الأول.',
     refresh: 'تحديث',
+    join_btn: 'انضمّ إلى لوحة الترتيب',
   },
   home: {
     cigarettes_today: 'سجائر اليوم',

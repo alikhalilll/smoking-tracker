@@ -17,19 +17,23 @@
         </button>
       </div>
       <div class="report-grid">
-        <div class="report-card tinted-card tinted-peach">
+        <div class="report-card">
+          <div class="report-bullet icon-peach"></div>
           <div class="report-label">{{ t('history.avg_gap') }}</div>
           <div class="report-value tabular">{{ formatDuration(gapStats.avg) }}</div>
         </div>
-        <div class="report-card tinted-card tinted-mint">
+        <div class="report-card">
+          <div class="report-bullet icon-mint"></div>
           <div class="report-label">{{ t('history.median_gap') }}</div>
           <div class="report-value tabular">{{ formatDuration(gapStats.median) }}</div>
         </div>
-        <div class="report-card tinted-card tinted-lavender">
+        <div class="report-card">
+          <div class="report-bullet icon-lavender"></div>
           <div class="report-label">{{ t('history.longest_gap') }}</div>
           <div class="report-value tabular">{{ formatDuration(gapStats.longest) }}</div>
         </div>
-        <div class="report-card tinted-card tinted-sun">
+        <div class="report-card">
+          <div class="report-bullet icon-sun"></div>
           <div class="report-label">{{ t('history.shortest_gap') }}</div>
           <div class="report-value tabular">{{ formatDuration(gapStats.shortest) }}</div>
         </div>
@@ -166,18 +170,33 @@ function barWidth(count: number): number {
   gap: 10px;
 }
 .report-card {
-  padding: 12px 14px;
+  position: relative;
+  padding: 14px 16px;
   border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
 }
+.report-bullet {
+  width: 8px;
+  height: 24px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+.report-bullet.icon-peach { background: var(--brand); }
+.report-bullet.icon-mint { background: var(--success); }
+.report-bullet.icon-lavender { background: var(--accent); }
+.report-bullet.icon-sun { background: var(--accent-warm); }
 .report-label {
   font-size: 11px;
   font-weight: 600;
-  opacity: 0.85;
+  color: var(--muted);
 }
 .report-value {
-  font-size: 18px;
-  font-weight: 700;
-  margin-top: 3px;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+  color: var(--text);
 }
 
 .day-list {

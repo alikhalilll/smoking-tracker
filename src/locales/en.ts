@@ -30,6 +30,7 @@ const en = {
     loading: 'Loading…',
     empty: 'No one’s on the board yet — be the first.',
     refresh: 'Refresh',
+    join_btn: 'Join the leaderboard',
   },
   home: {
     cigarettes_today: 'cigarettes today',

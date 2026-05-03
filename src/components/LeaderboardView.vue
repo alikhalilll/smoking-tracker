@@ -2,7 +2,6 @@
   <div class="fade-in lb-view">
     <div class="head">
       <h1 class="lb-headline">{{ t('leaderboard.title') }}</h1>
-      <p class="lb-subhead">{{ t(`leaderboard.metric_help_${metric}`) }}</p>
     </div>
 
     <!-- Gated: not signed in -->
@@ -15,7 +14,7 @@
       </button>
     </div>
 
-    <!-- Signed in but not yet opted in -->
+    <!-- Signed in but not yet opted in — inline join form -->
     <div
       v-else-if="!leaderboard.prefs.value.optedIn"
       class="card opt-in"
@@ -23,27 +22,36 @@
       <div class="opt-hero">🌱</div>
       <h2 class="opt-headline">{{ t('leaderboard.opt_in_headline') }}</h2>
       <p class="opt-body">{{ t('leaderboard.opt_in_body') }}</p>
-      <button class="btn btn-primary block" @click="emit('open-settings')">
-        {{ t('leaderboard.opt_in_cta') }}
-      </button>
+
+      <div class="join-form">
+        <input
+          v-model="joinName"
+          type="text"
+          maxlength="30"
+          class="field-input"
+          :placeholder="t('leaderboard_settings.display_name_placeholder')"
+          :disabled="joining"
+          @keydown.enter="onJoin"
+        />
+        <button
+          class="btn btn-primary block"
+          :disabled="!joinName.trim() || joining"
+          @click="onJoin"
+        >
+          <span v-if="joining" class="spinner"></span>
+          {{ joining ? t('cloud.sending') : t('leaderboard.join_btn') }}
+        </button>
+      </div>
     </div>
 
     <template v-else>
-      <!-- Animated metric pills -->
-      <div class="tab-pills" role="tablist">
-        <div
-          class="tab-pill-indicator"
-          :style="{
-            width: `${100 / metrics.length}%`,
-            transform: `translateX(${metrics.indexOf(metric) * 100}%)`,
-          }"
-        />
+      <!-- Filter / metric pills (Worldwide-style) -->
+      <div class="filter-pills">
         <button
           v-for="m in metrics"
           :key="m"
-          class="tab-pill"
+          class="filter-pill"
           :class="{ active: metric === m }"
-          role="tab"
           @click="metric = m"
         >
           {{ t(`leaderboard.metric_${m}`) }}
@@ -51,12 +59,12 @@
       </div>
 
       <!-- Loading skeletons -->
-      <div v-if="leaderboard.loading.value && rows.length === 0" class="lb-list">
-        <div v-for="i in 4" :key="i" class="lb-row skeleton-row">
-          <span class="skeleton" style="width: 28px; height: 28px; border-radius: 50%"></span>
+      <div v-if="leaderboard.loading.value && rows.length === 0" class="list-card">
+        <div v-for="i in 4" :key="i" class="list-row skeleton-row">
+          <span class="skeleton" style="width: 24px; height: 14px"></span>
           <span class="skeleton" style="width: 36px; height: 36px; border-radius: 50%"></span>
           <span class="skeleton" style="height: 14px; flex: 1"></span>
-          <span class="skeleton" style="height: 14px; width: 56px"></span>
+          <span class="skeleton" style="height: 24px; width: 64px; border-radius: 8px"></span>
         </div>
       </div>
 
@@ -74,118 +82,118 @@
       </div>
 
       <template v-else>
-        <!-- Podium card -->
-        <div v-if="podium.first" class="podium-card">
-          <span class="podium-decor podium-decor-a"></span>
-          <span class="podium-decor podium-decor-b"></span>
-
-          <div class="podium-grid">
-            <!-- 2nd -->
-            <div v-if="podium.second" class="podium-spot rank-2">
-              <div class="podium-avatar-wrap">
+        <!-- Podium scene: floating avatars + 3D blocks -->
+        <div v-if="podium.first" class="podium-scene">
+          <!-- Avatars float above the blocks; absolute-positioned to span the row -->
+          <div class="podium-avatars">
+            <div v-if="podium.second" class="ava-spot rank-2">
+              <div class="avatar-frame">
                 <Avatar
                   :name="podium.second.display_name"
                   :seed="podium.second.user_id"
-                  size="md"
+                  size="lg"
                 />
-                <span class="rank-badge silver">2</span>
+                <span class="rank-coin silver">2</span>
               </div>
-              <div class="podium-name">{{ podium.second.display_name }}</div>
-              <div class="podium-value tabular">{{ formatValue(podium.second) }}</div>
-              <div class="podium-pillar pillar-2"></div>
+              <div class="ava-name">{{ podium.second.display_name }}</div>
+              <div class="score-pill">
+                <ScoreIcon />
+                <span class="tabular">{{ formatRawValue(podium.second) }}</span>
+              </div>
             </div>
 
-            <!-- 1st (centered, taller) -->
-            <div class="podium-spot rank-1">
-              <div class="crown" aria-hidden="true">👑</div>
-              <div class="podium-avatar-wrap top">
-                <span class="avatar-glow"></span>
+            <div class="ava-spot rank-1">
+              <div class="avatar-frame avatar-frame-top">
                 <Avatar
                   :name="podium.first.display_name"
                   :seed="podium.first.user_id"
                   size="lg"
                 />
-                <span class="rank-badge gold">1</span>
+                <span class="rank-coin gold">1</span>
               </div>
-              <div class="podium-name top-name">{{ podium.first.display_name }}</div>
-              <div class="podium-value top-value tabular">{{ formatValue(podium.first) }}</div>
-              <div class="podium-pillar pillar-1"></div>
+              <div class="ava-name">{{ podium.first.display_name }}</div>
+              <div class="score-pill">
+                <ScoreIcon />
+                <span class="tabular">{{ formatRawValue(podium.first) }}</span>
+              </div>
             </div>
 
-            <!-- 3rd -->
-            <div v-if="podium.third" class="podium-spot rank-3">
-              <div class="podium-avatar-wrap">
+            <div v-if="podium.third" class="ava-spot rank-3">
+              <div class="avatar-frame">
                 <Avatar
                   :name="podium.third.display_name"
                   :seed="podium.third.user_id"
-                  size="md"
+                  size="lg"
                 />
-                <span class="rank-badge bronze">3</span>
+                <span class="rank-coin bronze">3</span>
               </div>
-              <div class="podium-name">{{ podium.third.display_name }}</div>
-              <div class="podium-value tabular">{{ formatValue(podium.third) }}</div>
-              <div class="podium-pillar pillar-3"></div>
+              <div class="ava-name">{{ podium.third.display_name }}</div>
+              <div class="score-pill">
+                <ScoreIcon />
+                <span class="tabular">{{ formatRawValue(podium.third) }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3D blocks underneath -->
+          <div class="podium-blocks">
+            <div class="block block-2"><span>2</span></div>
+            <div class="block block-1"><span>1</span></div>
+            <div class="block block-3"><span>3</span></div>
+          </div>
+        </div>
+
+        <!-- List card -->
+        <div v-if="restRows.length > 0" class="list-card">
+          <div
+            v-for="(row, i) in restRows"
+            :key="row.user_id"
+            class="list-row"
+            :class="{ 'list-self': isOwn(row) }"
+          >
+            <div class="list-rank tabular">{{ i + 4 }}</div>
+            <Avatar :name="row.display_name" :seed="row.user_id" size="md" />
+            <div class="list-name">
+              <span>{{ row.display_name }}</span>
+              <span
+                v-if="metric === 'smoke_free' && row.smoke_free_days >= 7"
+                class="flame-tag"
+                aria-hidden="true"
+              >🔥</span>
+            </div>
+            <div class="score-pill score-pill-row">
+              <ScoreIcon />
+              <span class="tabular">{{ formatRawValue(row) }}</span>
             </div>
           </div>
         </div>
 
-        <!-- Your-rank hero (when out of the podium) -->
-        <div v-if="yourRank" class="your-card">
-          <div class="your-rank tabular">#{{ yourRank.position }}</div>
+        <!-- Your-rank pinned at the bottom (if out of top of the list) -->
+        <div v-if="yourRank" class="your-pin">
+          <div class="list-rank tabular">{{ yourRank.position }}</div>
           <Avatar
             :name="yourRank.row.display_name"
             :seed="yourRank.row.user_id"
             size="md"
           />
-          <div class="your-name">
-            <div class="your-label">{{ t('leaderboard.you_rank_label') }}</div>
-            <div class="your-display">{{ yourRank.row.display_name }}</div>
+          <div class="list-name">
+            <span>{{ yourRank.row.display_name }}</span>
+            <span class="chip chip-brand list-you">{{ t('leaderboard.you') }}</span>
           </div>
-          <div class="your-value tabular">{{ formatValue(yourRank.row) }}</div>
-        </div>
-
-        <!-- Rest of the list (4+) -->
-        <div v-if="restRows.length > 0" class="lb-list">
-          <div
-            v-for="(row, i) in restRows"
-            :key="row.user_id"
-            class="lb-row"
-            :class="{ 'lb-self': isOwn(row) }"
-            :style="{ animationDelay: i * 0.04 + 's' }"
-          >
-            <div class="lb-rank tabular">{{ i + 4 }}</div>
-            <Avatar :name="row.display_name" :seed="row.user_id" size="sm" />
-            <div class="lb-name">
-              {{ row.display_name }}
-              <span v-if="isOwn(row)" class="chip chip-brand lb-you">
-                {{ t('leaderboard.you') }}
-              </span>
-            </div>
-            <div class="lb-value tabular">
-              <span
-                v-if="metric === 'smoke_free' && row.smoke_free_days >= 7"
-                class="flame"
-                aria-hidden="true"
-              >🔥</span>
-              {{ formatValue(row) }}
-            </div>
+          <div class="score-pill score-pill-row">
+            <ScoreIcon />
+            <span class="tabular">{{ formatRawValue(yourRank.row) }}</span>
           </div>
         </div>
 
-        <div class="bottom-row">
-          <button class="btn btn-icon" @click="leaderboard.refresh" :aria-label="t('leaderboard.refresh')">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/>
-            </svg>
-          </button>
-        </div>
+        <p class="metric-help">{{ t(`leaderboard.metric_help_${metric}`) }}</p>
       </template>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, h, ref } from 'vue'
 import { useI18n } from '../i18n'
 import { useAuth } from '../composables/useAuth'
 import Avatar from './Avatar.vue'
@@ -210,6 +218,34 @@ const { user } = useAuth()
 const metrics: ReadonlyArray<LeaderboardMetric> = ['smoke_free', 'reduction']
 const metric = ref<LeaderboardMetric>('smoke_free')
 
+// Score-pill icon (a small flame-ish glyph in a rounded box, similar to
+// the "T coin" in the reference shot but tied to the app's theme).
+const ScoreIcon = () =>
+  h(
+    'span',
+    { class: 'score-icon', 'aria-hidden': 'true' },
+    [
+      h(
+        'svg',
+        {
+          width: 14,
+          height: 14,
+          viewBox: '0 0 24 24',
+          fill: 'none',
+          stroke: 'currentColor',
+          'stroke-width': 2,
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+        },
+        [
+          h('path', {
+            d: 'M14 4s2 4 0 8-6 4-6 8a4 4 0 0 0 8 0c0-3-2-5-2-7 0-2 2-4 0-9z',
+          }),
+        ]
+      ),
+    ]
+  )
+
 const rows = computed<LeaderboardEntry[]>(() => {
   if (!props.leaderboard) return []
   return metric.value === 'smoke_free'
@@ -230,7 +266,9 @@ const yourRank = computed(() => {
   if (!me) return null
   const idx = rows.value.findIndex((r) => r.user_id === me)
   if (idx < 0) return null
+  // Already shown in podium or top-N list above
   if (idx < 3) return null
+  if (idx < 3 + restRows.value.length) return null
   return { position: idx + 1, row: rows.value[idx] }
 })
 
@@ -238,18 +276,23 @@ function isOwn(row: LeaderboardEntry): boolean {
   return user.value?.id === row.user_id
 }
 
-function formatValue(row: LeaderboardEntry): string {
-  if (metric.value === 'smoke_free') {
-    return t(
-      row.smoke_free_days === 1
-        ? 'leaderboard.smoke_free_one'
-        : 'leaderboard.smoke_free_many',
-      { n: row.smoke_free_days }
-    )
-  }
-  return t('leaderboard.reduction_value', {
-    pct: row.reduction_pct.toFixed(0),
-  })
+function formatRawValue(row: LeaderboardEntry): string {
+  if (metric.value === 'smoke_free') return String(row.smoke_free_days)
+  return `${row.reduction_pct.toFixed(0)}%`
+}
+
+// Inline opt-in form — set display name and join in one tap, no need
+// to bounce through Settings.
+const joinName = ref(props.leaderboard?.prefs.value.displayName ?? '')
+const joining = ref(false)
+
+async function onJoin(): Promise<void> {
+  const name = joinName.value.trim()
+  if (!name || !props.leaderboard) return
+  joining.value = true
+  props.leaderboard.setDisplayName(name)
+  await props.leaderboard.setOptIn(true)
+  joining.value = false
 }
 </script>
 
@@ -257,21 +300,16 @@ function formatValue(row: LeaderboardEntry): string {
 .lb-view {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 16px;
 }
 .head {
+  text-align: center;
   margin-bottom: 4px;
 }
 .lb-headline {
-  font-size: 28px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  margin-bottom: 4px;
-}
-.lb-subhead {
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.5;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
 
 /* Opt-in / gated state */
@@ -301,122 +339,106 @@ function formatValue(row: LeaderboardEntry): string {
   padding: 44px 20px;
 }
 
-/* Animated pill toggle */
-.tab-pills {
-  position: relative;
+/* Filter pills (matches the reference: white active, soft-grey inactive) */
+.filter-pills {
   display: flex;
-  background: var(--btn-ghost-bg);
-  border-radius: var(--radius-pill);
-  padding: 4px;
-  margin-bottom: 4px;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 0 8px;
+  scrollbar-width: none;
 }
-.tab-pill-indicator {
-  position: absolute;
-  top: 4px;
-  bottom: 4px;
-  inset-inline-start: 4px;
-  background: var(--card);
-  border-radius: var(--radius-pill);
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
-  width: calc((100% - 8px) / 2);
+.filter-pills::-webkit-scrollbar {
+  display: none;
 }
-.tab-pill {
-  position: relative;
-  flex: 1;
-  padding: 11px 12px;
+.filter-pill {
+  flex-shrink: 0;
+  appearance: none;
   border: none;
-  background: transparent;
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  color: var(--muted);
+  padding: 9px 18px;
   border-radius: var(--radius-pill);
-  z-index: 1;
+  background: var(--btn-ghost-bg);
+  color: var(--muted);
+  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
 }
-.tab-pill.active {
-  color: var(--text);
+.filter-pill.active {
+  background: var(--text);
+  color: var(--bg);
+  box-shadow: var(--shadow-sm);
+}
+.filter-pill:active { transform: scale(0.97); }
+
+/* === Podium scene === */
+.podium-scene {
+  position: relative;
+  padding: 4px 0 0;
+  margin: 8px -4px 0;
 }
 
-/* Podium */
-.podium-card {
-  position: relative;
-  background: linear-gradient(
-    160deg,
-    var(--brand-grad-from),
-    var(--accent) 90%
-  );
-  border-radius: 28px;
-  padding: 24px 18px 16px;
-  overflow: hidden;
-  box-shadow: 0 12px 32px rgba(255, 122, 61, 0.22),
-              0 4px 12px rgba(124, 92, 255, 0.15);
-}
-.podium-decor {
-  position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.18);
-  filter: blur(20px);
-  pointer-events: none;
-}
-.podium-decor-a {
-  width: 200px;
-  height: 200px;
-  top: -80px;
-  inset-inline-start: -60px;
-}
-.podium-decor-b {
-  width: 160px;
-  height: 160px;
-  bottom: -60px;
-  inset-inline-end: -50px;
-}
-
-.podium-grid {
-  position: relative;
+.podium-avatars {
   display: grid;
-  grid-template-columns: 1fr 1.15fr 1fr;
+  grid-template-columns: 1fr 1.1fr 1fr;
   align-items: end;
   gap: 8px;
+  position: relative;
+  z-index: 2;
+  /* Pull avatars down so they overlap the top of the blocks */
+  margin-bottom: -28px;
 }
-.podium-spot {
+.ava-spot {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
   gap: 6px;
-  position: relative;
 }
-.podium-spot.rank-1 {
-  transform: translateY(-4px);
+.ava-spot.rank-1 {
+  /* Lift 1st higher than the rest */
+  transform: translateY(-22px);
 }
-.podium-avatar-wrap {
+.ava-spot.rank-2 {
+  transform: translateY(8px);
+}
+.ava-spot.rank-3 {
+  transform: translateY(20px);
+}
+
+.avatar-frame {
   position: relative;
   display: inline-block;
-}
-.podium-avatar-wrap.top :deep(.avatar) {
-  border: 3px solid #fff;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
-}
-.avatar-glow {
-  position: absolute;
-  inset: -8px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255, 215, 116, 0.45), transparent 70%);
-  z-index: -1;
-  animation: pulse-glow 2.4s ease-in-out infinite;
+  background: var(--bg);
+  padding: 3px;
 }
-.crown {
-  font-size: 24px;
-  margin-bottom: -4px;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
-  animation: pop 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) 0.1s both;
+.avatar-frame-top {
+  /* Subtle glow under the 1st-place avatar */
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08),
+              0 8px 24px rgba(255, 215, 116, 0.25);
 }
-.rank-badge {
+.avatar-frame :deep(.avatar) {
+  width: 56px;
+  height: 56px;
+  font-size: 18px;
+  border: 2px solid color-mix(in srgb, var(--bg) 70%, transparent);
+}
+.avatar-frame :deep(.avatar-lg) {
+  width: 56px;
+  height: 56px;
+  font-size: 18px;
+}
+.ava-spot.rank-1 .avatar-frame :deep(.avatar) {
+  width: 72px;
+  height: 72px;
+  font-size: 22px;
+}
+
+.rank-coin {
   position: absolute;
-  bottom: -4px;
-  inset-inline-end: -4px;
+  top: -2px;
+  inset-inline-end: -2px;
   width: 22px;
   height: 22px;
   border-radius: 50%;
@@ -425,136 +447,165 @@ function formatValue(row: LeaderboardEntry): string {
   justify-content: center;
   font-size: 11px;
   font-weight: 800;
-  color: #5b3a00;
-  border: 2px solid #fff;
+  color: #2c1a0a;
+  border: 2px solid var(--bg);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
-.rank-badge.gold {
-  background: linear-gradient(180deg, #ffd874, #f59e0b);
-  width: 26px;
-  height: 26px;
-  font-size: 12px;
+.rank-coin.gold {
+  background: linear-gradient(180deg, #ffd874, #d99738);
+  color: #4a2c00;
 }
-.rank-badge.silver {
+.rank-coin.silver {
   background: linear-gradient(180deg, #e8eaed, #b0b6c0);
   color: #2c2f33;
 }
-.rank-badge.bronze {
+.rank-coin.bronze {
   background: linear-gradient(180deg, #d99764, #a05a2a);
   color: #2c1a0a;
 }
-.podium-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: #fff;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-top: 4px;
-}
-.top-name {
-  font-size: 13px;
-  font-weight: 700;
-}
-.podium-value {
-  font-size: 11px;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.85);
-}
-.top-value {
-  font-size: 12px;
-  color: #fff;
-}
 
-/* Pillars under each podium spot */
-.podium-pillar {
-  width: 100%;
-  border-radius: 12px 12px 0 0;
-  background: rgba(255, 255, 255, 0.18);
-  margin-top: 6px;
-}
-.pillar-1 {
-  height: 56px;
-  background: rgba(255, 255, 255, 0.28);
-}
-.pillar-2 {
-  height: 38px;
-}
-.pillar-3 {
-  height: 26px;
-}
-
-/* Your-rank hero card */
-.your-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border-radius: var(--radius-card);
-  background: var(--card);
-  border: 1.5px solid color-mix(in srgb, var(--brand) 35%, transparent);
-  box-shadow: 0 4px 16px rgba(255, 122, 61, 0.12);
-}
-.your-rank {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--brand);
-  min-width: 40px;
-}
-.your-name {
-  flex: 1;
-  min-width: 0;
-}
-.your-label {
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-  font-weight: 700;
-}
-.your-display {
-  font-size: 14px;
+.ava-name {
+  font-size: 12px;
   font-weight: 600;
   color: var(--text);
+  max-width: 100px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.your-value {
-  font-size: 14px;
+.ava-spot.rank-1 .ava-name {
+  font-size: 13px;
   font-weight: 700;
-  color: var(--brand);
+  max-width: 110px;
 }
 
-/* List rows */
-.lb-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+/* Score pill (the purple coin badge) */
+.score-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px 4px 5px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(124, 92, 255, 0.28);
 }
-.lb-row {
+.score-icon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 5px;
+  color: #fff;
+}
+.score-pill-row {
+  background: var(--accent-soft);
+  color: var(--accent);
+  box-shadow: none;
+}
+.score-pill-row .score-icon {
+  background: var(--accent);
+  color: #fff;
+}
+
+/* === 3D-ish podium blocks === */
+.podium-blocks {
   display: grid;
-  grid-template-columns: 28px 28px 1fr auto;
+  grid-template-columns: 1fr 1.1fr 1fr;
+  align-items: end;
+  gap: 8px;
+  position: relative;
+  z-index: 1;
+}
+.block {
+  position: relative;
+  border-radius: 14px 14px 6px 6px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14px;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface-tint) 80%, var(--bg)),
+    var(--surface-tint) 100%
+  );
+  /* Embossed top edge highlight + bottom shadow for the 3D feel */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.12),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.05),
+    0 8px 16px rgba(0, 0, 0, 0.06);
+}
+.block::before {
+  /* A soft top "face" overlay to suggest a beveled top */
+  content: '';
+  position: absolute;
+  top: 0;
+  inset-inline: 0;
+  height: 18px;
+  border-radius: 14px 14px 0 0;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bg) 60%, var(--surface-tint)),
+    transparent
+  );
+  pointer-events: none;
+}
+.block span {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 38px;
+  font-weight: 800;
+  color: color-mix(in srgb, var(--text) 18%, transparent);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+.block-1 {
+  height: 130px;
+}
+.block-2 {
+  height: 92px;
+}
+.block-3 {
+  height: 70px;
+}
+
+/* === List card (rows 4+) === */
+.list-card {
+  margin-top: 6px;
+  background: var(--card);
+  border-radius: var(--radius-card);
+  padding: 6px 14px;
+  box-shadow: var(--shadow-sm);
+}
+.list-row {
+  display: grid;
+  grid-template-columns: 22px auto 1fr auto;
   align-items: center;
   gap: 12px;
-  padding: 10px 14px;
-  border-radius: 16px;
-  font-size: 14px;
-  background: var(--card);
-  box-shadow: var(--shadow-sm);
-  animation: slideUp 0.32s ease-out both;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--hairline);
 }
-.lb-row.lb-self {
+.list-row:last-child {
+  border-bottom: none;
+}
+.list-row.list-self {
   background: var(--brand-soft);
-  border: 1.5px solid color-mix(in srgb, var(--brand) 35%, transparent);
-  box-shadow: 0 4px 12px rgba(255, 122, 61, 0.12);
+  border-radius: 12px;
+  padding-inline: 10px;
+  margin-inline: -10px;
+  border-bottom-color: transparent;
 }
-.lb-rank {
+.list-rank {
+  font-size: 14px;
   font-weight: 700;
   color: var(--muted);
-  font-size: 13px;
+  text-align: center;
 }
-.lb-name {
+.list-name {
+  font-size: 14px;
   font-weight: 600;
   display: flex;
   align-items: center;
@@ -563,34 +614,36 @@ function formatValue(row: LeaderboardEntry): string {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.lb-you {
+.list-you {
   font-size: 9px;
   padding: 2px 6px;
 }
-.lb-value {
-  font-weight: 700;
-  color: var(--text);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-.flame {
-  font-size: 14px;
+.flame-tag {
+  font-size: 13px;
   filter: drop-shadow(0 2px 4px rgba(245, 158, 11, 0.3));
 }
 
-.skeleton-row {
-  background: var(--card);
-  box-shadow: none;
-  animation: none;
+/* Your-rank pin (only when out of the visible list) */
+.your-pin {
+  display: grid;
+  grid-template-columns: 22px auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--brand-soft);
+  border: 1.5px solid color-mix(in srgb, var(--brand) 35%, transparent);
+  border-radius: var(--radius-card);
+  margin-top: 8px;
 }
 
-.bottom-row {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  margin-top: 4px;
+.metric-help {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.5;
 }
+
 .error-line {
   padding: 14px;
   background: var(--danger-soft);
@@ -598,5 +651,21 @@ function formatValue(row: LeaderboardEntry): string {
   border-radius: 14px;
   font-size: 13px;
   text-align: center;
+}
+
+.join-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: start;
+}
+.join-form .field-input {
+  text-align: center;
+  font-weight: 600;
+}
+
+.skeleton-row {
+  border-bottom: 1px solid var(--hairline);
+  padding: 12px 0;
 }
 </style>
