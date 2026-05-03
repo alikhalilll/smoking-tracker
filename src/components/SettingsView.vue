@@ -309,13 +309,17 @@
               :clearable="false"
               :is24="false"
               :auto-apply="true"
-              :format="formatPickerTime"
-              :hide-input-icon="true"
               :teleport="true"
               :dark="isDark"
               minutes-increment="5"
               @update:model-value="onBedtimeStartPicked"
-            />
+            >
+              <template #trigger>
+                <button type="button" class="time-trigger">
+                  {{ formatPickerTime(bedtimeStartObj) }}
+                </button>
+              </template>
+            </VueDatePicker>
           </div>
           <div class="time-field">
             <span class="time-label">{{ t('reminders.bedtime_end') }}</span>
@@ -325,13 +329,17 @@
               :clearable="false"
               :is24="false"
               :auto-apply="true"
-              :format="formatPickerTime"
-              :hide-input-icon="true"
               :teleport="true"
               :dark="isDark"
               minutes-increment="5"
               @update:model-value="onBedtimeEndPicked"
-            />
+            >
+              <template #trigger>
+                <button type="button" class="time-trigger">
+                  {{ formatPickerTime(bedtimeEndObj) }}
+                </button>
+              </template>
+            </VueDatePicker>
           </div>
         </div>
       </div>
@@ -1006,30 +1014,25 @@ function handleReset(): void {
   text-transform: uppercase;
 }
 
-/* === VueDatePicker theme overrides ===
-   Brand the input + popup with the app's design tokens. The library
-   exposes its own CSS variables; we just remap them. */
-.time-field :deep(.dp__input) {
+/* The picker is invisible — only its #trigger slot renders.
+   Our own button shows the formatted time. */
+.time-trigger {
   appearance: none;
   border: none;
   background: transparent;
-  color: var(--text);
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
   padding: 0;
   width: 100%;
   text-align: start;
   cursor: pointer;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
-.time-field :deep(.dp__input_wrap) {
-  cursor: pointer;
-}
-.time-field :deep(.dp__clear_icon),
-.time-field :deep(.dp__input_icons) {
-  display: none;
+.time-trigger:active {
+  opacity: 0.7;
 }
 
 .info-label {
