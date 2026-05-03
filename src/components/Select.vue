@@ -47,6 +47,7 @@ import {
   DrawerContent,
   DrawerTitle,
 } from 'vaul-vue'
+import { useHaptics } from '../composables/useHaptics'
 
 export interface SelectOption {
   value: string
@@ -66,6 +67,7 @@ const emit = defineEmits<{
 }>()
 
 const open = ref(false)
+const haptics = useHaptics()
 
 const selectedLabel = computed<string>(() => {
   const hit = props.options.find((o) => o.value === props.modelValue)
@@ -73,6 +75,7 @@ const selectedLabel = computed<string>(() => {
 })
 
 function onPick(v: string): void {
+  haptics.fire('tap')
   emit('update:modelValue', v)
   open.value = false
 }

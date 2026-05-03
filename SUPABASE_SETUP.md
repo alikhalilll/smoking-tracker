@@ -136,6 +136,31 @@ create policy "users update their own settings"
   on public.user_settings for update using (auth.uid() = user_id);
 create policy "users delete their own settings"
   on public.user_settings for delete using (auth.uid() = user_id);
+
+-- delete_account(): wraps the privileged auth.users delete behind a
+-- SECURITY DEFINER function so a signed-in client can wipe their own
+-- account with a single RPC call. Foreign keys on the public.* tables
+-- are ON DELETE CASCADE, so removing the auth.users row also clears
+-- entries / quit_plans / leaderboard_entries / user_settings.
+create or replace function public.delete_account()
+returns void
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  uid uuid;
+begin
+  uid := auth.uid();
+  if uid is null then
+    raise exception 'Not authenticated';
+  end if;
+  delete from auth.users where id = uid;
+end;
+$$;
+
+revoke all on function public.delete_account() from public;
+grant execute on function public.delete_account() to authenticated;
 ```
 
 Click **Run**.

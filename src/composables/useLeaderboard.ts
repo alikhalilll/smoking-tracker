@@ -174,19 +174,23 @@ export function useLeaderboard(data: Ref<AppData>): UseLeaderboard {
     if (!supabase || !isAuthed.value) return
     loading.value = true
     error.value = null
+    // Tiebreaker is the stable user_id, NOT updated_at. Sorting by
+    // updated_at made each device see "themselves on top" when metrics
+    // were tied, because every push refreshes the local user's
+    // updated_at. user_id makes every client agree on the order.
     const [sf, rd] = await Promise.all([
       supabase
         .from('leaderboard_entries')
         .select('*')
         .order('smoke_free_days', { ascending: false })
-        .order('updated_at', { ascending: false })
+        .order('user_id', { ascending: true })
         .limit(50),
       supabase
         .from('leaderboard_entries')
         .select('*')
         .order('reduction_pct', { ascending: false })
         .order('smoke_free_days', { ascending: false })
-        .order('updated_at', { ascending: false })
+        .order('user_id', { ascending: true })
         .limit(50),
     ])
     loading.value = false
@@ -205,12 +209,15 @@ export function useLeaderboard(data: Ref<AppData>): UseLeaderboard {
     sfMerged.sort((a, b) => {
       if (b.smoke_free_days !== a.smoke_free_days)
         return b.smoke_free_days - a.smoke_free_days
-      return (b.updated_at ?? '').localeCompare(a.updated_at ?? '')
+      // Stable tiebreak — see the comment above the supabase query.
+      return a.user_id.localeCompare(b.user_id)
     })
     rdMerged.sort((a, b) => {
       if (b.reduction_pct !== a.reduction_pct)
         return b.reduction_pct - a.reduction_pct
-      return b.smoke_free_days - a.smoke_free_days
+      if (b.smoke_free_days !== a.smoke_free_days)
+        return b.smoke_free_days - a.smoke_free_days
+      return a.user_id.localeCompare(b.user_id)
     })
     topSmokeFree.value = sfMerged.slice(0, 50)
     topReduction.value = rdMerged.slice(0, 50)

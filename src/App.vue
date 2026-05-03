@@ -19,10 +19,15 @@
   <div class="app-shell">
     <!-- Personalized greeting header -->
     <header class="greet">
-      <div>
-        <div class="greet-eyebrow">{{ greeting }}</div>
-        <div class="greet-name">{{ greetingName }}</div>
-      </div>
+      <button
+        type="button"
+        class="greet-id"
+        :aria-label="t('app.go_home')"
+        @click="goHome"
+      >
+        <span class="greet-eyebrow">{{ greeting }}</span>
+        <span class="greet-name">{{ greetingName }}</span>
+      </button>
       <button
         v-if="auth.isAuthed.value"
         class="btn btn-icon greet-action"
@@ -62,7 +67,7 @@
         @log="handleLog"
         @undo="undoLast"
         @open-report="showReport = true"
-        @open-quit="view = 'quit'"
+        @open-quit="setView('quit')"
       />
 
       <HistoryView
@@ -96,7 +101,7 @@
         v-else-if="view === 'leaderboard'"
         :leaderboard="leaderboard"
         :is-authed="auth.isAuthed.value"
-        @open-settings="view = 'settings'"
+        @open-settings="setView('settings')"
         @open-auth="openAuth"
       />
 
@@ -202,14 +207,61 @@ const tabs = computed<ReadonlyArray<{ id: TabId; icon: string }>>(() => {
   return ids.map((id) => ({ id, icon: ICONS[id] }))
 })
 
-const view = ref<TabId>('home')
+// Active tab is mirrored to the URL hash so a refresh stays on the
+// same screen instead of snapping back to Home. We use the hash (not
+// path) so this works on GitHub Pages without server rewrites.
+function readHashView(): TabId {
+  if (typeof window === 'undefined') return 'home'
+  const raw = window.location.hash.replace(/^#\/?/, '')
+  if (
+    raw === 'home' ||
+    raw === 'history' ||
+    raw === 'quit' ||
+    raw === 'leaderboard' ||
+    raw === 'settings'
+  ) {
+    return raw
+  }
+  return 'home'
+}
+
+const view = ref<TabId>(readHashView())
 const showReport = ref(false)
 const haptics = useHaptics()
 
-function onTabClick(id: TabId, _i: number): void {
+function setView(id: TabId): void {
   view.value = id
+  if (typeof window !== 'undefined') {
+    const next = `#/${id}`
+    if (window.location.hash !== next) {
+      // replaceState avoids stacking history entries every time the
+      // user taps a tab — back-button still exits the app naturally.
+      window.history.replaceState(null, '', next)
+    }
+  }
+}
+
+function onTabClick(id: TabId, _i: number): void {
+  setView(id)
   haptics.fire('tap')
 }
+
+function onHashChange(): void {
+  view.value = readHashView()
+}
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('hashchange', onHashChange)
+    // Make sure the hash exists on first paint (e.g. when arriving
+    // with no hash) so the URL reflects the active view.
+    setView(view.value)
+  }
+})
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('hashchange', onHashChange)
+  }
+})
 
 const auth = useAuth()
 const { open: openAuth } = useAuthModal()
@@ -315,7 +367,7 @@ function onReminderClicked(e: Event): void {
     detail === 'leaderboard' ||
     detail === 'settings'
   ) {
-    view.value = detail
+    setView(detail)
   }
 }
 onMounted(() => {
@@ -359,7 +411,12 @@ async function handleReset(): Promise<void> {
     }
   }
   resetAll()
-  view.value = 'home'
+  setView('home')
+}
+
+function goHome(): void {
+  setView('home')
+  haptics.fire('tap')
 }
 
 async function onSignOut(): Promise<void> {
@@ -461,10 +518,28 @@ async function onSignOut(): Promise<void> {
   align-items: center;
   gap: 12px;
 }
+/* The whole "Good morning / Name" block is a button — tap it to jump
+   home regardless of the current view. Reset native button chrome so
+   it looks identical to the original static label. */
+.greet-id {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+  text-align: start;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.greet-id:active { transform: scale(0.99); }
 .greet-eyebrow {
   font-size: 14px;
   color: var(--muted);
   font-weight: 500;
+  display: block;
 }
 .greet-name {
   font-size: 32px;
@@ -473,6 +548,7 @@ async function onSignOut(): Promise<void> {
   color: var(--text);
   line-height: 1.1;
   margin-top: 2px;
+  display: block;
 }
 .greet-action {
   flex-shrink: 0;

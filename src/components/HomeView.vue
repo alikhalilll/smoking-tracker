@@ -183,8 +183,8 @@
       </div>
       <div
         v-if="moneyMode != null"
-        class="stat-card"
-        :class="moneyMode === 'saved' ? 'stat-money' : ''"
+        class="stat-card stat-money"
+        :class="moneyMode === 'saved' ? 'stat-money-saved' : 'stat-money-spent'"
       >
         <div class="stat-icon icon-mint">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -709,6 +709,10 @@ async function onShare(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  /* Allow flex children (the value text) to actually shrink below
+     their intrinsic width — without this, long currency strings
+     ("EGP 1,234.50") push the card past its grid cell. */
+  min-width: 0;
 }
 .stat-icon {
   display: flex;
@@ -733,6 +737,11 @@ async function onShare(): Promise<void> {
   letter-spacing: -0.025em;
   color: var(--text);
   line-height: 1;
+  /* Cap intrinsic width and let long values wrap rather than overflow.
+     The money card's value can be 12+ chars ("EGP 1,234.50") and
+     wouldn't fit at 32px on a narrow phone. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Health milestones */
@@ -821,8 +830,13 @@ async function onShare(): Promise<void> {
   letter-spacing: 0.02em;
 }
 
-/* Money saved card stands out a touch */
+/* Money card: clamp keeps the currency string readable on narrow
+   phones (~20px) and lets larger screens stretch back up to 28px,
+   so "EGP 1,234.50" never crashes through the card edge. */
 .stat-money .stat-value {
+  font-size: clamp(20px, 6.5vw, 28px);
+}
+.stat-money-saved .stat-value {
   color: var(--success);
 }
 

@@ -4,6 +4,7 @@ import { useAuth } from './useAuth'
 import { useTheme, type ThemeMode } from './useTheme'
 import { useReminders, type ReminderSettings } from './useReminders'
 import { useEconomy, type EconomySettings } from './useEconomy'
+import { useHaptics } from './useHaptics'
 import {
   currentLocale,
   applyRemoteLocale,
@@ -22,6 +23,7 @@ interface SyncedSettings {
   locale: Locale
   reminders: ReminderSettings
   economy?: EconomySettings
+  hapticsEnabled?: boolean
 }
 
 interface ServerRow {
@@ -63,6 +65,7 @@ export function useSettingsSync(): UseSettingsSync {
   const theme = useTheme()
   const reminders = useReminders()
   const economy = useEconomy()
+  const haptics = useHaptics()
 
   const status: Ref<SettingsSyncStatus> = ref('idle')
   const lastError: Ref<string | null> = ref(null)
@@ -83,6 +86,7 @@ export function useSettingsSync(): UseSettingsSync {
       locale: currentLocale.value,
       reminders: { ...reminders.settings.value },
       economy: { ...economy.settings.value },
+      hapticsEnabled: haptics.enabled.value,
     }
   }
 
@@ -100,6 +104,9 @@ export function useSettingsSync(): UseSettingsSync {
       }
       if (s.economy && typeof s.economy === 'object') {
         economy.applyRemote(s.economy)
+      }
+      if (typeof s.hapticsEnabled === 'boolean') {
+        haptics.applyRemote(s.hapticsEnabled)
       }
     } finally {
       applyingRemote = false
@@ -188,6 +195,7 @@ export function useSettingsSync(): UseSettingsSync {
       currentLocale,
       () => reminders.settings.value,
       () => economy.settings.value,
+      () => haptics.enabled.value,
     ],
     () => {
       if (applyingRemote) return
