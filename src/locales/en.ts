@@ -267,6 +267,10 @@ const en = {
     lang_auto: 'Auto',
     lang_en: 'English',
     lang_ar: 'العربية',
+    bedtime_label: 'Bedtime — quiet hours',
+    bedtime_help: 'Don’t notify me while I’m sleeping. Reminders resume when bedtime ends.',
+    bedtime_start: 'From',
+    bedtime_end: 'To',
   },
 } as const
 

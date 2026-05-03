@@ -224,6 +224,43 @@
             </button>
           </div>
 
+          <!-- Bedtime: pause notifications during sleep hours -->
+          <div class="bedtime-row" style="margin-top: 14px">
+            <div>
+              <div class="info-label">{{ t('reminders.bedtime_label') }}</div>
+              <div class="card-sub" style="margin-top: 2px">
+                {{ t('reminders.bedtime_help') }}
+              </div>
+            </div>
+            <Toggle
+              :model-value="reminders.settings.value.bedtimeEnabled"
+              @update:model-value="onBedtimeToggle"
+            />
+          </div>
+          <div
+            v-if="reminders.settings.value.bedtimeEnabled"
+            class="bedtime-times"
+          >
+            <label class="time-field">
+              <span class="time-label">{{ t('reminders.bedtime_start') }}</span>
+              <input
+                type="time"
+                class="time-input"
+                :value="reminders.settings.value.bedtimeStart"
+                @change="onBedtimeStartChange"
+              />
+            </label>
+            <label class="time-field">
+              <span class="time-label">{{ t('reminders.bedtime_end') }}</span>
+              <input
+                type="time"
+                class="time-input"
+                :value="reminders.settings.value.bedtimeEnd"
+                @change="onBedtimeEndChange"
+              />
+            </label>
+          </div>
+
           <div
             v-if="reminders.permission.value !== 'granted'"
             class="permission-warning"
@@ -429,6 +466,19 @@ function onGapChange(minutes: number): void {
 
 function onNotificationLocaleChange(loc: NotificationLocale): void {
   reminders.setNotificationLocale(loc)
+  emit('reminders-changed')
+}
+
+function onBedtimeToggle(enabled: boolean): void {
+  reminders.setBedtime({ enabled })
+  emit('reminders-changed')
+}
+function onBedtimeStartChange(e: Event): void {
+  reminders.setBedtime({ start: (e.target as HTMLInputElement).value })
+  emit('reminders-changed')
+}
+function onBedtimeEndChange(e: Event): void {
+  reminders.setBedtime({ end: (e.target as HTMLInputElement).value })
   emit('reminders-changed')
 }
 
@@ -852,6 +902,49 @@ function handleReset(): void {
   margin-top: 14px;
   padding-top: 14px;
   border-top: 1px solid var(--hairline);
+}
+
+/* Bedtime */
+.bedtime-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline);
+}
+.bedtime-times {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+.time-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.time-label {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.time-input {
+  appearance: none;
+  border: 1.5px solid var(--hairline);
+  border-radius: 12px;
+  background: var(--card);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+.time-input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px var(--brand-soft);
 }
 .info-label {
   font-size: 12px;
