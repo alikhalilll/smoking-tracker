@@ -44,6 +44,8 @@ const ar = {
     best_day: 'أفضل يوم',
     generate_report: 'إنشاء التقرير الكامل',
     quit_target_today: 'هدف الإقلاع اليوم',
+    milestone_one_day: '🌱 يوم كامل بدون تدخين — استمر!',
+    milestone_n_days: '🔥 {n} أيام بدون تدخين — رائع!',
   },
   history: {
     empty: 'لا توجد بيانات بعد. ابدأ بالتسجيل!',

@@ -1,98 +1,102 @@
 <template>
   <div class="fade-in">
-    <div v-if="days.length === 0" class="empty-state">
-      {{ t('history.empty') }}
+    <div v-if="days.length === 0" class="empty-state card">
+      <div class="empty-hero">📒</div>
+      <p>{{ t('history.empty') }}</p>
     </div>
 
     <template v-else>
       <!-- Overall gap report -->
       <div class="report-header">
-        <div class="section-title" style="margin-bottom: 0">
+        <h2 class="h-section" style="margin-bottom: 0">
           {{ t('history.gap_report') }}
-        </div>
-        <button class="report-btn" @click="emit('open-report')">
+        </h2>
+        <button class="btn btn-ghost report-cta" @click="emit('open-report')">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-5"/></svg>
           {{ t('home.generate_report') }}
         </button>
       </div>
       <div class="report-grid">
-        <div class="report-card">
+        <div class="report-card tinted-card tinted-peach">
           <div class="report-label">{{ t('history.avg_gap') }}</div>
-          <div class="report-value">{{ formatDuration(gapStats.avg) }}</div>
+          <div class="report-value tabular">{{ formatDuration(gapStats.avg) }}</div>
         </div>
-        <div class="report-card">
+        <div class="report-card tinted-card tinted-mint">
           <div class="report-label">{{ t('history.median_gap') }}</div>
-          <div class="report-value">{{ formatDuration(gapStats.median) }}</div>
+          <div class="report-value tabular">{{ formatDuration(gapStats.median) }}</div>
         </div>
-        <div class="report-card">
+        <div class="report-card tinted-card tinted-lavender">
           <div class="report-label">{{ t('history.longest_gap') }}</div>
-          <div class="report-value">{{ formatDuration(gapStats.longest) }}</div>
+          <div class="report-value tabular">{{ formatDuration(gapStats.longest) }}</div>
         </div>
-        <div class="report-card">
+        <div class="report-card tinted-card tinted-sun">
           <div class="report-label">{{ t('history.shortest_gap') }}</div>
-          <div class="report-value">{{ formatDuration(gapStats.shortest) }}</div>
+          <div class="report-value tabular">{{ formatDuration(gapStats.shortest) }}</div>
         </div>
       </div>
 
       <!-- Per-day breakdown -->
-      <div class="section-title" style="margin-top: 1.75rem">
+      <h2 class="h-section" style="margin-top: 1.75rem">
         {{ t('history.daily_breakdown') }}
-      </div>
+      </h2>
 
-      <div
-        v-for="(d, i) in days"
-        :key="d"
-        class="day-card"
-        :style="{ animationDelay: i * 0.03 + 's' }"
-      >
-        <div class="day-header" @click="toggle(d)">
-          <div>
-            <div class="day-label">{{ getDayLabel(d) }}</div>
-            <div class="day-date">{{ d }}</div>
-          </div>
-          <div class="day-right">
-            <div
-              class="day-bar"
-              :style="{
-                width: barWidth(byDay[d]) + 'px',
-                background: getColor(byDay[d]),
-              }"
-            />
-            <div class="day-count" :style="{ color: getColor(byDay[d]) }">
-              {{ byDay[d] }}
+      <div class="day-list">
+        <div
+          v-for="(d, i) in days"
+          :key="d"
+          class="day-card card"
+          :style="{ animationDelay: i * 0.03 + 's', borderLeftColor: getColor(byDay[d]) }"
+        >
+          <button class="day-header" @click="toggle(d)">
+            <div>
+              <div class="day-label">{{ getDayLabel(d) }}</div>
+              <div class="day-date tabular">{{ d }}</div>
             </div>
-            <div class="caret" :class="{ open: expanded[d] }">›</div>
+            <div class="day-right">
+              <div
+                class="day-bar"
+                :style="{
+                  width: barWidth(byDay[d]) + 'px',
+                  background: getColor(byDay[d]),
+                }"
+              />
+              <div class="day-count tabular" :style="{ color: getColor(byDay[d]) }">
+                {{ byDay[d] }}
+              </div>
+              <div class="caret" :class="{ open: expanded[d] }">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+            </div>
+          </button>
+
+          <div class="day-meta">
+            <span>{{ t('history.first_at', { time: formatTime(dayReports[d].first) }) }}</span>
+            <span>·</span>
+            <span>{{ t('history.last_at', { time: formatTime(dayReports[d].last) }) }}</span>
+            <span v-if="dayReports[d].avgGap != null">·</span>
+            <span v-if="dayReports[d].avgGap != null">
+              {{ t('history.avg_gap_inline', { duration: formatDuration(dayReports[d].avgGap) }) }}
+            </span>
           </div>
-        </div>
 
-        <div class="day-meta">
-          <span>{{ t('history.first_at', { time: formatTime(dayReports[d].first) }) }}</span>
-          <span>·</span>
-          <span>{{ t('history.last_at', { time: formatTime(dayReports[d].last) }) }}</span>
-          <span v-if="dayReports[d].avgGap != null">·</span>
-          <span v-if="dayReports[d].avgGap != null">
-            {{ t('history.avg_gap_inline', { duration: formatDuration(dayReports[d].avgGap) }) }}
-          </span>
-        </div>
-
-        <div v-if="expanded[d]" class="entries-list">
-          <div
-            v-for="(e, idx) in dayReports[d].entries"
-            :key="idx"
-            class="entry-row"
-          >
-            <div class="entry-time">{{ formatTime(e.time) }}</div>
-            <div class="entry-gap">
-              <span v-if="e.gapMs == null" class="gap-muted">
-                {{ t('history.first_ever') }}
-              </span>
-              <span v-else>+{{ formatDuration(e.gapMs) }}</span>
+          <div v-if="expanded[d]" class="entries-list">
+            <div
+              v-for="(e, idx) in dayReports[d].entries"
+              :key="idx"
+              class="entry-row"
+            >
+              <div class="entry-time tabular">{{ formatTime(e.time) }}</div>
+              <div class="entry-gap tabular">
+                <span v-if="e.gapMs == null" class="gap-muted">
+                  {{ t('history.first_ever') }}
+                </span>
+                <span v-else>+{{ formatDuration(e.gapMs) }}</span>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </template>
-
-    <div style="height: 2rem" />
   </div>
 </template>
 
@@ -135,40 +139,26 @@ function barWidth(count: number): number {
 </script>
 
 <style scoped>
-.section-title {
-  font-size: 11px;
-  font-weight: 500;
+.empty-state {
+  text-align: center;
+  padding: 36px 22px;
   color: var(--muted);
-  margin-bottom: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 14px;
+}
+.empty-hero {
+  font-size: 44px;
+  line-height: 1;
+  margin-bottom: 10px;
 }
 .report-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
-.report-btn {
-  padding: 6px 12px;
-  border: 1.5px solid var(--faint);
-  border-radius: 8px;
-  background: transparent;
-  font-family: inherit;
-  font-size: 11px;
-  font-weight: 600;
-  cursor: pointer;
-  color: var(--text);
-  letter-spacing: 0.02em;
-}
-.report-btn:active {
-  background: var(--card);
-}
-.empty-state {
-  color: var(--subtle);
-  font-size: 14px;
-  padding: 3rem 0;
-  text-align: center;
+.report-cta {
+  font-size: 12px;
+  padding: 8px 12px;
 }
 .report-grid {
   display: grid;
@@ -176,34 +166,46 @@ function barWidth(count: number): number {
   gap: 10px;
 }
 .report-card {
-  background: var(--card);
-  border-radius: 10px;
   padding: 12px 14px;
+  border-radius: 18px;
 }
 .report-label {
   font-size: 11px;
-  color: var(--muted);
+  font-weight: 600;
+  opacity: 0.85;
 }
 .report-value {
   font-size: 18px;
-  font-weight: 600;
+  font-weight: 700;
   margin-top: 3px;
 }
+
+.day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 .day-card {
-  border-bottom: 1px solid var(--border);
-  padding: 12px 0;
+  padding: 14px;
   animation: slideUp 0.3s ease-out both;
+  border-inline-start: 4px solid var(--brand);
 }
 .day-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   cursor: pointer;
-  user-select: none;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: inherit;
+  text-align: start;
 }
 .day-label {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
 }
 .day-date {
   font-size: 11px;
@@ -221,20 +223,19 @@ function barWidth(count: number): number {
   transition: width 0.3s;
 }
 .day-count {
-  font-size: 20px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 800;
   min-width: 28px;
-  text-align: right;
+  text-align: end;
 }
 .caret {
   color: var(--subtle);
-  font-size: 18px;
+  display: flex;
+  align-items: center;
   transition: transform 0.2s;
-  width: 12px;
-  text-align: center;
 }
 .caret.open {
-  transform: rotate(90deg);
+  transform: rotate(180deg);
 }
 .day-meta {
   display: flex;
@@ -242,30 +243,26 @@ function barWidth(count: number): number {
   gap: 6px;
   font-size: 11px;
   color: var(--subtle);
-  margin-top: 8px;
+  margin-top: 10px;
 }
 .entries-list {
   margin-top: 12px;
   padding: 10px 12px;
-  background: var(--card);
-  border-radius: 8px;
+  background: var(--surface-tint);
+  border-radius: 14px;
 }
 .entry-row {
   display: flex;
   justify-content: space-between;
-  padding: 6px 0;
+  padding: 7px 0;
   font-size: 13px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--hairline);
 }
 .entry-row:last-child {
   border-bottom: none;
 }
-.entry-time {
-  font-variant-numeric: tabular-nums;
-}
 .entry-gap {
   color: var(--muted);
-  font-variant-numeric: tabular-nums;
 }
 .gap-muted {
   color: var(--subtle);
