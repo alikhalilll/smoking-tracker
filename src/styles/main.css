@@ -237,9 +237,13 @@ body {
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-feature-settings: 'cv11', 'ss01', 'ss03';
+  /* Multi-blob gradient mesh for that warm, joyful, premium feel.
+     Three soft radial gradients give the page subtle depth without
+     drawing attention away from cards. */
   background:
-    radial-gradient(1200px 600px at 100% -10%, color-mix(in srgb, var(--brand) 10%, transparent), transparent 60%),
-    radial-gradient(900px 500px at -10% 110%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 60%),
+    radial-gradient(900px 540px at 100% -8%, color-mix(in srgb, var(--brand) 18%, transparent), transparent 55%),
+    radial-gradient(700px 420px at -10% 100%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%),
+    radial-gradient(500px 320px at 60% 50%, color-mix(in srgb, var(--success) 8%, transparent), transparent 60%),
     var(--bg);
   background-attachment: fixed;
   color: var(--text);

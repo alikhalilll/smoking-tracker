@@ -96,10 +96,10 @@
       />
     </main>
 
-    <!-- Floating bottom nav — solid dark pill with a circular
-         indicator that morphs to the active icon (wellness vibe).
-         Uses CSS variables so it inverts cleanly in dark mode. -->
-    <nav class="nav-bar" :style="indicatorStyle">
+    <!-- Floating Liquid Glass nav bar — translucent backdrop, lensed
+         highlight, brand-coral circular indicator that morphs to the
+         active tab. -->
+    <nav class="nav-bar glass" :style="indicatorStyle">
       <div class="nav-indicator" />
       <button
         v-for="(tab, i) in tabs"
@@ -414,9 +414,9 @@ async function onSignOut(): Promise<void> {
   /* Animated view transitions could go here later */
 }
 
-/* Floating dark pill nav (wellness reference).
-   `left: 50%` + `transform: translateX(-50%)` for centering so it
-   stays put in both LTR and RTL — translateX is always physical. */
+/* Liquid Glass floating nav bar — translucent + heavy blur + lensed
+   sheen (the .glass utility takes care of those bits). The indicator
+   is a brand-tinted soft circle that morphs between icons. */
 .nav-bar {
   position: fixed;
   left: 50%;
@@ -428,38 +428,22 @@ async function onSignOut(): Promise<void> {
   border-radius: var(--radius-pill);
   z-index: 100;
   max-width: calc(100vw - 24px);
-  background: #15171a;
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18),
-              0 2px 6px rgba(15, 23, 42, 0.08);
 }
-[data-theme='dark'] .nav-bar,
-:root:not([data-theme='light']) .nav-bar {
-  background: #1f2228;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) .nav-bar {
-    background: #1f2228;
-  }
-}
-
-/* The active indicator is a CIRCLE that morphs between the icon
-   positions. left/width are computed from getBoundingClientRect()
-   in JS, so we use physical `left:` (RTL-safe). */
 .nav-indicator {
   position: absolute;
   top: 8px;
   bottom: 8px;
   left: var(--ind-x, 0);
   width: var(--ind-w, 0);
-  background: #fff;
+  background: linear-gradient(135deg, var(--brand-grad-from), var(--brand-grad-to));
   border-radius: 50%;
-  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
-              width 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
-              left 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: var(--brand-shadow);
+  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+              left 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
   pointer-events: none;
   z-index: 0;
 }
-
 .nav-tab {
   position: relative;
   z-index: 1;
@@ -474,11 +458,11 @@ async function onSignOut(): Promise<void> {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--muted);
   transition: color 0.2s ease;
 }
 .nav-tab.active {
-  color: #15171a;
+  color: #fff;
 }
 .nav-icon {
   display: flex;
