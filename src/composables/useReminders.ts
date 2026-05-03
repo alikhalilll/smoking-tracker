@@ -9,6 +9,12 @@ export interface ReminderSettings {
   gapMinutes: number
   /** Language for notification text. 'auto' follows the app locale. */
   notificationLocale: NotificationLocale
+  /** When true, suppress notifications between bedtimeStart and bedtimeEnd. */
+  bedtimeEnabled: boolean
+  /** "HH:MM" 24-hour, local time. */
+  bedtimeStart: string
+  /** "HH:MM" 24-hour, local time. May be < bedtimeStart (wraps midnight). */
+  bedtimeEnd: string
 }
 
 const STORAGE_KEY = 'smoking-tracker-reminders'
@@ -17,7 +23,41 @@ const DEFAULT_SETTINGS: ReminderSettings = {
   enabled: false,
   gapMinutes: 30,
   notificationLocale: 'auto',
+  bedtimeEnabled: false,
+  bedtimeStart: '22:00',
+  bedtimeEnd: '07:00',
 }
+
+/** "HH:MM" → minutes since midnight. */
+function timeToMins(t: string): number {
+  const [h, m] = t.split(':').map((v) => parseInt(v, 10) || 0)
+  return h * 60 + m
+}
+
+/** Is the given Date inside the [start, end) bedtime window? */
+function isInBedtime(d: Date, startHM: string, endHM: string): boolean {
+  const cur = d.getHours() * 60 + d.getMinutes()
+  const s = timeToMins(startHM)
+  const e = timeToMins(endHM)
+  if (s === e) return false
+  if (s < e) return cur >= s && cur < e
+  // Window wraps past midnight.
+  return cur >= s || cur < e
+}
+
+/** Returns the next future Date at HH:MM (today if still ahead, else tomorrow). */
+function nextOccurrenceAt(hm: string): Date {
+  const [h, m] = hm.split(':').map((v) => parseInt(v, 10) || 0)
+  const d = new Date()
+  d.setSeconds(0, 0)
+  d.setHours(h, m, 0, 0)
+  if (d.getTime() <= Date.now()) {
+    d.setDate(d.getDate() + 1)
+  }
+  return d
+}
+
+const HM_RE = /^\d{2}:\d{2}$/
 
 function load(): ReminderSettings {
   try {
@@ -27,6 +67,14 @@ function load(): ReminderSettings {
     const loc = parsed.notificationLocale
     const validLoc: NotificationLocale =
       loc === 'auto' || loc === 'en' || loc === 'ar' ? loc : 'auto'
+    const startHM =
+      typeof parsed.bedtimeStart === 'string' && HM_RE.test(parsed.bedtimeStart)
+        ? parsed.bedtimeStart
+        : DEFAULT_SETTINGS.bedtimeStart
+    const endHM =
+      typeof parsed.bedtimeEnd === 'string' && HM_RE.test(parsed.bedtimeEnd)
+        ? parsed.bedtimeEnd
+        : DEFAULT_SETTINGS.bedtimeEnd
     return {
       enabled: !!parsed.enabled,
       gapMinutes:
@@ -34,6 +82,9 @@ function load(): ReminderSettings {
           ? parsed.gapMinutes
           : DEFAULT_SETTINGS.gapMinutes,
       notificationLocale: validLoc,
+      bedtimeEnabled: !!parsed.bedtimeEnabled,
+      bedtimeStart: startHM,
+      bedtimeEnd: endHM,
     }
   } catch {
     return { ...DEFAULT_SETTINGS }
@@ -228,6 +279,7 @@ export interface UseReminders {
   setEnabled: (b: boolean) => void
   setGap: (minutes: number) => void
   setNotificationLocale: (loc: NotificationLocale) => void
+  setBedtime: (opts: { enabled?: boolean; start?: string; end?: string }) => void
   /** Schedule the next reminder. Call after each log, or to (re)start the cycle. */
   scheduleNext: (titleAndBody: { title: string; body: string }) => void
   /** Fire one notification immediately. Returns a diagnostic object so the UI can show a meaningful error. */
@@ -267,14 +319,63 @@ export function useReminders(): UseReminders {
     save(settings.value)
   }
 
+  function setBedtime(opts: {
+    enabled?: boolean
+    start?: string
+    end?: string
+  }): void {
+    settings.value = {
+      ...settings.value,
+      bedtimeEnabled:
+        opts.enabled !== undefined
+          ? opts.enabled
+          : settings.value.bedtimeEnabled,
+      bedtimeStart:
+        opts.start && HM_RE.test(opts.start)
+          ? opts.start
+          : settings.value.bedtimeStart,
+      bedtimeEnd:
+        opts.end && HM_RE.test(opts.end)
+          ? opts.end
+          : settings.value.bedtimeEnd,
+    }
+    save(settings.value)
+  }
+
   function scheduleNext(payload: { title: string; body: string }): void {
     clearTimer()
     if (!settings.value.enabled) return
     if (permission.value !== 'granted') return
-    const ms = settings.value.gapMinutes * 60_000
+
+    const baseMs = settings.value.gapMinutes * 60_000
+    const fireAt = new Date(Date.now() + baseMs)
+
+    let ms = baseMs
+    if (
+      settings.value.bedtimeEnabled &&
+      isInBedtime(
+        fireAt,
+        settings.value.bedtimeStart,
+        settings.value.bedtimeEnd
+      )
+    ) {
+      // Reschedule for the moment bedtime ends instead of firing now.
+      ms = nextOccurrenceAt(settings.value.bedtimeEnd).getTime() - Date.now()
+    }
+
     timerId = setTimeout(() => {
-      void showNotification(payload.title, payload.body)
-      // Re-arm so reminders continue while the app is open.
+      // One last guard in case the user crosses into bedtime between
+      // scheduling and firing.
+      if (
+        !settings.value.bedtimeEnabled ||
+        !isInBedtime(
+          new Date(),
+          settings.value.bedtimeStart,
+          settings.value.bedtimeEnd
+        )
+      ) {
+        void showNotification(payload.title, payload.body)
+      }
       scheduleNext(payload)
     }, ms)
   }
@@ -359,6 +460,7 @@ export function useReminders(): UseReminders {
     setEnabled,
     setGap,
     setNotificationLocale,
+    setBedtime,
     scheduleNext,
     sendTest,
     cancel,

@@ -267,6 +267,10 @@ const ar = {
     lang_auto: 'تلقائي',
     lang_en: 'English',
     lang_ar: 'العربية',
+    bedtime_label: 'وقت النوم — ساعات هادئة',
+    bedtime_help: 'لا تُرسل إشعارات أثناء نومي. تستأنف التذكيرات بعد انتهاء وقت النوم.',
+    bedtime_start: 'من',
+    bedtime_end: 'إلى',
   },
 } as const
 
