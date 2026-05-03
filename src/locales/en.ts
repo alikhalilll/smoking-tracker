@@ -44,6 +44,8 @@ const en = {
     best_day: 'Best day',
     generate_report: 'Generate full report',
     quit_target_today: 'Quit target today',
+    milestone_one_day: '🌱 One day smoke-free — keep going!',
+    milestone_n_days: '🔥 {n} days smoke-free — incredible!',
   },
   history: {
     empty: 'No data yet. Start logging!',
