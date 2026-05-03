@@ -1,15 +1,5 @@
 <template>
   <div class="fade-in lb-view">
-    <!-- Floating decorative dots — pure CSS animated background -->
-    <div class="dots" aria-hidden="true">
-      <span class="dot dot-1"></span>
-      <span class="dot dot-2"></span>
-      <span class="dot dot-3"></span>
-      <span class="dot dot-4"></span>
-      <span class="dot dot-5"></span>
-      <span class="dot dot-6"></span>
-    </div>
-
     <div class="head">
       <h1 class="lb-headline">
         {{ t('leaderboard.title') }}
@@ -95,7 +85,7 @@
 
       <template v-else>
         <!-- Top 3 podium -->
-        <div v-if="podium.first" class="podium">
+        <div v-if="podium.first" class="podium" :class="podiumLayoutClass">
           <!-- 2nd place (start side) — ice particles -->
           <div v-if="podium.second" class="podium-spot rank-2">
             <div class="podium-avatar-wrap medium">
@@ -276,6 +266,14 @@ const podium = computed(() => ({
 
 const restRows = computed(() => rows.value.slice(3))
 
+// Layout adapts when there aren't 3 users yet — solo centers the
+// single user, duo balances 1st + 2nd without an empty 3rd column.
+const podiumLayoutClass = computed(() => {
+  if (!podium.value.second) return 'podium-solo'
+  if (!podium.value.third) return 'podium-duo'
+  return ''
+})
+
 function isOwn(row: LeaderboardEntry): boolean {
   return user.value?.id === row.user_id
 }
@@ -322,91 +320,7 @@ async function onJoin(): Promise<void> {
   overflow: visible;
 }
 
-/* === Floating decorative dots — heavy ambient motion === */
-.dots {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-  z-index: 0;
-}
-.dot {
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0.7;
-}
-.dot-1 {
-  width: 14px;
-  height: 14px;
-  background: var(--brand);
-  top: 8%;
-  inset-inline-start: 78%;
-  animation: drift-1 9s ease-in-out infinite;
-}
-.dot-2 {
-  width: 10px;
-  height: 10px;
-  background: var(--accent);
-  top: 18%;
-  inset-inline-start: 8%;
-  animation: drift-2 11s ease-in-out infinite;
-}
-.dot-3 {
-  width: 22px;
-  height: 22px;
-  background: color-mix(in srgb, var(--success) 80%, transparent);
-  top: 36%;
-  inset-inline-start: 88%;
-  animation: drift-3 13s ease-in-out infinite;
-}
-.dot-4 {
-  width: 16px;
-  height: 16px;
-  background: color-mix(in srgb, var(--accent-warm) 80%, transparent);
-  top: 56%;
-  inset-inline-start: 4%;
-  animation: drift-1 10s ease-in-out infinite reverse;
-}
-.dot-5 {
-  width: 8px;
-  height: 8px;
-  background: var(--brand);
-  top: 70%;
-  inset-inline-start: 70%;
-  animation: drift-2 8s ease-in-out infinite;
-}
-.dot-6 {
-  width: 12px;
-  height: 12px;
-  background: var(--accent);
-  top: 88%;
-  inset-inline-start: 28%;
-  animation: drift-3 12s ease-in-out infinite reverse;
-}
-
-@keyframes drift-1 {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.7; }
-  50% { transform: translate(-18px, 28px) scale(1.2); opacity: 1; }
-}
-@keyframes drift-2 {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
-  50% { transform: translate(24px, -18px) scale(0.85); opacity: 0.9; }
-}
-@keyframes drift-3 {
-  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.7; }
-  50% { transform: translate(-12px, -28px) scale(1.15); opacity: 1; }
-}
-
-.head,
-.featured,
-.filter-pills,
-.user-list,
-.metric-help,
-.opt-in,
-.empty {
-  position: relative;
-  z-index: 1;
-}
+/* (Floating dots are now global — see App.vue's .ambient-dots) */
 
 .head {
   text-align: center;
@@ -496,6 +410,21 @@ async function onJoin(): Promise<void> {
   padding: 28px 4px 64px;
   position: relative;
   z-index: 1;
+}
+/* Single user — center it horizontally, no empty side columns */
+.podium.podium-solo {
+  display: flex;
+  justify-content: center;
+}
+.podium.podium-solo .rank-1 {
+  transform: none;
+  animation-delay: 0s;
+}
+/* Two users — center them as a balanced pair */
+.podium.podium-duo {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
 }
 .podium-spot {
   display: flex;

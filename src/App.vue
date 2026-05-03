@@ -1,4 +1,21 @@
 <template>
+  <!-- Ambient floating dots — fixed behind every screen, dim by default,
+       brighter on the leaderboard tab. -->
+  <div
+    class="ambient-dots"
+    :class="{ 'amb-bright': view === 'leaderboard' }"
+    aria-hidden="true"
+  >
+    <span class="adot ad1"></span>
+    <span class="adot ad2"></span>
+    <span class="adot ad3"></span>
+    <span class="adot ad4"></span>
+    <span class="adot ad5"></span>
+    <span class="adot ad6"></span>
+    <span class="adot ad7"></span>
+    <span class="adot ad8"></span>
+  </div>
+
   <div class="app-shell">
     <!-- Personalized greeting header -->
     <header class="greet">
@@ -352,6 +369,81 @@ async function onSignOut(): Promise<void> {
   /* Reserve room at the bottom for the floating nav. */
   padding-bottom: calc(112px + env(safe-area-inset-bottom));
   min-height: 100dvh;
+  position: relative;
+  z-index: 1;
+}
+
+/* === Ambient dots (global background — visible on every screen) === */
+.ambient-dots {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+  opacity: 0.08;
+  transition: opacity 0.4s ease;
+}
+.ambient-dots.amb-bright {
+  opacity: 0.7;
+}
+.adot {
+  position: absolute;
+  border-radius: 50%;
+}
+.ad1 {
+  width: 14px; height: 14px; background: var(--brand);
+  top: 8%; left: 78%;
+  animation: drift-1 9s ease-in-out infinite;
+}
+.ad2 {
+  width: 10px; height: 10px; background: var(--accent);
+  top: 18%; left: 8%;
+  animation: drift-2 11s ease-in-out infinite;
+}
+.ad3 {
+  width: 22px; height: 22px;
+  background: color-mix(in srgb, var(--success) 80%, transparent);
+  top: 36%; left: 88%;
+  animation: drift-3 13s ease-in-out infinite;
+}
+.ad4 {
+  width: 16px; height: 16px;
+  background: color-mix(in srgb, var(--accent-warm) 80%, transparent);
+  top: 56%; left: 4%;
+  animation: drift-1 10s ease-in-out infinite reverse;
+}
+.ad5 {
+  width: 8px; height: 8px; background: var(--brand);
+  top: 70%; left: 70%;
+  animation: drift-2 8s ease-in-out infinite;
+}
+.ad6 {
+  width: 12px; height: 12px; background: var(--accent);
+  top: 88%; left: 28%;
+  animation: drift-3 12s ease-in-out infinite reverse;
+}
+.ad7 {
+  width: 18px; height: 18px; background: var(--brand);
+  top: 26%; left: 48%;
+  animation: drift-2 14s ease-in-out infinite reverse;
+}
+.ad8 {
+  width: 9px; height: 9px;
+  background: color-mix(in srgb, var(--success) 70%, transparent);
+  top: 80%; left: 90%;
+  animation: drift-1 12s ease-in-out infinite;
+}
+@keyframes drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-18px, 28px) scale(1.2); }
+}
+@keyframes drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(24px, -18px) scale(0.85); }
+}
+@keyframes drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50%      { transform: translate(-12px, -28px) scale(1.15); }
 }
 
 /* Greeting header — bigger, bolder, "Hey, Michelle" energy */
@@ -412,7 +504,12 @@ async function onSignOut(): Promise<void> {
   padding: 4px 6px;
   color: var(--muted);
   transition: color 0.2s ease, transform 0.12s ease;
-  min-width: 56px;
+  min-width: 48px;
+  flex: 1 1 auto;
+}
+@media (max-width: 360px) {
+  .nav-tab { min-width: 44px; padding: 4px 4px; }
+  .nav-label { font-size: 10px; }
 }
 .nav-tab:active {
   transform: scale(0.94);
