@@ -6,6 +6,39 @@ import type { AppData, LeaderboardEntry } from '../types'
 
 const STORAGE_KEY = 'smoking-tracker-leaderboard-prefs'
 
+/**
+ * Local-only mocks injected into the leaderboard when
+ * VITE_SEED_LEADERBOARD=true so the layout is visible without
+ * touching Supabase. Numbers are spread so both metric boards have
+ * a meaningful order.
+ */
+const SEED_USERS: ReadonlyArray<Omit<LeaderboardEntry, 'updated_at'>> = [
+  { user_id: 'mock-1',  display_name: 'Kameron Porter',  smoke_free_days: 100, reduction_pct: 100, total_logged: 0,  daily_avg: 0.0 },
+  { user_id: 'mock-2',  display_name: 'Michael Kopfler',  smoke_free_days: 75,  reduction_pct: 78,  total_logged: 12, daily_avg: 0.4 },
+  { user_id: 'mock-3',  display_name: 'Alice Koller',     smoke_free_days: 73,  reduction_pct: 65,  total_logged: 18, daily_avg: 0.6 },
+  { user_id: 'mock-4',  display_name: 'Peter Dinklage',   smoke_free_days: 69,  reduction_pct: 60,  total_logged: 22, daily_avg: 0.7 },
+  { user_id: 'mock-5',  display_name: 'George Limbof',    smoke_free_days: 66,  reduction_pct: 55,  total_logged: 14, daily_avg: 0.5 },
+  { user_id: 'mock-6',  display_name: 'Julia Berger',     smoke_free_days: 58,  reduction_pct: 50,  total_logged: 30, daily_avg: 0.9 },
+  { user_id: 'mock-7',  display_name: 'Dave Jhonson',     smoke_free_days: 54,  reduction_pct: 48,  total_logged: 28, daily_avg: 0.8 },
+  { user_id: 'mock-8',  display_name: 'Sarah Lee',        smoke_free_days: 45,  reduction_pct: 42,  total_logged: 35, daily_avg: 1.1 },
+  { user_id: 'mock-9',  display_name: 'Marcus Chen',      smoke_free_days: 38,  reduction_pct: 38,  total_logged: 41, daily_avg: 1.4 },
+  { user_id: 'mock-10', display_name: 'Elena Vega',       smoke_free_days: 30,  reduction_pct: 30,  total_logged: 50, daily_avg: 1.5 },
+  { user_id: 'mock-11', display_name: 'Mia Thompson',     smoke_free_days: 21,  reduction_pct: 22,  total_logged: 60, daily_avg: 1.8 },
+  { user_id: 'mock-12', display_name: 'Noah Brooks',      smoke_free_days: 14,  reduction_pct: 18,  total_logged: 72, daily_avg: 2.0 },
+]
+
+const SEED_ENABLED = import.meta.env.VITE_SEED_LEADERBOARD === 'true'
+
+function withMocks(real: LeaderboardEntry[]): LeaderboardEntry[] {
+  if (!SEED_ENABLED) return real
+  // Don't duplicate mocks if a refresh fired twice.
+  const realIds = new Set(real.map((r) => r.user_id))
+  const mocks: LeaderboardEntry[] = SEED_USERS.filter(
+    (s) => !realIds.has(s.user_id)
+  ).map((s) => ({ ...s, updated_at: new Date().toISOString() }))
+  return [...real, ...mocks]
+}
+
 export interface LeaderboardPrefs {
   optedIn: boolean
   displayName: string
@@ -141,10 +174,6 @@ export function useLeaderboard(data: Ref<AppData>): UseLeaderboard {
     if (!supabase || !isAuthed.value) return
     loading.value = true
     error.value = null
-    // Always include a deterministic tiebreaker so the order doesn't
-    // shuffle between identical scores. Recent activity (updated_at)
-    // breaks the smoke-free tie; smoke-free streak breaks the
-    // reduction tie (more progress in absolute days wins).
     const [sf, rd] = await Promise.all([
       supabase
         .from('leaderboard_entries')
@@ -169,8 +198,22 @@ export function useLeaderboard(data: Ref<AppData>): UseLeaderboard {
       error.value = rd.error.message
       return
     }
-    topSmokeFree.value = (sf.data ?? []) as LeaderboardEntry[]
-    topReduction.value = (rd.data ?? []) as LeaderboardEntry[]
+    // Inject local mocks (only when VITE_SEED_LEADERBOARD=true) so
+    // the layout is testable without writing seed data to Supabase.
+    const sfMerged = withMocks((sf.data ?? []) as LeaderboardEntry[])
+    const rdMerged = withMocks((rd.data ?? []) as LeaderboardEntry[])
+    sfMerged.sort((a, b) => {
+      if (b.smoke_free_days !== a.smoke_free_days)
+        return b.smoke_free_days - a.smoke_free_days
+      return (b.updated_at ?? '').localeCompare(a.updated_at ?? '')
+    })
+    rdMerged.sort((a, b) => {
+      if (b.reduction_pct !== a.reduction_pct)
+        return b.reduction_pct - a.reduction_pct
+      return b.smoke_free_days - a.smoke_free_days
+    })
+    topSmokeFree.value = sfMerged.slice(0, 50)
+    topReduction.value = rdMerged.slice(0, 50)
   }
 
   async function pushOwnRow(): Promise<void> {

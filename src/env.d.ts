@@ -15,6 +15,8 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string
   /** Legacy alias kept for backward compatibility. */
   readonly VITE_SUPABASE_ANON_KEY?: string
+  /** Local-only: inject mock leaderboard rows so the full UI is visible. */
+  readonly VITE_SEED_LEADERBOARD?: string
 }
 
 interface ImportMeta {
