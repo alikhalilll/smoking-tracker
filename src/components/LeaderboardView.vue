@@ -87,7 +87,9 @@
           <!-- Avatars float above the blocks; absolute-positioned to span the row -->
           <div class="podium-avatars">
             <div v-if="podium.second" class="ava-spot rank-2">
+              <span class="aura aura-ice" aria-hidden="true">❄️</span>
               <div class="avatar-frame">
+                <span class="halo halo-ice" aria-hidden="true"></span>
                 <Avatar
                   :name="podium.second.display_name"
                   :seed="podium.second.user_id"
@@ -103,7 +105,9 @@
             </div>
 
             <div class="ava-spot rank-1">
+              <span class="aura aura-fire" aria-hidden="true">🔥</span>
               <div class="avatar-frame avatar-frame-top">
+                <span class="halo halo-fire" aria-hidden="true"></span>
                 <Avatar
                   :name="podium.first.display_name"
                   :seed="podium.first.user_id"
@@ -119,7 +123,9 @@
             </div>
 
             <div v-if="podium.third" class="ava-spot rank-3">
+              <span class="aura aura-bolt" aria-hidden="true">⚡</span>
               <div class="avatar-frame">
+                <span class="halo halo-bolt" aria-hidden="true"></span>
                 <Avatar
                   :name="podium.third.display_name"
                   :seed="podium.third.user_id"
@@ -454,6 +460,96 @@ async function onJoin(): Promise<void> {
   border-radius: 50%;
   background: var(--bg);
   padding: 3px;
+  z-index: 1;
+}
+
+/* === Elemental aura emojis floating above each podium spot === */
+.aura {
+  position: absolute;
+  top: -22px;
+  font-size: 22px;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 3;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.25));
+}
+.aura-fire {
+  font-size: 28px;
+  top: -32px;
+  animation: flame-flicker 1.4s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+.aura-ice {
+  animation: ice-float 3s ease-in-out infinite;
+}
+.aura-bolt {
+  animation: bolt-zap 2.8s steps(1, end) infinite;
+}
+
+@keyframes flame-flicker {
+  0%, 100% { transform: scale(1) rotate(-2deg); opacity: 1; }
+  20% { transform: scale(1.08) rotate(2deg); opacity: 0.92; }
+  40% { transform: scale(0.95) rotate(-1deg); opacity: 1; }
+  60% { transform: scale(1.05) rotate(1deg); opacity: 0.95; }
+  80% { transform: scale(0.98) rotate(-2deg); opacity: 1; }
+}
+@keyframes ice-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(20deg); }
+}
+@keyframes bolt-zap {
+  0%, 80%, 100% { transform: scale(1); opacity: 0.6; }
+  82%, 92% { transform: scale(1.25); opacity: 1; }
+  86% { transform: scale(1.4); opacity: 1; filter: brightness(1.4); }
+}
+
+/* === Halos behind the avatars (the colored "energy" of each rank) === */
+.halo {
+  position: absolute;
+  inset: -10px;
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+}
+.halo-fire {
+  background: radial-gradient(
+    circle,
+    rgba(255, 122, 61, 0.55),
+    rgba(255, 200, 100, 0.25) 50%,
+    transparent 70%
+  );
+  animation: halo-fire-pulse 1.4s ease-in-out infinite;
+}
+.halo-ice {
+  background: radial-gradient(
+    circle,
+    rgba(120, 200, 255, 0.45),
+    rgba(180, 220, 255, 0.18) 55%,
+    transparent 75%
+  );
+  animation: halo-ice-pulse 3s ease-in-out infinite;
+}
+.halo-bolt {
+  background: radial-gradient(
+    circle,
+    rgba(251, 191, 36, 0.45),
+    rgba(255, 220, 130, 0.18) 50%,
+    transparent 72%
+  );
+  animation: halo-bolt-pulse 2.8s steps(1, end) infinite;
+}
+
+@keyframes halo-fire-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.18); opacity: 1; }
+}
+@keyframes halo-ice-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.10); opacity: 1; }
+}
+@keyframes halo-bolt-pulse {
+  0%, 80%, 100% { transform: scale(1); opacity: 0.6; }
+  82%, 92% { transform: scale(1.2); opacity: 1; }
 }
 .avatar-frame-top {
   /* Subtle glow under the 1st-place avatar */
