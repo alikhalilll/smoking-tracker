@@ -493,6 +493,23 @@
           </div>
         </div>
       </div>
+
+      <!-- Hard refresh — clears the SW caches, unregisters the worker,
+           and reloads. Use this when the PWA is stuck on an old version. -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon icon-lavender">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </div>
+          <div>
+            <div class="card-title">{{ t('settings.hard_refresh_title') }}</div>
+            <div class="card-sub">{{ t('settings.hard_refresh_help') }}</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost block" :disabled="refreshing" @click="onHardRefresh">
+          {{ refreshing ? t('settings.hard_refresh_in_progress') : t('settings.hard_refresh_btn') }}
+        </button>
+      </div>
     </section>
   </div>
 </template>
@@ -884,6 +901,32 @@ const visibleSyncStatus = computed(() => {
   if (s === 'error' || s === 'offline' || s === 'syncing') return s
   return null
 })
+
+// Hard refresh — drops every SW cache, unregisters the active worker,
+// then reloads. This mirrors what Chrome's "Empty Cache and Hard Reload"
+// does for SW-controlled pages: the next request actually hits the
+// network instead of the cached app shell.
+const refreshing = ref(false)
+async function onHardRefresh(): Promise<void> {
+  if (refreshing.value) return
+  refreshing.value = true
+  try {
+    if (typeof caches !== 'undefined') {
+      const names = await caches.keys()
+      await Promise.all(names.map((n) => caches.delete(n)))
+    }
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations()
+      await Promise.all(regs.map((r) => r.unregister()))
+    }
+  } catch {
+    // best-effort — fall through to the reload either way
+  }
+  // Cache-busting query so even a stale HTTP cache layer is bypassed.
+  const url = new URL(window.location.href)
+  url.searchParams.set('_r', Date.now().toString(36))
+  window.location.replace(url.toString())
+}
 
 async function handleReset(): Promise<void> {
   const ok = await confirmDrawer({

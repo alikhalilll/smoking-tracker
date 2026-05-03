@@ -209,6 +209,10 @@ const en = {
     export_title: 'Export data',
     export_help: 'Download every logged cigarette as a CSV file.',
     export_btn: 'Download CSV',
+    hard_refresh_title: 'Hard refresh',
+    hard_refresh_help: 'Clear the offline cache and reload from the server. Use if the app feels stuck on an old version.',
+    hard_refresh_btn: 'Refresh now',
+    hard_refresh_in_progress: 'Refreshing…',
   },
   health: {
     pulse: { label: 'Pulse normalizes', body: '20 minutes after your last cigarette, your heart rate and blood pressure return toward normal.' },
