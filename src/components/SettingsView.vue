@@ -307,9 +307,9 @@
               :model-value="bedtimeStartObj"
               time-picker
               :clearable="false"
-              :is24="true"
+              :is24="false"
               :auto-apply="true"
-              :format="'HH:mm'"
+              :format="'hh:mm a'"
               :teleport="true"
               :dark="isDark"
               minutes-increment="5"
@@ -322,9 +322,9 @@
               :model-value="bedtimeEndObj"
               time-picker
               :clearable="false"
-              :is24="true"
+              :is24="false"
               :auto-apply="true"
-              :format="'HH:mm'"
+              :format="'hh:mm a'"
               :teleport="true"
               :dark="isDark"
               minutes-increment="5"
