@@ -32,17 +32,28 @@ apply(mode.value)
 export interface UseTheme {
   mode: Ref<ThemeMode>
   setTheme: (m: ThemeMode) => void
+  /** Apply a value pulled from the cloud without echoing back to push. */
+  applyRemote: (m: ThemeMode) => void
+}
+
+function persist(m: ThemeMode): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, m)
+  } catch {
+    // ignore
+  }
 }
 
 export function useTheme(): UseTheme {
   function setTheme(m: ThemeMode): void {
     mode.value = m
-    try {
-      localStorage.setItem(STORAGE_KEY, m)
-    } catch {
-      // ignore
-    }
+    persist(m)
     apply(m)
   }
-  return { mode, setTheme }
+  function applyRemote(m: ThemeMode): void {
+    mode.value = m
+    persist(m)
+    apply(m)
+  }
+  return { mode, setTheme, applyRemote }
 }

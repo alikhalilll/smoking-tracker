@@ -90,6 +90,10 @@ export function setLocale(l: Locale): void {
   apply(l)
 }
 
+/** Apply a locale pulled from the cloud. Same effect as setLocale today,
+ * but kept distinct so the sync layer has a clear callsite. */
+export const applyRemoteLocale = setLocale
+
 /** Locale tag suitable for Intl APIs. */
 export function intlLocale(): string {
   return currentLocale.value === 'ar' ? 'ar' : 'en-US'

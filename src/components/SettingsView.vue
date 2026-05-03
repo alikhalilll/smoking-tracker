@@ -280,9 +280,9 @@
         </details>
       </div>
 
-      <!-- Bedtime — its own card, always visible regardless of the
-           reminders toggle so the user can configure quiet hours up
-           front. The setting still only matters once reminders are on. -->
+      <!-- Bedtime — required. Notifications pause inside this window AND
+           gap analytics subtract any sleep overlap so an overnight gap
+           doesn't get counted as awake time. -->
       <div class="card">
         <div class="card-header">
           <div class="card-icon icon-lavender">
@@ -292,15 +292,8 @@
             <div class="card-title">{{ t('reminders.bedtime_label') }}</div>
             <div class="card-sub">{{ t('reminders.bedtime_help') }}</div>
           </div>
-          <Toggle
-            :model-value="reminders.settings.value.bedtimeEnabled"
-            @update:model-value="onBedtimeToggle"
-          />
         </div>
-        <div
-          v-if="reminders.settings.value.bedtimeEnabled"
-          class="bedtime-times"
-        >
+        <div class="bedtime-times">
           <div class="time-field" @click="openStartPicker">
             <span class="time-label">{{ t('reminders.bedtime_start') }}</span>
             <button type="button" class="time-trigger">
@@ -495,11 +488,6 @@ function onGapChange(minutes: number): void {
 
 function onNotificationLocaleChange(loc: NotificationLocale): void {
   reminders.setNotificationLocale(loc)
-  emit('reminders-changed')
-}
-
-function onBedtimeToggle(enabled: boolean): void {
-  reminders.setBedtime({ enabled })
   emit('reminders-changed')
 }
 
