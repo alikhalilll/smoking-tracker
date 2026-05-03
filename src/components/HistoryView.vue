@@ -85,8 +85,8 @@
 
           <div v-if="expanded[d]" class="entries-list">
             <div
-              v-for="(e, idx) in dayReports[d].entries"
-              :key="idx"
+              v-for="e in dayReports[d].entries"
+              :key="e.id"
               class="entry-row"
             >
               <div class="entry-time tabular">{{ formatTime(e.time) }}</div>
@@ -96,11 +96,33 @@
                 </span>
                 <span v-else>+{{ formatDuration(e.gapMs) }}</span>
               </div>
+              <button
+                class="entry-edit-btn"
+                :aria-label="t('history.edit_entry_aria')"
+                @click="onEditEntry(e.id, e.time)"
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              </button>
             </div>
+            <button class="delete-day-btn" @click="onDeleteDay(d)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+              {{ t('history.delete_day_btn') }}
+            </button>
           </div>
         </div>
       </div>
     </template>
+
+    <!-- Edit-entry picker. Day is locked to the original entry's date
+         and time can't drift past "now" — both constraints are enforced
+         inside the picker and on save. -->
+    <DateTimePicker
+      v-model:open="editorOpen"
+      :model-value="editValue"
+      :lock-date="true"
+      :max-date="editorMax"
+      @update:model-value="onEntryEdited"
+    />
   </div>
 </template>
 
@@ -114,6 +136,7 @@ import {
 } from '../composables/useStats'
 import { useI18n } from '../i18n'
 import type { DayReport, GapStats } from '../types'
+import DateTimePicker from './DateTimePicker.vue'
 
 const { t } = useI18n()
 
@@ -128,12 +151,48 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
   'open-report': []
+  'delete-day': [date: string]
+  'edit-entry': [payload: { id: string; iso: string }]
 }>()
 
 const expanded = ref<Record<string, boolean>>({})
 
 function toggle(d: string): void {
   expanded.value[d] = !expanded.value[d]
+}
+
+function onDeleteDay(d: string): void {
+  const count = props.byDay[d] ?? 0
+  if (!confirm(t('history.delete_day_confirm', { count, date: d }))) return
+  emit('delete-day', d)
+}
+
+// Edit-entry state. The DateTimePicker takes a Date and emits the
+// chosen Date when the user saves.
+const editingId = ref<string | null>(null)
+const editValue = ref<Date | null>(null)
+const editorOpen = ref(false)
+// Snapshotted at the moment the editor opens so the upper bound
+// doesn't drift while the sheet is on screen. If the user edits an
+// entry from a past day, the original time is in the past anyway, so
+// the bound only really binds when editing today's entry.
+const editorMax = ref<Date | null>(null)
+
+function onEditEntry(id: string, currentIso: string): void {
+  editingId.value = id
+  editValue.value = new Date(currentIso)
+  editorMax.value = new Date()
+  editorOpen.value = true
+}
+
+function onEntryEdited(picked: Date | null): void {
+  if (editingId.value && picked) {
+    emit('edit-entry', { id: editingId.value, iso: picked.toISOString() })
+  }
+  editingId.value = null
+  editValue.value = null
+  editorMax.value = null
+  editorOpen.value = false
 }
 
 function barWidth(count: number): number {
@@ -287,4 +346,47 @@ function barWidth(count: number): number {
   color: var(--subtle);
   font-style: italic;
 }
+.delete-day-btn {
+  margin-top: 10px;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--danger) 25%, transparent);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--danger);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.delete-day-btn:active {
+  background: var(--danger-soft);
+}
+.entry-row {
+  align-items: center;
+}
+.entry-edit-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 6px;
+  margin-inline-start: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.entry-edit-btn:active {
+  background: var(--surface-tint);
+  color: var(--text);
+}
+
 </style>

@@ -16,6 +16,10 @@ export interface UseStorage {
   data: Ref<AppData>
   addEntries: (count: number) => void
   undoLast: () => void
+  deleteDay: (date: string) => void
+  /** Update an entry's timestamp. Recomputes `date` from the new time
+   *  and marks `synced: false` so the next sync pass UPSERTs it. */
+  editEntryTime: (id: string, newIsoTime: string) => void
   resetAll: () => void
   startQuitPlan: (intensity: QuitIntensity, baseline: number) => void
   abandonQuitPlan: () => void
@@ -99,6 +103,27 @@ export function useStorage(): UseStorage {
     }
   }
 
+  function deleteDay(date: string): void {
+    data.value.entries = data.value.entries.filter((e) => e.date !== date)
+    save()
+  }
+
+  function editEntryTime(id: string, newIsoTime: string): void {
+    const e = data.value.entries.find((x) => x.id === id)
+    if (!e) return
+    e.time = newIsoTime
+    // Local-date string from the ISO timestamp. The server `date` column
+    // tracks the local calendar day, so an edit that crosses midnight
+    // moves the entry to the new day's bucket.
+    const d = new Date(newIsoTime)
+    const yyyy = d.getFullYear()
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    e.date = `${yyyy}-${mm}-${dd}`
+    e.synced = false
+    save()
+  }
+
   function resetAll(): void {
     data.value = getDefaultData()
     save()
@@ -115,11 +140,17 @@ export function useStorage(): UseStorage {
       targetsByDate: generateTargets(baseline, durationDays, today),
     }
     data.value.quitPlan = plan
+    // Starting a fresh plan invalidates any prior abandon stamp — the
+    // new plan is what we want sync to converge on.
+    delete data.value.quitPlanClearedAt
     save()
   }
 
   function abandonQuitPlan(): void {
     delete data.value.quitPlan
+    // Stamp the moment of abandon so a racing pull can't restore a
+    // stale server row written before this point.
+    data.value.quitPlanClearedAt = Date.now()
     save()
   }
 
@@ -127,6 +158,8 @@ export function useStorage(): UseStorage {
     data,
     addEntries,
     undoLast,
+    deleteDay,
+    editEntryTime,
     resetAll,
     startQuitPlan,
     abandonQuitPlan,

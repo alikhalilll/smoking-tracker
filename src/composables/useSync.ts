@@ -52,10 +52,10 @@ export function useSync(data: Ref<AppData>): UseSync {
     setStatus('syncing')
 
     // Step 1 — push any not-yet-synced local entries first, so offline
-    // writes don't get wiped by the authoritative replace below.
-    // Use upsert with ignoreDuplicates so a stale `synced: false` flag
-    // (e.g. browser killed mid-push) doesn't crash the whole pull
-    // with a primary-key collision.
+    // writes (and edits to existing entries) don't get wiped by the
+    // authoritative replace below. Upsert WITHOUT ignoreDuplicates so
+    // an edit (id present on server, synced=false locally) actually
+    // updates the row instead of silently skipping. Last-write-wins.
     const unsyncedLocal = data.value.entries.filter((e) => !e.synced)
     if (unsyncedLocal.length > 0) {
       const { error: insertErr } = await supabase
@@ -67,7 +67,7 @@ export function useSync(data: Ref<AppData>): UseSync {
             time: e.time,
             date: e.date,
           })),
-          { onConflict: 'id', ignoreDuplicates: true }
+          { onConflict: 'id' }
         )
       if (insertErr) {
         setStatus('error', insertErr.message)
@@ -114,7 +114,29 @@ export function useSync(data: Ref<AppData>): UseSync {
       return
     }
 
-    if (serverPlan && !data.value.quitPlan) {
+    // Honor the local abandon stamp: a server row written *before* the
+    // user's most recent abandon is stale (the delete just hasn't
+    // landed yet, or this is a race against the periodic pull). Treat
+    // it as gone and tell the server to delete it, so the abandon
+    // converges across devices.
+    const clearedAt = data.value.quitPlanClearedAt ?? 0
+    const serverPlanMs =
+      serverPlan != null
+        ? new Date((serverPlan as ServerPlan).updated_at).getTime()
+        : 0
+    const serverPlanIsStale =
+      serverPlan != null && serverPlanMs <= clearedAt
+
+    if (serverPlanIsStale) {
+      const { error: delErr } = await supabase
+        .from('quit_plans')
+        .delete()
+        .eq('user_id', user.value.id)
+      if (delErr) {
+        setStatus('error', delErr.message)
+        return
+      }
+    } else if (serverPlan && !data.value.quitPlan) {
       applyingRemote = true
       try {
         data.value.quitPlan = serverPlanToLocal(serverPlan as ServerPlan)
@@ -160,34 +182,31 @@ export function useSync(data: Ref<AppData>): UseSync {
     )
     const localIds = new Set(data.value.entries.map((e) => e.id))
 
-    // Insert local-only by id and mark them as synced once the server
-    // confirms. Use upsert/ignoreDuplicates so a server-side row we
-    // don't yet know about (e.g. raced from another tab) doesn't 409
-    // the whole batch.
-    const toInsert: SmokeEntry[] = data.value.entries.filter(
-      (e) => !serverIds.has(e.id)
-    )
-    if (toInsert.length > 0) {
-      const { error: insertErr } = await supabase
+    // Push every unsynced entry — covers both new logs (id not on server)
+    // and local edits (id on server, time/date changed). UPSERT without
+    // ignoreDuplicates so existing rows are updated. Last-write-wins.
+    const toUpsert: SmokeEntry[] = data.value.entries.filter((e) => !e.synced)
+    if (toUpsert.length > 0) {
+      const { error: upsertErr } = await supabase
         .from('entries')
         .upsert(
-          toInsert.map((e) => ({
+          toUpsert.map((e) => ({
             id: e.id,
             user_id: user.value!.id,
             time: e.time,
             date: e.date,
           })),
-          { onConflict: 'id', ignoreDuplicates: true }
+          { onConflict: 'id' }
         )
-      if (insertErr) {
-        setStatus('error', insertErr.message)
+      if (upsertErr) {
+        setStatus('error', upsertErr.message)
         return
       }
-      const insertedIds = new Set(toInsert.map((e) => e.id))
+      const upsertedIds = new Set(toUpsert.map((e) => e.id))
       applyingRemote = true
       try {
         for (const e of data.value.entries) {
-          if (insertedIds.has(e.id)) e.synced = true
+          if (upsertedIds.has(e.id)) e.synced = true
         }
       } finally {
         applyingRemote = false
@@ -262,9 +281,18 @@ export function useSync(data: Ref<AppData>): UseSync {
     { immediate: true }
   )
 
-  // Debounced push on local changes.
+  // Entry changes are debounced — a user logging 3 cigarettes in a row
+  // shouldn't fire 3 separate pushes. We track length AND the count of
+  // unsynced rows so an edit (which doesn't change length but flips
+  // `synced` to false on a row) still wakes the watcher.
+  // flush: 'sync' so applyingRemote (cleared synchronously after pushDiff
+  // marks rows synced=true) holds across the watcher fire — without it,
+  // every successful push would queue a redundant pushDiff right after.
   watch(
-    () => [data.value.entries.length, data.value.quitPlan],
+    () => [
+      data.value.entries.length,
+      data.value.entries.filter((e) => !e.synced).length,
+    ],
     () => {
       if (applyingRemote) return
       if (!isAuthed.value) return
@@ -272,6 +300,31 @@ export function useSync(data: Ref<AppData>): UseSync {
       pushTimer = setTimeout(() => {
         void pushDiff().catch((err) => setStatus('error', String(err)))
       }, 800)
+    },
+    { flush: 'sync' }
+  )
+
+  // Quit plan changes push immediately — every plan action (start /
+  // abandon / future edits) must hit the server right away so closing
+  // the app within the debounce window can't drop the change.
+  watch(
+    () => data.value.quitPlan,
+    async (next) => {
+      if (applyingRemote) return
+      if (!isAuthed.value || !supabase || !user.value) return
+      try {
+        if (next) {
+          await pushPlan(next)
+        } else {
+          const { error } = await supabase
+            .from('quit_plans')
+            .delete()
+            .eq('user_id', user.value.id)
+          if (error) setStatus('error', error.message)
+        }
+      } catch (err) {
+        setStatus('error', String(err))
+      }
     },
     { deep: true }
   )

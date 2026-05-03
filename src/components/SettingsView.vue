@@ -294,44 +294,18 @@
           </div>
         </div>
         <div class="bedtime-times">
-          <div class="time-field" @click="openStartPicker">
+          <div class="time-field">
             <span class="time-label">{{ t('reminders.bedtime_start') }}</span>
-            <button type="button" class="time-trigger">
-              {{ formatPickerTime(bedtimeStartObj) }}
-            </button>
-            <VueDatePicker
-              ref="startPicker"
-              :model-value="bedtimeStartObj"
-              time-picker
-              :clearable="false"
-              :is24="false"
-              :auto-apply="true"
-              :teleport="true"
-              :dark="isDark"
-              minutes-increment="5"
-              :hide-input-icon="true"
-              class="hidden-picker"
-              @update:model-value="onBedtimeStartPicked"
+            <TimePicker
+              :model-value="reminders.settings.value.bedtimeStart"
+              @update:model-value="onBedtimeStartHm"
             />
           </div>
-          <div class="time-field" @click="openEndPicker">
+          <div class="time-field">
             <span class="time-label">{{ t('reminders.bedtime_end') }}</span>
-            <button type="button" class="time-trigger">
-              {{ formatPickerTime(bedtimeEndObj) }}
-            </button>
-            <VueDatePicker
-              ref="endPicker"
-              :model-value="bedtimeEndObj"
-              time-picker
-              :clearable="false"
-              :is24="false"
-              :auto-apply="true"
-              :teleport="true"
-              :dark="isDark"
-              minutes-increment="5"
-              :hide-input-icon="true"
-              class="hidden-picker"
-              @update:model-value="onBedtimeEndPicked"
+            <TimePicker
+              :model-value="reminders.settings.value.bedtimeEnd"
+              @update:model-value="onBedtimeEndHm"
             />
           </div>
         </div>
@@ -365,6 +339,84 @@
             <div class="data-value tabular">{{ dailyAvg }}</div>
           </div>
         </div>
+      </div>
+
+      <!-- Cigarette price (drives the "money saved" widget on Home) -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon icon-mint">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          </div>
+          <div>
+            <div class="card-title">{{ t('settings.economy_title') }}</div>
+            <div class="card-sub">{{ t('settings.economy_help') }}</div>
+          </div>
+        </div>
+        <div class="economy-row">
+          <label class="economy-field">
+            <span class="economy-label">{{ t('settings.economy_pack_price_label') }}</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              inputmode="decimal"
+              class="field-input"
+              :value="economy.settings.value.pricePerPack"
+              @input="onPackPriceInput"
+            />
+          </label>
+          <label class="economy-field economy-field-cigs">
+            <span class="economy-label">{{ t('settings.economy_cigs_per_pack_label') }}</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              inputmode="numeric"
+              class="field-input"
+              :value="economy.settings.value.cigsPerPack"
+              @input="onCigsPerPackInput"
+            />
+          </label>
+        </div>
+
+        <div class="economy-field" style="margin-top: 12px">
+          <span class="economy-label">{{ t('settings.economy_currency_label') }}</span>
+          <Select
+            :model-value="economy.settings.value.currency"
+            :options="currencyOptions"
+            @update:model-value="economy.setCurrency"
+          />
+        </div>
+
+        <div
+          v-if="economy.settings.value.pricePerPack > 0"
+          class="economy-derived"
+        >
+          {{
+            t('settings.economy_derived', {
+              price: formatMoney(
+                economy.pricePerCigarette.value,
+                economy.settings.value.currency
+              ),
+            })
+          }}
+        </div>
+      </div>
+
+      <!-- CSV export -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon icon-lavender">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          </div>
+          <div>
+            <div class="card-title">{{ t('settings.export_title') }}</div>
+            <div class="card-sub">{{ t('settings.export_help') }}</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost block" @click="onExportCsv">
+          {{ t('settings.export_btn') }}
+        </button>
       </div>
 
       <div class="card danger-card">
@@ -408,10 +460,11 @@ import {
   type NotificationLocale,
 } from '../composables/useReminders'
 import { useAuth } from '../composables/useAuth'
+import { useEconomy, formatMoney } from '../composables/useEconomy'
 import { isSupabaseConfigured } from '../supabase'
 import Toggle from './Toggle.vue'
-import { VueDatePicker } from '@vuepic/vue-datepicker'
-import '@vuepic/vue-datepicker/dist/main.css'
+import Select from './Select.vue'
+import TimePicker from './TimePicker.vue'
 import type { UseSync } from '../composables/useSync'
 import type { UseLeaderboard } from '../composables/useLeaderboard'
 
@@ -428,6 +481,12 @@ const NOTIFICATION_LOCALE_OPTIONS: ReadonlyArray<{
   value: NotificationLocale
 }> = [{ value: 'auto' }, { value: 'en' }, { value: 'ar' }]
 
+interface ExportEntry {
+  id: string
+  time: string
+  date: string
+}
+
 interface Props {
   startDate: string
   totalSmoked: number
@@ -436,6 +495,8 @@ interface Props {
   sync?: UseSync | null
   leaderboard?: UseLeaderboard | null
   isAuthed?: boolean
+  /** All entries — used by the CSV export. */
+  entries?: ReadonlyArray<ExportEntry>
 }
 
 const props = defineProps<Props>()
@@ -445,6 +506,50 @@ const emit = defineEmits<{
   'reminders-changed': []
   'open-auth': []
 }>()
+
+const economy = useEconomy()
+const CURRENCIES: ReadonlyArray<string> = [
+  'USD', 'EUR', 'GBP', 'EGP', 'SAR', 'AED', 'JOD', 'TRY', 'CAD', 'AUD', 'INR', 'PKR',
+]
+const currencyOptions = computed(() =>
+  CURRENCIES.map((c) => ({ value: c, label: c }))
+)
+
+function onPackPriceInput(e: Event): void {
+  const v = parseFloat((e.target as HTMLInputElement).value)
+  economy.setPackPrice(Number.isFinite(v) && v >= 0 ? v : 0)
+}
+function onCigsPerPackInput(e: Event): void {
+  const v = parseInt((e.target as HTMLInputElement).value, 10)
+  economy.setCigsPerPack(Number.isFinite(v) && v >= 1 ? v : 20)
+}
+
+function csvEscape(v: string): string {
+  // Quote if it contains a comma, quote, or newline; double inner quotes.
+  if (/[",\n\r]/.test(v)) return `"${v.replace(/"/g, '""')}"`
+  return v
+}
+
+function onExportCsv(): void {
+  const rows = props.entries ?? []
+  const header = 'id,time,date'
+  const body = rows
+    .map((e) => `${csvEscape(e.id)},${csvEscape(e.time)},${csvEscape(e.date)}`)
+    .join('\n')
+  const blob = new Blob([`${header}\n${body}\n`], {
+    type: 'text/csv;charset=utf-8',
+  })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  const stamp = new Date().toISOString().slice(0, 10)
+  a.href = url
+  a.download = `smoke-tracker-${stamp}.csv`
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  // Defer revocation so Safari has time to start the download.
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
 
 // Treat undefined as `false` so the gated state is the safe default
 // when this prop isn't passed.
@@ -491,76 +596,14 @@ function onNotificationLocaleChange(loc: NotificationLocale): void {
   emit('reminders-changed')
 }
 
-interface PickerTime {
-  hours: number
-  minutes: number
-  seconds?: number
-}
-
-function hmToObj(hm: string): PickerTime {
-  const [h, m] = hm.split(':').map((v) => parseInt(v, 10) || 0)
-  return { hours: h, minutes: m }
-}
-function objToHm(t: PickerTime | null): string {
-  if (!t) return '00:00'
-  return `${String(t.hours).padStart(2, '0')}:${String(t.minutes).padStart(2, '0')}`
-}
-
-/**
- * Custom format for VueDatePicker. The library's built-in 'hh:mm a'
- * token sometimes drops the period in 12h mode, so we render it
- * ourselves to guarantee 'h:mm AM/PM' (e.g. '10:00 PM', '7:30 AM').
- * The picker calls this with either a Date or a `{hours, minutes}` —
- * we handle both shapes.
- */
-type PickerFormatArg = Date | { hours: number; minutes: number }
-function formatPickerTime(d: PickerFormatArg): string {
-  const hours24 =
-    d instanceof Date ? d.getHours() : (d?.hours ?? 0)
-  const minutes =
-    d instanceof Date ? d.getMinutes() : (d?.minutes ?? 0)
-  const period = hours24 >= 12 ? 'PM' : 'AM'
-  const h12 = hours24 % 12 === 0 ? 12 : hours24 % 12
-  return `${h12}:${String(minutes).padStart(2, '0')} ${period}`
-}
-
-const bedtimeStartObj = computed<PickerTime>(() =>
-  hmToObj(reminders.settings.value.bedtimeStart)
-)
-const bedtimeEndObj = computed<PickerTime>(() =>
-  hmToObj(reminders.settings.value.bedtimeEnd)
-)
-
-function onBedtimeStartPicked(t: PickerTime | null): void {
-  reminders.setBedtime({ start: objToHm(t) })
+function onBedtimeStartHm(hm: string): void {
+  reminders.setBedtime({ start: hm })
   emit('reminders-changed')
 }
-function onBedtimeEndPicked(t: PickerTime | null): void {
-  reminders.setBedtime({ end: objToHm(t) })
+function onBedtimeEndHm(hm: string): void {
+  reminders.setBedtime({ end: hm })
   emit('reminders-changed')
 }
-
-// Refs to imperatively open each hidden picker when its card is tapped.
-const startPicker = ref<{ openMenu: () => void } | null>(null)
-const endPicker = ref<{ openMenu: () => void } | null>(null)
-function openStartPicker(): void {
-  startPicker.value?.openMenu()
-}
-function openEndPicker(): void {
-  endPicker.value?.openMenu()
-}
-
-// Dark theme detection so the picker matches the app
-const isDark = computed<boolean>(() => {
-  if (typeof document === 'undefined') return false
-  const explicit = document.documentElement.getAttribute('data-theme')
-  if (explicit === 'dark') return true
-  if (explicit === 'light') return false
-  return (
-    typeof window !== 'undefined' &&
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-  )
-})
 
 interface DiagSnapshot {
   buildId: string
@@ -984,7 +1027,7 @@ function handleReset(): void {
   border-top: 1px solid var(--hairline);
 }
 
-/* Bedtime — uses VueDatePicker (time-only), themed to match the app */
+/* Bedtime — TimePicker (vaul-vue Drawer) sits inside each card */
 .bedtime-times {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1000,6 +1043,7 @@ function handleReset(): void {
   border-radius: 16px;
   border: 1.5px solid transparent;
   transition: border-color 0.15s ease, background 0.15s ease;
+  cursor: pointer;
 }
 .time-field:focus-within {
   border-color: var(--brand);
@@ -1010,47 +1054,6 @@ function handleReset(): void {
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-}
-
-/* The whole .time-field card is the click target; our button shows
-   the formatted time, and the actual VueDatePicker instance is
-   visually hidden — we open it imperatively via a ref. The popup
-   still teleports to <body> so it shows up normally on click. */
-.time-field {
-  cursor: pointer;
-}
-.time-trigger {
-  appearance: none;
-  border: none;
-  background: transparent;
-  padding: 0;
-  width: 100%;
-  text-align: start;
-  cursor: pointer;
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-variant-numeric: tabular-nums;
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  color: var(--text);
-  pointer-events: none; /* let the parent .time-field receive the click */
-}
-.hidden-picker {
-  width: 0;
-  height: 0;
-  overflow: hidden;
-  position: absolute;
-  pointer-events: none;
-  opacity: 0;
-}
-.hidden-picker :deep(.dp__main),
-.hidden-picker :deep(.dp__input_wrap),
-.hidden-picker :deep(.dp__input) {
-  width: 0;
-  height: 0;
-  padding: 0;
-  border: none;
-  visibility: hidden;
 }
 
 .info-label {
@@ -1108,6 +1111,46 @@ function handleReset(): void {
   color: var(--text);
   margin-top: 4px;
 }
+
+/* Cigarette price card. align-items: end keeps the inputs flush along
+   the bottom of the row even when one label wraps to two lines (e.g.
+   "Cigarettes per pack"). The label itself flexes to take whatever
+   vertical space it needs without dragging its input up. */
+.economy-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 12px;
+  align-items: end;
+}
+.economy-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.economy-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  /* Reserve two lines so a single-line label still aligns its input
+     with a wrapping neighbor — keeps both inputs at the same height
+     even on narrower screens. */
+  min-height: 2.4em;
+  display: flex;
+  align-items: flex-end;
+}
+.economy-derived {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: var(--surface-tint);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+  text-align: center;
+}
+
 
 /* Danger button */
 .danger-btn {

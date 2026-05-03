@@ -1,0 +1,276 @@
+/* === Bottom-sheet styles, shared by Select / TimePicker / DateTimePicker.
+ *
+ * vaul-vue's DrawerContent is positioned by the library; we just style
+ * the surface, the dim overlay, the drag handle, and the inner pieces.
+ * Loaded globally from main.ts so DrawerPortal-rendered nodes (which
+ * mount at document.body, outside Vue scoped boundaries) pick them up.
+ */
+
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 200;
+}
+
+.sheet-content {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 201;
+  background: var(--card);
+  border-top-left-radius: 22px;
+  border-top-right-radius: 22px;
+  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
+  padding: 8px 16px calc(20px + env(safe-area-inset-bottom));
+  /* No outer scroll — vaul's drag-to-dismiss conflicts with overflow:auto
+     on the drawer surface. Scroll is delegated to inner sections that
+     opt in (.sheet-list and .report-sheet) so vertical drag only fires
+     on non-scrollable areas. */
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sheet-handle-row {
+  display: flex;
+  justify-content: center;
+  padding: 6px 0 4px;
+}
+.sheet-handle {
+  display: block;
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--hairline);
+}
+
+.sheet-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 4px 0 8px;
+  text-align: center;
+}
+
+/* Select — list of options. Inner scroll container; bounded so very
+   long option lists don't push the drawer past the viewport. vaul
+   recognizes this as the scrollable area and only treats drags from
+   non-scrolling regions as dismiss gestures. */
+.sheet-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 60vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.sheet-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px;
+  border-radius: 12px;
+  font-size: 15px;
+  color: var(--text);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s ease;
+}
+.sheet-option:active {
+  background: var(--surface-tint);
+}
+.sheet-option.active {
+  color: var(--brand);
+  font-weight: 600;
+  background: var(--brand-soft);
+}
+.sheet-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sheet-option-check {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand);
+  flex-shrink: 0;
+}
+
+/* Time controls (TimePicker + DateTimePicker share the same row) */
+.sheet-time-row {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  padding: 8px 4px;
+  justify-content: center;
+}
+.sheet-time-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.sheet-time-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: center;
+}
+.sheet-time-input {
+  width: 76px;
+  padding: 12px 10px;
+  border: 1.5px solid var(--hairline);
+  border-radius: var(--radius-input);
+  background: var(--card);
+  color: var(--text);
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 28px;
+  font-weight: 700;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.sheet-time-input::-webkit-outer-spin-button,
+.sheet-time-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.sheet-time-input:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px var(--brand-soft);
+}
+.sheet-time-sep {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--muted);
+  padding-bottom: 12px;
+}
+.sheet-period {
+  display: flex;
+  flex-direction: column;
+  background: var(--btn-ghost-bg);
+  border-radius: 12px;
+  padding: 3px;
+  gap: 2px;
+}
+.sheet-period-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 8px 14px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.sheet-period-btn.active {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Calendar inside DateTimePicker */
+.sheet-cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px;
+}
+.sheet-cal-heading {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-transform: capitalize;
+}
+.sheet-cal-nav {
+  appearance: none;
+  border: none;
+  background: var(--surface-tint);
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--text);
+  transition: background 0.15s ease;
+}
+.sheet-cal-nav:hover { background: var(--btn-ghost-bg); }
+.sheet-cal-nav:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.sheet-cal-grids {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sheet-cal-grid { width: 100%; border-collapse: collapse; }
+.sheet-cal-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+.sheet-cal-head-cell {
+  font-size: 10px;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted);
+  text-align: center;
+  padding: 6px 0;
+  letter-spacing: 0.04em;
+}
+.sheet-cal-cell { text-align: center; padding: 0; }
+.sheet-cal-trigger {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 14px;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  cursor: pointer;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.sheet-cal-trigger:hover { background: var(--surface-tint); }
+.sheet-cal-trigger[data-outside-view] { color: var(--subtle); opacity: 0.5; }
+.sheet-cal-trigger[data-today] { font-weight: 700; color: var(--brand); }
+.sheet-cal-trigger[data-selected] { background: var(--brand); color: #fff; }
+.sheet-cal-trigger[data-selected]:hover { background: var(--brand); }
+.sheet-cal-trigger[data-disabled] { opacity: 0.35; cursor: not-allowed; }
+
+/* Footer buttons */
+.sheet-actions {
+  display: flex;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline);
+  margin-top: 4px;
+}
+.sheet-actions .btn {
+  flex: 1;
+  font-size: 14px;
+  padding: 14px;
+}

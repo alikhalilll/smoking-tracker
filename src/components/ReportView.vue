@@ -1,17 +1,20 @@
 <template>
-  <div class="report-overlay" @click.self="emit('close')">
-    <div class="report-panel">
-      <div class="report-top">
-        <div>
-          <div class="brand">{{ t('report.title') }}</div>
-          <div class="generated-at">
-            {{ t('report.generated_at', { when: generatedAt }) }}
+  <DrawerRoot :open="open" @update:open="onOpenChange">
+    <DrawerPortal>
+      <DrawerOverlay class="sheet-overlay" />
+      <DrawerContent class="sheet-content report-sheet">
+        <div class="sheet-handle-row"><span class="sheet-handle" /></div>
+        <div class="report-top">
+          <div>
+            <DrawerTitle class="brand">{{ t('report.title') }}</DrawerTitle>
+            <div class="generated-at">
+              {{ t('report.generated_at', { when: generatedAt }) }}
+            </div>
           </div>
+          <button class="close-btn" @click="emit('close')">
+            {{ t('report.close') }}
+          </button>
         </div>
-        <button class="close-btn" @click="emit('close')">
-          {{ t('report.close') }}
-        </button>
-      </div>
 
       <!-- Summary -->
       <section class="report-section">
@@ -147,13 +150,21 @@
         </div>
       </section>
 
-      <div style="height: 2rem" />
-    </div>
-  </div>
+        <div style="height: 2rem" />
+      </DrawerContent>
+    </DrawerPortal>
+  </DrawerRoot>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import {
+  DrawerRoot,
+  DrawerPortal,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerTitle,
+} from 'vaul-vue'
 import { formatDuration } from '../composables/useStats'
 import { useI18n, intlLocale } from '../i18n'
 import { getToday } from '../composables/useDate'
@@ -168,6 +179,7 @@ import type {
 const { t } = useI18n()
 
 interface Props {
+  open: boolean
   totalSmoked: number
   totalDays: number
   dailyAvg: number
@@ -182,7 +194,19 @@ const props = defineProps<Props>()
 
 const emit = defineEmits<{
   close: []
+  'update:open': [value: boolean]
 }>()
+
+// Bridge vaul's open state to the parent's `close` semantics: any
+// drawer-driven close (drag-down, outside tap, Esc) emits both an
+// update:open(false) and our existing `close` event so callers don't
+// need to know the drawer details.
+function onOpenChange(v: boolean): void {
+  emit('update:open', v)
+  if (!v) emit('close')
+}
+// Reference the prop in the script section to keep TS happy in templates.
+void props
 
 const generatedAt = computed(() =>
   new Date().toLocaleString(intlLocale(), {
@@ -253,24 +277,17 @@ function shortDate(dateStr: string): string {
 </script>
 
 <style scoped>
-.report-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  z-index: 100;
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
+/* Report-specific layout. Long-form content, so this sheet opts back
+   into outer scroll (the base .sheet-content disables it because the
+   Select list and time pickers are short and rely on inner scroll
+   instead — vaul's drag handler conflicts with both having overflow). */
+.report-sheet {
+  padding-left: 16px;
+  padding-right: 16px;
+  max-height: 92vh;
   overflow-y: auto;
-  animation: fadeIn 0.18s ease-out;
-}
-.report-panel {
-  width: 100%;
-  max-width: 480px;
-  background: var(--bg);
-  min-height: 100dvh;
-  padding: 1.25rem 1rem 0;
-  animation: slideUp 0.22s ease-out;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .report-top {
   display: flex;

@@ -33,8 +33,24 @@ create policy "users see their own entries"
   on public.entries for select using (auth.uid() = user_id);
 create policy "users insert their own entries"
   on public.entries for insert with check (auth.uid() = user_id);
+create policy "users update their own entries"
+  on public.entries for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
 create policy "users delete their own entries"
   on public.entries for delete using (auth.uid() = user_id);
+
+-- Existing installs: if you set up the schema before the
+-- "edit entry time" feature, you must run JUST the UPDATE policy
+-- above to allow the upsert that powers entry edits:
+--
+--   create policy "users update their own entries"
+--     on public.entries for update
+--     using (auth.uid() = user_id)
+--     with check (auth.uid() = user_id);
+--
+-- Without it, every edit fails with code 42501 / "new row violates
+-- row-level security policy".
 
 -- If you set the schema up before this change you'll have a unique
 -- constraint on (user_id, time). It blocks batched logs (multiple

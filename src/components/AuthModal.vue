@@ -1,25 +1,41 @@
 <template>
-  <transition name="modal">
-    <div v-if="isOpen" class="modal-backdrop" @click.self="close">
-      <div class="modal-card glass-strong">
-        <button class="modal-close btn btn-icon" @click="close" aria-label="Close">
+  <DrawerRoot :open="isOpen" @update:open="(v) => (v ? null : close())">
+    <DrawerPortal>
+      <DrawerOverlay class="sheet-overlay" />
+      <DrawerContent class="sheet-content auth-sheet">
+        <div class="sheet-handle-row"><span class="sheet-handle" /></div>
+
+        <button
+          type="button"
+          class="modal-close btn btn-icon"
+          :aria-label="'Close'"
+          @click="close"
+        >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>
         </button>
 
         <div class="modal-hero">🌱</div>
-        <h2 class="modal-title">{{ t('login.title') }}</h2>
-        <p class="modal-sub">{{ t('login.subtitle') }}</p>
+        <DrawerTitle class="modal-title">{{ t('login.title') }}</DrawerTitle>
+        <DrawerDescription class="modal-sub">{{ t('login.subtitle') }}</DrawerDescription>
 
         <SignInCard @signed-in="onSignedIn" />
-      </div>
-    </div>
-  </transition>
+      </DrawerContent>
+    </DrawerPortal>
+  </DrawerRoot>
 </template>
 
 <script setup lang="ts">
 import { watch } from 'vue'
+import {
+  DrawerRoot,
+  DrawerPortal,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerTitle,
+  DrawerDescription,
+} from 'vaul-vue'
 import { useI18n } from '../i18n'
 import { useAuth } from '../composables/useAuth'
 import { useAuthModal } from '../composables/useAuthModal'
@@ -49,26 +65,11 @@ function onSignedIn(): void {
 </script>
 
 <style scoped>
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(20, 17, 13, 0.45);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 300;
-  padding: 16px;
-  padding-bottom: max(16px, env(safe-area-inset-bottom));
-}
-.modal-card {
-  width: 100%;
-  max-width: 420px;
-  border-radius: 28px;
-  padding: 28px 22px 22px;
-  position: relative;
+/* Auth-specific layout. The base sheet styles come from
+   styles/sheet.css (loaded globally), since vaul portals to <body>. */
+.auth-sheet {
   text-align: center;
+  padding: 8px 22px calc(28px + env(safe-area-inset-bottom));
 }
 .modal-close {
   position: absolute;
@@ -82,36 +83,20 @@ function onSignedIn(): void {
 .modal-hero {
   font-size: 56px;
   line-height: 1;
-  margin-bottom: 8px;
+  margin: 4px 0 6px;
 }
 .modal-title {
   font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.01em;
-  margin-bottom: 6px;
+  margin: 0 0 6px;
+  text-align: center;
 }
 .modal-sub {
   font-size: 13px;
   color: var(--muted);
   line-height: 1.55;
-  margin-bottom: 22px;
-}
-
-.modal-enter-from .modal-card,
-.modal-leave-to .modal-card {
-  opacity: 0;
-  transform: translateY(16px) scale(0.96);
-}
-.modal-enter-from,
-.modal-leave-to {
-  opacity: 0;
-}
-.modal-enter-active,
-.modal-leave-active {
-  transition: opacity 0.2s ease;
-}
-.modal-enter-active .modal-card,
-.modal-leave-active .modal-card {
-  transition: all 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+  margin: 0 0 22px;
+  text-align: center;
 }
 </style>
