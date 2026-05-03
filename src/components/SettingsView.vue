@@ -309,7 +309,8 @@
               :clearable="false"
               :is24="false"
               :auto-apply="true"
-              :format="'hh:mm a'"
+              :format="formatPickerTime"
+              :hide-input-icon="true"
               :teleport="true"
               :dark="isDark"
               minutes-increment="5"
@@ -324,7 +325,8 @@
               :clearable="false"
               :is24="false"
               :auto-apply="true"
-              :format="'hh:mm a'"
+              :format="formatPickerTime"
+              :hide-input-icon="true"
               :teleport="true"
               :dark="isDark"
               minutes-increment="5"
@@ -506,6 +508,24 @@ function hmToObj(hm: string): PickerTime {
 function objToHm(t: PickerTime | null): string {
   if (!t) return '00:00'
   return `${String(t.hours).padStart(2, '0')}:${String(t.minutes).padStart(2, '0')}`
+}
+
+/**
+ * Custom format for VueDatePicker. The library's built-in 'hh:mm a'
+ * token sometimes drops the period in 12h mode, so we render it
+ * ourselves to guarantee 'h:mm AM/PM' (e.g. '10:00 PM', '7:30 AM').
+ * The picker calls this with either a Date or a `{hours, minutes}` —
+ * we handle both shapes.
+ */
+type PickerFormatArg = Date | { hours: number; minutes: number }
+function formatPickerTime(d: PickerFormatArg): string {
+  const hours24 =
+    d instanceof Date ? d.getHours() : (d?.hours ?? 0)
+  const minutes =
+    d instanceof Date ? d.getMinutes() : (d?.minutes ?? 0)
+  const period = hours24 >= 12 ? 'PM' : 'AM'
+  const h12 = hours24 % 12 === 0 ? 12 : hours24 % 12
+  return `${h12}:${String(minutes).padStart(2, '0')} ${period}`
 }
 
 const bedtimeStartObj = computed<PickerTime>(() =>
@@ -996,24 +1016,20 @@ function handleReset(): void {
   color: var(--text);
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.01em;
-  padding: 0 0 0 6px;
+  padding: 0;
   width: 100%;
   text-align: start;
-}
-.time-field :deep(.dp__input_icon),
-.time-field :deep(.dp__clear_icon),
-.time-field :deep(.dp__input_wrap) > svg {
-  color: var(--muted);
-}
-.time-field :deep(.dp__input_icon) {
-  inset-inline-start: auto;
-  inset-inline-end: 0;
+  cursor: pointer;
 }
 .time-field :deep(.dp__input_wrap) {
   cursor: pointer;
+}
+.time-field :deep(.dp__clear_icon),
+.time-field :deep(.dp__input_icons) {
+  display: none;
 }
 
 .info-label {
