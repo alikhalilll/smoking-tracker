@@ -96,10 +96,17 @@
       <template v-else>
         <!-- Top 3 podium -->
         <div v-if="podium.first" class="podium">
-          <!-- 2nd place (start side) — ice -->
+          <!-- 2nd place (start side) — ice particles -->
           <div v-if="podium.second" class="podium-spot rank-2">
-            <span class="aura aura-ice" aria-hidden="true">❄️</span>
             <div class="podium-avatar-wrap medium">
+              <span class="fx fx-ice" aria-hidden="true">
+                <span class="snow s1"></span>
+                <span class="snow s2"></span>
+                <span class="snow s3"></span>
+                <span class="snow s4"></span>
+                <span class="snow s5"></span>
+                <span class="snow s6"></span>
+              </span>
               <span class="halo halo-ice" aria-hidden="true"></span>
               <Avatar
                 :name="podium.second.display_name"
@@ -115,11 +122,20 @@
             </div>
           </div>
 
-          <!-- 1st place (center, biggest) — fire + crown -->
+          <!-- 1st place (center, biggest) — fire embers + crown -->
           <div class="podium-spot rank-1">
             <span class="crown" aria-hidden="true">👑</span>
-            <span class="aura aura-fire" aria-hidden="true">🔥</span>
             <div class="podium-avatar-wrap big">
+              <span class="fx fx-fire" aria-hidden="true">
+                <span class="ember e1"></span>
+                <span class="ember e2"></span>
+                <span class="ember e3"></span>
+                <span class="ember e4"></span>
+                <span class="ember e5"></span>
+                <span class="ember e6"></span>
+                <span class="ember e7"></span>
+                <span class="ember e8"></span>
+              </span>
               <span class="halo halo-fire" aria-hidden="true"></span>
               <Avatar
                 :name="podium.first.display_name"
@@ -135,10 +151,15 @@
             </div>
           </div>
 
-          <!-- 3rd place (end side) — bolt -->
+          <!-- 3rd place (end side) — lightning sparks -->
           <div v-if="podium.third" class="podium-spot rank-3">
-            <span class="aura aura-bolt" aria-hidden="true">⚡</span>
             <div class="podium-avatar-wrap medium">
+              <span class="fx fx-bolt" aria-hidden="true">
+                <span class="spark sp1"></span>
+                <span class="spark sp2"></span>
+                <span class="spark sp3"></span>
+                <span class="spark sp4"></span>
+              </span>
               <span class="halo halo-bolt" aria-hidden="true"></span>
               <Avatar
                 :name="podium.third.display_name"
@@ -470,7 +491,9 @@ async function onJoin(): Promise<void> {
   grid-template-columns: 1fr 1.15fr 1fr;
   align-items: end;
   gap: 12px;
-  padding: 28px 4px 8px;
+  /* Generous bottom padding so the rank-3 spot's translateY(28px)
+     doesn't collide with the list below. */
+  padding: 28px 4px 64px;
   position: relative;
   z-index: 1;
 }
@@ -635,47 +658,139 @@ async function onJoin(): Promise<void> {
   color: #fff;
 }
 
-/* === Elemental aura emojis above the rank-2 and rank-3 spots === */
-.aura {
+/* === Real particle effects per rank ===
+   Each rank's avatar is wrapped in an .fx layer that holds many
+   absolutely-positioned spans. Pure CSS, GPU-only transforms. */
+.fx {
   position: absolute;
-  top: -14px;
-  font-size: 22px;
-  line-height: 1;
+  inset: -24px;
   pointer-events: none;
-  z-index: 3;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.25));
+  z-index: 4;
+  overflow: visible;
 }
-.podium-spot.rank-1 .aura {
-  /* Fire sits next to the crown */
-  top: 6px;
-  inset-inline-end: -6px;
-  font-size: 22px;
+
+/* --- 1st place: rising fire embers + flicker glow --- */
+.fx-fire .ember {
+  position: absolute;
+  bottom: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 50% 30%,
+    #ffe7a8 0%,
+    #ff9b3d 35%,
+    #ff4d22 70%,
+    transparent 100%
+  );
+  filter: blur(0.5px);
+  opacity: 0;
+  animation: ember-rise 1.6s ease-out infinite;
+  mix-blend-mode: screen;
 }
-.aura-fire {
-  animation: flame-flicker 1.4s ease-in-out infinite;
-  transform-origin: bottom center;
+.fx-fire .e1 { left: 18%; --x: -8px;  animation-delay: 0s;     width: 9px;  height: 9px; }
+.fx-fire .e2 { left: 32%; --x: 6px;   animation-delay: 0.18s;  width: 7px;  height: 7px; }
+.fx-fire .e3 { left: 46%; --x: -4px;  animation-delay: 0.42s;  width: 10px; height: 10px; }
+.fx-fire .e4 { left: 60%; --x: 8px;   animation-delay: 0.62s;  width: 6px;  height: 6px; }
+.fx-fire .e5 { left: 74%; --x: -10px; animation-delay: 0.85s;  width: 8px;  height: 8px; }
+.fx-fire .e6 { left: 24%; --x: 12px;  animation-delay: 1.05s;  width: 7px;  height: 7px; }
+.fx-fire .e7 { left: 52%; --x: -6px;  animation-delay: 1.25s;  width: 9px;  height: 9px; }
+.fx-fire .e8 { left: 68%; --x: 4px;   animation-delay: 1.45s;  width: 6px;  height: 6px; }
+@keyframes ember-rise {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6);
+  }
+  15% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translate(var(--x, 0), -110px) scale(0.3);
+  }
 }
-.aura-ice {
-  animation: ice-float 3s ease-in-out infinite;
+
+/* --- 2nd place: drifting snowflakes --- */
+.fx-ice .snow {
+  position: absolute;
+  top: -16px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #ffffff 0%,
+    #d8eeff 60%,
+    transparent 100%
+  );
+  box-shadow: 0 0 4px rgba(180, 220, 255, 0.7);
+  opacity: 0;
+  animation: snow-fall 4s linear infinite;
 }
-.aura-bolt {
-  animation: bolt-zap 2.8s steps(1, end) infinite;
+.fx-ice .s1 { left: 14%; --rot: -180deg; animation-delay: 0s;     width: 5px; height: 5px; }
+.fx-ice .s2 { left: 28%; --rot: 220deg;  animation-delay: 0.6s;   width: 7px; height: 7px; }
+.fx-ice .s3 { left: 42%; --rot: -160deg; animation-delay: 1.2s;   width: 4px; height: 4px; }
+.fx-ice .s4 { left: 60%; --rot: 200deg;  animation-delay: 1.8s;   width: 6px; height: 6px; }
+.fx-ice .s5 { left: 74%; --rot: -240deg; animation-delay: 2.4s;   width: 5px; height: 5px; }
+.fx-ice .s6 { left: 86%; --rot: 180deg;  animation-delay: 3.0s;   width: 7px; height: 7px; }
+@keyframes snow-fall {
+  0% {
+    opacity: 0;
+    transform: translateY(0) translateX(0) rotate(0);
+  }
+  10% { opacity: 1; }
+  50% {
+    transform: translateY(60px) translateX(8px) rotate(calc(var(--rot) / 2));
+  }
+  90% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translateY(120px) translateX(-8px) rotate(var(--rot));
+  }
 }
-@keyframes flame-flicker {
-  0%, 100% { transform: scale(1) rotate(-2deg); opacity: 1; }
-  20% { transform: scale(1.08) rotate(2deg); opacity: 0.92; }
-  40% { transform: scale(0.95) rotate(-1deg); opacity: 1; }
-  60% { transform: scale(1.05) rotate(1deg); opacity: 0.95; }
-  80% { transform: scale(0.98) rotate(-2deg); opacity: 1; }
+
+/* --- 3rd place: flashing electric sparks --- */
+.fx-bolt .spark {
+  position: absolute;
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #fff5c4, #fbbf24);
+  box-shadow:
+    0 0 6px rgba(251, 191, 36, 0.9),
+    0 0 18px rgba(251, 191, 36, 0.55);
+  opacity: 0;
 }
-@keyframes ice-float {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-6px) rotate(20deg); }
+.fx-bolt .sp1 {
+  top: -12px;
+  left: 20%;
+  height: 28px;
+  transform: rotate(-18deg);
+  animation: spark-flash 1.8s steps(1, end) infinite;
 }
-@keyframes bolt-zap {
-  0%, 80%, 100% { transform: scale(1); opacity: 0.6; }
-  82%, 92% { transform: scale(1.25); opacity: 1; }
-  86% { transform: scale(1.4); opacity: 1; filter: brightness(1.4); }
+.fx-bolt .sp2 {
+  top: 8px;
+  left: 78%;
+  height: 22px;
+  transform: rotate(20deg);
+  animation: spark-flash 1.8s steps(1, end) infinite 0.45s;
+}
+.fx-bolt .sp3 {
+  top: 40px;
+  left: 30%;
+  height: 18px;
+  transform: rotate(12deg);
+  animation: spark-flash 1.8s steps(1, end) infinite 0.9s;
+}
+.fx-bolt .sp4 {
+  top: 30px;
+  left: 65%;
+  height: 24px;
+  transform: rotate(-25deg);
+  animation: spark-flash 1.8s steps(1, end) infinite 1.35s;
+}
+@keyframes spark-flash {
+  0%, 92%, 100% { opacity: 0; }
+  3%, 8%        { opacity: 1; }
+  4%            { opacity: 0; }
+  6%            { opacity: 1; }
 }
 
 /* Halos behind avatars */
