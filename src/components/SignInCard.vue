@@ -5,7 +5,7 @@
       <div
         class="tab-pill-indicator"
         :style="{
-          width: `${100 / authMethods.length}%`,
+          width: `calc((100% - 8px) / ${authMethods.length})`,
           /* In RTL the visual order of children is reversed, so the
              indicator must move in the opposite physical direction. */
           transform: `translateX(${
