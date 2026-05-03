@@ -502,26 +502,35 @@ async function onShare(): Promise<void> {
 .chart-section {
   margin-top: 4px;
 }
+/* Fixed-height columns so the bar can never push the value or
+   label out of the card. Each column is a flex stack pinned to the
+   bottom; the bar's pixel height is clamped to a hard ceiling. */
 .bar-chart {
   display: flex;
-  gap: 8px;
-  align-items: flex-end;
-  height: 120px;
-  padding: 12px;
+  gap: 6px;
+  padding: 14px;
   background: var(--card);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-sm);
+  overflow: hidden;
+  align-items: flex-end;
+  height: 144px;
 }
 .bar-col {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: flex-end;
+  gap: 4px;
+  height: 100%;
 }
 .bar-value {
   font-size: 11px;
   font-weight: 600;
+  text-align: center;
+  line-height: 1;
 }
 .bar {
   width: 100%;
@@ -532,6 +541,7 @@ async function onShare(): Promise<void> {
     var(--bar-default)
   );
   transition: height 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+  max-height: 90px;
 }
 .bar.bar-empty {
   background: var(--bar-empty);
@@ -549,6 +559,8 @@ async function onShare(): Promise<void> {
 .bar-label {
   font-size: 10px;
   letter-spacing: 0.04em;
+  text-align: center;
+  line-height: 1;
 }
 
 /* Stats grid — white cards with tinted icon bubbles (wellness vibe) */

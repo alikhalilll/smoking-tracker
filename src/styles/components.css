@@ -225,6 +225,14 @@
   transform: translateY(-50%);
   color: var(--muted);
   pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+}
+.field-icon svg {
+  display: block;
 }
 
 /* === Hairline divider === */

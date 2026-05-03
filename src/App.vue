@@ -96,20 +96,22 @@
       />
     </main>
 
-    <!-- Floating Liquid Glass nav bar — translucent backdrop, lensed
-         highlight, brand-coral circular indicator that morphs to the
-         active tab. -->
-    <nav class="nav-bar glass" :style="indicatorStyle">
-      <div class="nav-indicator" />
+    <!-- Floating Liquid Glass nav: icon-with-label tabs; active tab
+         lights up brand-coral with a soft circular highlight around
+         just the icon. No morphing indicator — labels are static so
+         each tab keeps a fixed footprint. -->
+    <nav class="nav-bar glass">
       <button
         v-for="(tab, i) in tabs"
         :key="tab.id"
-        ref="tabRefs"
         class="nav-tab"
         :class="{ active: view === tab.id }"
         @click="onTabClick(tab.id, i)"
       >
-        <span class="nav-icon" v-html="tab.icon"></span>
+        <span class="nav-icon-wrap">
+          <span class="nav-icon" v-html="tab.icon"></span>
+        </span>
+        <span class="nav-label">{{ t(`tabs.${tab.id}`) }}</span>
       </button>
     </nav>
 
@@ -136,7 +138,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useStorage } from './composables/useStorage'
 import { useStats, timeAgo } from './composables/useStats'
 import { useQuitPlan } from './composables/useQuitPlan'
@@ -169,7 +171,7 @@ const ICONS: Record<TabId, string> = {
   settings: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
 }
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const supabaseConfigured = isSupabaseConfigured()
 
 const tabs = computed<ReadonlyArray<{ id: TabId; icon: string }>>(() => {
@@ -181,45 +183,12 @@ const tabs = computed<ReadonlyArray<{ id: TabId; icon: string }>>(() => {
 
 const view = ref<TabId>('home')
 const showReport = ref(false)
-const tabRefs = ref<HTMLButtonElement[]>([])
-const indicator = ref({ x: 0, w: 0 })
 const haptics = useHaptics()
-
-const indicatorStyle = computed(() => ({
-  '--ind-x': `${indicator.value.x}px`,
-  '--ind-w': `${indicator.value.w}px`,
-}))
-
-function recalcIndicator(): void {
-  const idx = tabs.value.findIndex((t) => t.id === view.value)
-  const el = tabRefs.value[idx]
-  if (!el) return
-  const parent = el.parentElement
-  if (!parent) return
-  const parentRect = parent.getBoundingClientRect()
-  const rect = el.getBoundingClientRect()
-  indicator.value = {
-    x: rect.left - parentRect.left,
-    w: rect.width,
-  }
-}
 
 function onTabClick(id: TabId, _i: number): void {
   view.value = id
   haptics.fire('tap')
-  nextTick(recalcIndicator)
 }
-
-watch(view, () => nextTick(recalcIndicator))
-watch(locale, () => nextTick(recalcIndicator))
-
-onMounted(() => {
-  nextTick(recalcIndicator)
-  window.addEventListener('resize', recalcIndicator)
-})
-onUnmounted(() => {
-  window.removeEventListener('resize', recalcIndicator)
-})
 
 const auth = useAuth()
 const { open: openAuth } = useAuthModal()
@@ -414,57 +383,69 @@ async function onSignOut(): Promise<void> {
   /* Animated view transitions could go here later */
 }
 
-/* Liquid Glass floating nav bar — translucent + heavy blur + lensed
-   sheen (the .glass utility takes care of those bits). The indicator
-   is a brand-tinted soft circle that morphs between icons. */
+/* Liquid Glass floating nav: icon-with-label tabs, soft circle
+   highlight around just the active icon. Centered with physical
+   `left: 50%` so it stays put in both LTR and RTL. */
 .nav-bar {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
   bottom: max(14px, env(safe-area-inset-bottom));
   display: flex;
-  gap: 4px;
-  padding: 8px;
+  gap: 2px;
+  padding: 8px 10px;
   border-radius: var(--radius-pill);
   z-index: 100;
   max-width: calc(100vw - 24px);
 }
-.nav-indicator {
-  position: absolute;
-  top: 8px;
-  bottom: 8px;
-  left: var(--ind-x, 0);
-  width: var(--ind-w, 0);
-  background: linear-gradient(135deg, var(--brand-grad-from), var(--brand-grad-to));
-  border-radius: 50%;
-  box-shadow: var(--brand-shadow);
-  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
-              width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
-              left 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
-  pointer-events: none;
-  z-index: 0;
-}
 .nav-tab {
-  position: relative;
-  z-index: 1;
   appearance: none;
   border: none;
   background: transparent;
   font-family: inherit;
   cursor: pointer;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
+  gap: 2px;
+  padding: 4px 6px;
   color: var(--muted);
-  transition: color 0.2s ease;
+  transition: color 0.2s ease, transform 0.12s ease;
+  min-width: 56px;
+}
+.nav-tab:active {
+  transform: scale(0.94);
 }
 .nav-tab.active {
-  color: #fff;
+  color: var(--brand);
+}
+.nav-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  transition: background 0.2s ease;
+}
+.nav-tab.active .nav-icon-wrap {
+  background: color-mix(in srgb, var(--brand) 18%, transparent);
 }
 .nav-icon {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+}
+.nav-icon :deep(svg) {
+  display: block;
+}
+.nav-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
 }
 </style>

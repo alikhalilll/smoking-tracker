@@ -2,13 +2,25 @@
   <div class="fade-in settings">
     <h1 class="settings-title">{{ t('settings.title') }}</h1>
 
-    <!-- Section tabs (scrollable filter pills) -->
-    <div class="filter-pills">
+    <!-- Section tabs — segmented control (cleaner than the loud
+         gradient pills; the indicator slides between tabs). -->
+    <div class="seg-tabs" role="tablist">
+      <div
+        class="seg-tab-indicator"
+        :style="{
+          width: `${100 / sections.length}%`,
+          transform: `translateX(${
+            sections.findIndex((s) => s.id === section) *
+            (isRtl ? -100 : 100)
+          }%)`,
+        }"
+      />
       <button
         v-for="s in sections"
         :key="s.id"
-        class="filter-pill"
+        class="seg-tab"
         :class="{ active: section === s.id }"
+        role="tab"
         @click="section = s.id"
       >
         {{ t(`settings.section_${s.id}`) }}
@@ -379,7 +391,7 @@ const emit = defineEmits<{
 // when this prop isn't passed.
 const isAuthed = computed(() => props.isAuthed ?? false)
 
-const { t, locale, setLocale } = useI18n()
+const { t, locale, setLocale, isRtl } = useI18n()
 const { mode: themeMode, setTheme } = useTheme()
 const reminders = useReminders()
 
@@ -632,35 +644,49 @@ function handleReset(): void {
   margin: 4px 0 0;
 }
 
-/* Section pills (same scrollable filter pattern as the leaderboard) */
-.filter-pills {
+/* Section tabs — segmented control with a sliding indicator */
+.seg-tabs {
+  position: relative;
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  padding: 4px 0 8px;
-  scrollbar-width: none;
+  gap: 0;
+  background: var(--btn-ghost-bg);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  margin-top: 4px;
 }
-.filter-pills::-webkit-scrollbar { display: none; }
-.filter-pill {
-  flex-shrink: 0;
+.seg-tab-indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  inset-inline-start: 4px;
+  background: var(--card);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.seg-tab {
+  position: relative;
+  z-index: 1;
+  flex: 1;
   appearance: none;
   border: none;
+  background: transparent;
   font-family: inherit;
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  padding: 9px 16px;
+  padding: 9px 6px;
   border-radius: var(--radius-pill);
-  background: var(--btn-ghost-bg);
   color: var(--muted);
-  transition: background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+  transition: color 0.2s ease;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.filter-pill.active {
-  background: linear-gradient(135deg, var(--brand-grad-from), var(--brand-grad-to));
-  color: #fff;
-  box-shadow: var(--brand-shadow);
+.seg-tab.active {
+  color: var(--text);
 }
-.filter-pill:active { transform: scale(0.97); }
 
 .sec {
   display: flex;
