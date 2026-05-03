@@ -94,34 +94,74 @@
       </div>
 
       <template v-else>
-        <!-- Featured #1 -->
-        <div v-if="podium.first" class="featured">
-          <div class="crown-area">
+        <!-- Top 3 podium -->
+        <div v-if="podium.first" class="podium">
+          <!-- 2nd place (start side) — ice -->
+          <div v-if="podium.second" class="podium-spot rank-2">
+            <span class="aura aura-ice" aria-hidden="true">❄️</span>
+            <div class="podium-avatar-wrap medium">
+              <span class="halo halo-ice" aria-hidden="true"></span>
+              <Avatar
+                :name="podium.second.display_name"
+                :seed="podium.second.user_id"
+                size="lg"
+              />
+              <span class="podium-medal silver">2</span>
+            </div>
+            <div class="podium-name">{{ podium.second.display_name }}</div>
+            <div class="podium-score">
+              <ScoreIcon />
+              <span class="tabular">{{ formatRawValue(podium.second) }}</span>
+            </div>
+          </div>
+
+          <!-- 1st place (center, biggest) — fire + crown -->
+          <div class="podium-spot rank-1">
             <span class="crown" aria-hidden="true">👑</span>
-            <div class="featured-avatar-wrap">
+            <span class="aura aura-fire" aria-hidden="true">🔥</span>
+            <div class="podium-avatar-wrap big">
+              <span class="halo halo-fire" aria-hidden="true"></span>
               <Avatar
                 :name="podium.first.display_name"
                 :seed="podium.first.user_id"
                 size="lg"
               />
-              <span class="featured-medal">1</span>
+              <span class="podium-medal gold">1</span>
+            </div>
+            <div class="podium-name top">{{ podium.first.display_name }}</div>
+            <div class="podium-score top">
+              <ScoreIcon />
+              <span class="tabular">{{ formatRawValue(podium.first) }}</span>
             </div>
           </div>
-          <h2 class="featured-name">{{ podium.first.display_name }}</h2>
-          <div class="featured-pill">
-            <ScoreIcon />
-            <span class="tabular">{{ formatRawValue(podium.first) }}</span>
+
+          <!-- 3rd place (end side) — bolt -->
+          <div v-if="podium.third" class="podium-spot rank-3">
+            <span class="aura aura-bolt" aria-hidden="true">⚡</span>
+            <div class="podium-avatar-wrap medium">
+              <span class="halo halo-bolt" aria-hidden="true"></span>
+              <Avatar
+                :name="podium.third.display_name"
+                :seed="podium.third.user_id"
+                size="lg"
+              />
+              <span class="podium-medal bronze">3</span>
+            </div>
+            <div class="podium-name">{{ podium.third.display_name }}</div>
+            <div class="podium-score">
+              <ScoreIcon />
+              <span class="tabular">{{ formatRawValue(podium.third) }}</span>
+            </div>
           </div>
         </div>
 
-        <!-- User list (ranks 2+) -->
-        <div class="user-list">
+        <!-- User list (ranks 4+) -->
+        <div v-if="restRows.length > 0" class="user-list">
           <div
-            v-for="(row, i) in restAfterFirst"
+            v-for="(row, i) in restRows"
             :key="row.user_id"
             class="user-row"
             :class="{
-              'user-row-highlight': i === 0 && !isOwn(row),
               'user-row-self': isOwn(row),
             }"
             :style="{ animationDelay: `${0.06 * i}s` }"
@@ -138,7 +178,7 @@
                 {{ formattedSub(row) }}
               </div>
             </div>
-            <div class="user-rank" :class="`rc-${(i + 2) % 6}`">{{ i + 2 }}</div>
+            <div class="user-rank" :class="`rc-${(i + 4) % 6}`">{{ i + 4 }}</div>
           </div>
         </div>
 
@@ -209,9 +249,11 @@ const rows = computed<LeaderboardEntry[]>(() => {
 
 const podium = computed(() => ({
   first: rows.value[0] ?? null,
+  second: rows.value[1] ?? null,
+  third: rows.value[2] ?? null,
 }))
 
-const restAfterFirst = computed(() => rows.value.slice(1))
+const restRows = computed(() => rows.value.slice(3))
 
 function isOwn(row: LeaderboardEntry): boolean {
   return user.value?.id === row.user_id
@@ -422,35 +464,53 @@ async function onJoin(): Promise<void> {
 }
 .filter-pill:active { transform: scale(0.97); }
 
-/* === Featured #1 === */
-.featured {
+/* === Top 3 podium === */
+.podium {
+  display: grid;
+  grid-template-columns: 1fr 1.15fr 1fr;
+  align-items: end;
+  gap: 12px;
+  padding: 28px 4px 8px;
+  position: relative;
+  z-index: 1;
+}
+.podium-spot {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 12px 0 18px;
-  animation: featured-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  text-align: center;
+  gap: 8px;
+  position: relative;
+  animation: spot-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
-@keyframes featured-rise {
+.podium-spot.rank-2 {
+  transform: translateY(16px);
+  animation-delay: 0.05s;
+}
+.podium-spot.rank-1 {
+  transform: translateY(-8px);
+  animation-delay: 0.18s;
+}
+.podium-spot.rank-3 {
+  transform: translateY(28px);
+  animation-delay: 0.28s;
+}
+@keyframes spot-rise {
   from {
     opacity: 0;
-    transform: translateY(28px) scale(0.92);
+    transform: translateY(40px) scale(0.85);
   }
 }
-.crown-area {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
+
+/* Crown floats above the 1st-place avatar */
 .crown {
-  font-size: 44px;
+  font-size: 36px;
   line-height: 1;
-  margin-bottom: -10px;
-  z-index: 2;
+  z-index: 3;
   filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.25));
   animation: crown-wiggle 2.6s ease-in-out infinite;
   transform-origin: bottom center;
+  margin-bottom: -8px;
 }
 @keyframes crown-wiggle {
   0%, 100% { transform: rotate(-6deg) translateY(0); }
@@ -458,70 +518,197 @@ async function onJoin(): Promise<void> {
   50% { transform: rotate(-3deg) translateY(0); }
   75% { transform: rotate(3deg) translateY(-2px); }
 }
-.featured-avatar-wrap {
+
+.podium-avatar-wrap {
   position: relative;
+  display: inline-block;
+  border-radius: 50%;
+  background: var(--bg);
+  padding: 3px;
+  z-index: 1;
+}
+.podium-avatar-wrap.medium :deep(.avatar) {
+  width: 64px;
+  height: 64px;
+  font-size: 20px;
+}
+.podium-avatar-wrap.big :deep(.avatar) {
+  width: 92px;
+  height: 92px;
+  font-size: 30px;
+  border: 3px solid var(--card);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.18);
+}
+.podium-avatar-wrap.big {
   animation: avatar-bob 3.2s ease-in-out infinite;
 }
 @keyframes avatar-bob {
   0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+  50% { transform: translateY(-5px); }
 }
-.featured-avatar-wrap :deep(.avatar) {
-  width: 110px;
-  height: 110px;
-  font-size: 38px;
-  border: 4px solid var(--card);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-}
-.featured-medal {
+
+.podium-medal {
   position: absolute;
   bottom: -4px;
   inset-inline-start: 50%;
   transform: translateX(-50%);
-  background: linear-gradient(180deg, #ffd874, #d99738);
-  color: #4a2c00;
   font-weight: 800;
-  font-size: 14px;
-  width: 32px;
-  height: 32px;
+  font-size: 12px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   border: 3px solid var(--bg);
-  box-shadow: 0 4px 10px rgba(217, 151, 56, 0.4);
+  z-index: 2;
 }
-.featured-name {
-  font-size: 26px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  text-align: center;
+.podium-avatar-wrap.big .podium-medal {
+  width: 30px;
+  height: 30px;
+  font-size: 14px;
 }
-.featured-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 16px 8px 8px;
-  border-radius: var(--radius-pill);
-  background: var(--success-soft);
-  color: var(--success);
+.podium-medal.gold {
+  background: linear-gradient(180deg, #ffd874, #d99738);
+  color: #4a2c00;
+  box-shadow: 0 4px 10px rgba(217, 151, 56, 0.45);
+}
+.podium-medal.silver {
+  background: linear-gradient(180deg, #e8eaed, #9aa0aa);
+  color: #2a2c33;
+}
+.podium-medal.bronze {
+  background: linear-gradient(180deg, #d99764, #a05a2a);
+  color: #2a1808;
+}
+
+.podium-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.podium-name.top {
   font-size: 14px;
   font-weight: 700;
+}
+
+.podium-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 5px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-tint);
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 700;
+}
+.podium-score.top {
+  background: linear-gradient(135deg, var(--brand-grad-from), var(--brand-grad-to));
+  color: #fff;
+  box-shadow: var(--brand-shadow);
+  font-size: 13px;
+  padding: 5px 12px 5px 6px;
   animation: pill-pulse 2.4s ease-in-out infinite;
 }
 @keyframes pill-pulse {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.04); }
+  50% { transform: scale(1.05); }
 }
+
 .score-icon {
   display: inline-flex;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   align-items: center;
   justify-content: center;
-  background: var(--success);
+  background: rgba(255, 255, 255, 0.22);
+  color: currentColor;
+  border-radius: 5px;
+}
+.podium-score:not(.top) .score-icon {
+  background: var(--brand);
   color: #fff;
-  border-radius: 7px;
+}
+
+/* === Elemental aura emojis above the rank-2 and rank-3 spots === */
+.aura {
+  position: absolute;
+  top: -14px;
+  font-size: 22px;
+  line-height: 1;
+  pointer-events: none;
+  z-index: 3;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.25));
+}
+.podium-spot.rank-1 .aura {
+  /* Fire sits next to the crown */
+  top: 6px;
+  inset-inline-end: -6px;
+  font-size: 22px;
+}
+.aura-fire {
+  animation: flame-flicker 1.4s ease-in-out infinite;
+  transform-origin: bottom center;
+}
+.aura-ice {
+  animation: ice-float 3s ease-in-out infinite;
+}
+.aura-bolt {
+  animation: bolt-zap 2.8s steps(1, end) infinite;
+}
+@keyframes flame-flicker {
+  0%, 100% { transform: scale(1) rotate(-2deg); opacity: 1; }
+  20% { transform: scale(1.08) rotate(2deg); opacity: 0.92; }
+  40% { transform: scale(0.95) rotate(-1deg); opacity: 1; }
+  60% { transform: scale(1.05) rotate(1deg); opacity: 0.95; }
+  80% { transform: scale(0.98) rotate(-2deg); opacity: 1; }
+}
+@keyframes ice-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(20deg); }
+}
+@keyframes bolt-zap {
+  0%, 80%, 100% { transform: scale(1); opacity: 0.6; }
+  82%, 92% { transform: scale(1.25); opacity: 1; }
+  86% { transform: scale(1.4); opacity: 1; filter: brightness(1.4); }
+}
+
+/* Halos behind avatars */
+.halo {
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  z-index: 0;
+  pointer-events: none;
+}
+.halo-fire {
+  background: radial-gradient(circle, rgba(255, 122, 61, 0.55), rgba(255, 200, 100, 0.25) 50%, transparent 70%);
+  animation: halo-fire-pulse 1.4s ease-in-out infinite;
+}
+.halo-ice {
+  background: radial-gradient(circle, rgba(120, 200, 255, 0.45), rgba(180, 220, 255, 0.18) 55%, transparent 75%);
+  animation: halo-ice-pulse 3s ease-in-out infinite;
+}
+.halo-bolt {
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.45), rgba(255, 220, 130, 0.18) 50%, transparent 72%);
+  animation: halo-bolt-pulse 2.8s steps(1, end) infinite;
+}
+@keyframes halo-fire-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.18); opacity: 1; }
+}
+@keyframes halo-ice-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50% { transform: scale(1.10); opacity: 1; }
+}
+@keyframes halo-bolt-pulse {
+  0%, 80%, 100% { transform: scale(1); opacity: 0.6; }
+  82%, 92% { transform: scale(1.2); opacity: 1; }
 }
 
 /* === User list rows === */
