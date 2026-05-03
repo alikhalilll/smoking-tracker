@@ -1,7 +1,20 @@
 <template>
   <div class="fade-in lb-view">
+    <!-- Floating decorative dots — pure CSS animated background -->
+    <div class="dots" aria-hidden="true">
+      <span class="dot dot-1"></span>
+      <span class="dot dot-2"></span>
+      <span class="dot dot-3"></span>
+      <span class="dot dot-4"></span>
+      <span class="dot dot-5"></span>
+      <span class="dot dot-6"></span>
+    </div>
+
     <div class="head">
-      <h1 class="lb-headline">{{ t('leaderboard.title') }}</h1>
+      <h1 class="lb-headline">
+        {{ t('leaderboard.title') }}
+        <span class="trophy" aria-hidden="true">🏆</span>
+      </h1>
     </div>
 
     <!-- Gated: not signed in -->
@@ -45,7 +58,7 @@
     </div>
 
     <template v-else>
-      <!-- Filter / metric pills (Worldwide-style) -->
+      <!-- Metric pills -->
       <div class="filter-pills">
         <button
           v-for="m in metrics"
@@ -59,12 +72,11 @@
       </div>
 
       <!-- Loading skeletons -->
-      <div v-if="leaderboard.loading.value && rows.length === 0" class="list-card">
-        <div v-for="i in 4" :key="i" class="list-row skeleton-row">
-          <span class="skeleton" style="width: 24px; height: 14px"></span>
-          <span class="skeleton" style="width: 36px; height: 36px; border-radius: 50%"></span>
-          <span class="skeleton" style="height: 14px; flex: 1"></span>
-          <span class="skeleton" style="height: 24px; width: 64px; border-radius: 8px"></span>
+      <div v-if="leaderboard.loading.value && rows.length === 0" class="user-list">
+        <div v-for="i in 4" :key="i" class="user-row skeleton-row">
+          <span class="skeleton" style="width: 44px; height: 44px; border-radius: 50%"></span>
+          <span class="skeleton" style="height: 16px; flex: 1"></span>
+          <span class="skeleton" style="width: 32px; height: 32px; border-radius: 50%"></span>
         </div>
       </div>
 
@@ -82,113 +94,51 @@
       </div>
 
       <template v-else>
-        <!-- Podium scene: floating avatars + 3D blocks -->
-        <div v-if="podium.first" class="podium-scene">
-          <!-- Avatars float above the blocks; absolute-positioned to span the row -->
-          <div class="podium-avatars">
-            <div v-if="podium.second" class="ava-spot rank-2">
-              <span class="aura aura-ice" aria-hidden="true">❄️</span>
-              <div class="avatar-frame">
-                <span class="halo halo-ice" aria-hidden="true"></span>
-                <Avatar
-                  :name="podium.second.display_name"
-                  :seed="podium.second.user_id"
-                  size="lg"
-                />
-                <span class="rank-coin silver">2</span>
-              </div>
-              <div class="ava-name">{{ podium.second.display_name }}</div>
-              <div class="score-pill">
-                <ScoreIcon />
-                <span class="tabular">{{ formatRawValue(podium.second) }}</span>
-              </div>
-            </div>
-
-            <div class="ava-spot rank-1">
-              <span class="aura aura-fire" aria-hidden="true">🔥</span>
-              <div class="avatar-frame avatar-frame-top">
-                <span class="halo halo-fire" aria-hidden="true"></span>
-                <Avatar
-                  :name="podium.first.display_name"
-                  :seed="podium.first.user_id"
-                  size="lg"
-                />
-                <span class="rank-coin gold">1</span>
-              </div>
-              <div class="ava-name">{{ podium.first.display_name }}</div>
-              <div class="score-pill">
-                <ScoreIcon />
-                <span class="tabular">{{ formatRawValue(podium.first) }}</span>
-              </div>
-            </div>
-
-            <div v-if="podium.third" class="ava-spot rank-3">
-              <span class="aura aura-bolt" aria-hidden="true">⚡</span>
-              <div class="avatar-frame">
-                <span class="halo halo-bolt" aria-hidden="true"></span>
-                <Avatar
-                  :name="podium.third.display_name"
-                  :seed="podium.third.user_id"
-                  size="lg"
-                />
-                <span class="rank-coin bronze">3</span>
-              </div>
-              <div class="ava-name">{{ podium.third.display_name }}</div>
-              <div class="score-pill">
-                <ScoreIcon />
-                <span class="tabular">{{ formatRawValue(podium.third) }}</span>
-              </div>
+        <!-- Featured #1 -->
+        <div v-if="podium.first" class="featured">
+          <div class="crown-area">
+            <span class="crown" aria-hidden="true">👑</span>
+            <div class="featured-avatar-wrap">
+              <Avatar
+                :name="podium.first.display_name"
+                :seed="podium.first.user_id"
+                size="lg"
+              />
+              <span class="featured-medal">1</span>
             </div>
           </div>
-
-          <!-- 3D blocks underneath -->
-          <div class="podium-blocks">
-            <div class="block block-2"><span>2</span></div>
-            <div class="block block-1"><span>1</span></div>
-            <div class="block block-3"><span>3</span></div>
-          </div>
-        </div>
-
-        <!-- List card -->
-        <div v-if="restRows.length > 0" class="list-card">
-          <div
-            v-for="(row, i) in restRows"
-            :key="row.user_id"
-            class="list-row"
-            :class="{ 'list-self': isOwn(row) }"
-          >
-            <div class="list-rank tabular">{{ i + 4 }}</div>
-            <Avatar :name="row.display_name" :seed="row.user_id" size="md" />
-            <div class="list-name">
-              <span>{{ row.display_name }}</span>
-              <span
-                v-if="metric === 'smoke_free' && row.smoke_free_days >= 7"
-                class="flame-tag"
-                aria-hidden="true"
-              >🔥</span>
-            </div>
-            <div class="score-pill score-pill-row">
-              <ScoreIcon />
-              <span class="tabular">{{ formatRawValue(row) }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Your-rank pinned at the bottom (if out of top of the list) -->
-        <div v-if="yourRank" class="your-pin">
-          <div class="list-rank tabular">{{ yourRank.position }}</div>
-          <Avatar
-            :name="yourRank.row.display_name"
-            :seed="yourRank.row.user_id"
-            size="md"
-          />
-          <div class="list-name">
-            <span>{{ yourRank.row.display_name }}</span>
-            <span class="chip chip-brand list-you">{{ t('leaderboard.you') }}</span>
-          </div>
-          <div class="score-pill score-pill-row">
+          <h2 class="featured-name">{{ podium.first.display_name }}</h2>
+          <div class="featured-pill">
             <ScoreIcon />
-            <span class="tabular">{{ formatRawValue(yourRank.row) }}</span>
+            <span class="tabular">{{ formatRawValue(podium.first) }}</span>
+          </div>
+        </div>
+
+        <!-- User list (ranks 2+) -->
+        <div class="user-list">
+          <div
+            v-for="(row, i) in restAfterFirst"
+            :key="row.user_id"
+            class="user-row"
+            :class="{
+              'user-row-highlight': i === 0 && !isOwn(row),
+              'user-row-self': isOwn(row),
+            }"
+            :style="{ animationDelay: `${0.06 * i}s` }"
+          >
+            <Avatar :name="row.display_name" :seed="row.user_id" size="md" />
+            <div class="user-info">
+              <div class="user-name">
+                {{ row.display_name }}
+                <span v-if="isOwn(row)" class="chip chip-brand list-you">
+                  {{ t('leaderboard.you') }}
+                </span>
+              </div>
+              <div class="user-sub tabular">
+                {{ formattedSub(row) }}
+              </div>
+            </div>
+            <div class="user-rank" :class="`rc-${(i + 2) % 6}`">{{ i + 2 }}</div>
           </div>
         </div>
 
@@ -224,8 +174,6 @@ const { user } = useAuth()
 const metrics: ReadonlyArray<LeaderboardMetric> = ['smoke_free', 'reduction']
 const metric = ref<LeaderboardMetric>('smoke_free')
 
-// Score-pill icon (a small flame-ish glyph in a rounded box, similar to
-// the "T coin" in the reference shot but tied to the app's theme).
 const ScoreIcon = () =>
   h(
     'span',
@@ -261,22 +209,9 @@ const rows = computed<LeaderboardEntry[]>(() => {
 
 const podium = computed(() => ({
   first: rows.value[0] ?? null,
-  second: rows.value[1] ?? null,
-  third: rows.value[2] ?? null,
 }))
 
-const restRows = computed(() => rows.value.slice(3))
-
-const yourRank = computed(() => {
-  const me = user.value?.id
-  if (!me) return null
-  const idx = rows.value.findIndex((r) => r.user_id === me)
-  if (idx < 0) return null
-  // Already shown in podium or top-N list above
-  if (idx < 3) return null
-  if (idx < 3 + restRows.value.length) return null
-  return { position: idx + 1, row: rows.value[idx] }
-})
+const restAfterFirst = computed(() => rows.value.slice(1))
 
 function isOwn(row: LeaderboardEntry): boolean {
   return user.value?.id === row.user_id
@@ -287,8 +222,20 @@ function formatRawValue(row: LeaderboardEntry): string {
   return `${row.reduction_pct.toFixed(0)}%`
 }
 
-// Inline opt-in form — set display name and join in one tap, no need
-// to bounce through Settings.
+function formattedSub(row: LeaderboardEntry): string {
+  if (metric.value === 'smoke_free') {
+    return t(
+      row.smoke_free_days === 1
+        ? 'leaderboard.smoke_free_one'
+        : 'leaderboard.smoke_free_many',
+      { n: row.smoke_free_days }
+    )
+  }
+  return t('leaderboard.reduction_value', {
+    pct: row.reduction_pct.toFixed(0),
+  })
+}
+
 const joinName = ref(props.leaderboard?.prefs.value.displayName ?? '')
 const joining = ref(false)
 
@@ -304,18 +251,120 @@ async function onJoin(): Promise<void> {
 
 <style scoped>
 .lb-view {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* Make sure the dots that drift outside the card stay visible */
+  overflow: visible;
 }
+
+/* === Floating decorative dots — heavy ambient motion === */
+.dots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+.dot {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.7;
+}
+.dot-1 {
+  width: 14px;
+  height: 14px;
+  background: var(--brand);
+  top: 8%;
+  inset-inline-start: 78%;
+  animation: drift-1 9s ease-in-out infinite;
+}
+.dot-2 {
+  width: 10px;
+  height: 10px;
+  background: var(--accent);
+  top: 18%;
+  inset-inline-start: 8%;
+  animation: drift-2 11s ease-in-out infinite;
+}
+.dot-3 {
+  width: 22px;
+  height: 22px;
+  background: color-mix(in srgb, var(--success) 80%, transparent);
+  top: 36%;
+  inset-inline-start: 88%;
+  animation: drift-3 13s ease-in-out infinite;
+}
+.dot-4 {
+  width: 16px;
+  height: 16px;
+  background: color-mix(in srgb, var(--accent-warm) 80%, transparent);
+  top: 56%;
+  inset-inline-start: 4%;
+  animation: drift-1 10s ease-in-out infinite reverse;
+}
+.dot-5 {
+  width: 8px;
+  height: 8px;
+  background: var(--brand);
+  top: 70%;
+  inset-inline-start: 70%;
+  animation: drift-2 8s ease-in-out infinite;
+}
+.dot-6 {
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  top: 88%;
+  inset-inline-start: 28%;
+  animation: drift-3 12s ease-in-out infinite reverse;
+}
+
+@keyframes drift-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.7; }
+  50% { transform: translate(-18px, 28px) scale(1.2); opacity: 1; }
+}
+@keyframes drift-2 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.6; }
+  50% { transform: translate(24px, -18px) scale(0.85); opacity: 0.9; }
+}
+@keyframes drift-3 {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.7; }
+  50% { transform: translate(-12px, -28px) scale(1.15); opacity: 1; }
+}
+
+.head,
+.featured,
+.filter-pills,
+.user-list,
+.metric-help,
+.opt-in,
+.empty {
+  position: relative;
+  z-index: 1;
+}
+
 .head {
   text-align: center;
-  margin-bottom: 4px;
 }
 .lb-headline {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: center;
+}
+.trophy {
+  font-size: 22px;
+  animation: trophy-spin 4s ease-in-out infinite;
+  display: inline-block;
+}
+@keyframes trophy-spin {
+  0%, 100% { transform: rotate(-12deg); }
+  50% { transform: rotate(12deg); }
 }
 
 /* Opt-in / gated state */
@@ -345,19 +394,15 @@ async function onJoin(): Promise<void> {
   padding: 44px 20px;
 }
 
-/* Filter pills (matches the reference: white active, soft-grey inactive) */
+/* Filter pills */
 .filter-pills {
   display: flex;
   gap: 10px;
-  overflow-x: auto;
-  padding: 4px 0 8px;
-  scrollbar-width: none;
-}
-.filter-pills::-webkit-scrollbar {
-  display: none;
+  justify-content: center;
+  padding: 4px 0;
+  flex-wrap: wrap;
 }
 .filter-pill {
-  flex-shrink: 0;
   appearance: none;
   border: none;
   font-family: inherit;
@@ -377,429 +422,205 @@ async function onJoin(): Promise<void> {
 }
 .filter-pill:active { transform: scale(0.97); }
 
-/* === Podium scene === */
-.podium-scene {
-  position: relative;
-  padding: 16px 8px 8px;
-  margin: 4px 0 0;
-  background: linear-gradient(
-    160deg,
-    color-mix(in srgb, var(--brand) 14%, transparent),
-    color-mix(in srgb, var(--accent) 12%, transparent) 70%,
-    color-mix(in srgb, var(--success) 10%, transparent)
-  );
-  border-radius: 28px;
-  overflow: hidden;
-}
-.podium-scene::before,
-.podium-scene::after {
-  content: '';
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(36px);
-  pointer-events: none;
-  opacity: 0.55;
-}
-.podium-scene::before {
-  width: 220px;
-  height: 220px;
-  background: var(--brand);
-  top: -100px;
-  inset-inline-start: -60px;
-}
-.podium-scene::after {
-  width: 180px;
-  height: 180px;
-  background: var(--accent);
-  bottom: -80px;
-  inset-inline-end: -50px;
-}
-
-.podium-avatars {
-  display: grid;
-  grid-template-columns: 1fr 1.1fr 1fr;
-  align-items: end;
-  gap: 8px;
-  position: relative;
-  z-index: 2;
-  /* Pull avatars down so they overlap the top of the blocks */
-  margin-bottom: -28px;
-}
-.ava-spot {
+/* === Featured #1 === */
+.featured {
   display: flex;
   flex-direction: column;
   align-items: center;
-  text-align: center;
-  gap: 6px;
-  animation: spot-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  gap: 10px;
+  padding: 12px 0 18px;
+  animation: featured-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
-.ava-spot.rank-1 {
-  /* Lift 1st higher than the rest */
-  transform: translateY(-22px);
-  animation-delay: 0.18s;
-}
-.ava-spot.rank-2 {
-  transform: translateY(8px);
-  animation-delay: 0.05s;
-}
-.ava-spot.rank-3 {
-  transform: translateY(20px);
-  animation-delay: 0.28s;
-}
-@keyframes spot-rise {
+@keyframes featured-rise {
   from {
     opacity: 0;
-    /* Start a little lower than the resting position */
-    transform: translateY(40px) scale(0.85);
+    transform: translateY(28px) scale(0.92);
   }
 }
-
-.avatar-frame {
+.crown-area {
   position: relative;
-  display: inline-block;
-  border-radius: 50%;
-  background: var(--bg);
-  padding: 3px;
-  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
-
-/* === Elemental aura emojis floating above each podium spot === */
-.aura {
-  position: absolute;
-  top: -22px;
-  font-size: 22px;
+.crown {
+  font-size: 44px;
   line-height: 1;
-  pointer-events: none;
-  z-index: 3;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.25));
-}
-.aura-fire {
-  font-size: 28px;
-  top: -32px;
-  animation: flame-flicker 1.4s ease-in-out infinite;
+  margin-bottom: -10px;
+  z-index: 2;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.25));
+  animation: crown-wiggle 2.6s ease-in-out infinite;
   transform-origin: bottom center;
 }
-.aura-ice {
-  animation: ice-float 3s ease-in-out infinite;
+@keyframes crown-wiggle {
+  0%, 100% { transform: rotate(-6deg) translateY(0); }
+  25% { transform: rotate(6deg) translateY(-2px); }
+  50% { transform: rotate(-3deg) translateY(0); }
+  75% { transform: rotate(3deg) translateY(-2px); }
 }
-.aura-bolt {
-  animation: bolt-zap 2.8s steps(1, end) infinite;
+.featured-avatar-wrap {
+  position: relative;
+  animation: avatar-bob 3.2s ease-in-out infinite;
 }
-
-@keyframes flame-flicker {
-  0%, 100% { transform: scale(1) rotate(-2deg); opacity: 1; }
-  20% { transform: scale(1.08) rotate(2deg); opacity: 0.92; }
-  40% { transform: scale(0.95) rotate(-1deg); opacity: 1; }
-  60% { transform: scale(1.05) rotate(1deg); opacity: 0.95; }
-  80% { transform: scale(0.98) rotate(-2deg); opacity: 1; }
+@keyframes avatar-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
-@keyframes ice-float {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-6px) rotate(20deg); }
+.featured-avatar-wrap :deep(.avatar) {
+  width: 110px;
+  height: 110px;
+  font-size: 38px;
+  border: 4px solid var(--card);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
 }
-@keyframes bolt-zap {
-  0%, 80%, 100% { transform: scale(1); opacity: 0.6; }
-  82%, 92% { transform: scale(1.25); opacity: 1; }
-  86% { transform: scale(1.4); opacity: 1; filter: brightness(1.4); }
-}
-
-/* === Halos behind the avatars (the colored "energy" of each rank) === */
-.halo {
+.featured-medal {
   position: absolute;
-  inset: -10px;
-  border-radius: 50%;
-  z-index: 0;
-  pointer-events: none;
-}
-.halo-fire {
-  background: radial-gradient(
-    circle,
-    rgba(255, 122, 61, 0.55),
-    rgba(255, 200, 100, 0.25) 50%,
-    transparent 70%
-  );
-  animation: halo-fire-pulse 1.4s ease-in-out infinite;
-}
-.halo-ice {
-  background: radial-gradient(
-    circle,
-    rgba(120, 200, 255, 0.45),
-    rgba(180, 220, 255, 0.18) 55%,
-    transparent 75%
-  );
-  animation: halo-ice-pulse 3s ease-in-out infinite;
-}
-.halo-bolt {
-  background: radial-gradient(
-    circle,
-    rgba(251, 191, 36, 0.45),
-    rgba(255, 220, 130, 0.18) 50%,
-    transparent 72%
-  );
-  animation: halo-bolt-pulse 2.8s steps(1, end) infinite;
-}
-
-@keyframes halo-fire-pulse {
-  0%, 100% { transform: scale(1); opacity: 0.85; }
-  50% { transform: scale(1.18); opacity: 1; }
-}
-@keyframes halo-ice-pulse {
-  0%, 100% { transform: scale(1); opacity: 0.7; }
-  50% { transform: scale(1.10); opacity: 1; }
-}
-@keyframes halo-bolt-pulse {
-  0%, 80%, 100% { transform: scale(1); opacity: 0.6; }
-  82%, 92% { transform: scale(1.2); opacity: 1; }
-}
-.avatar-frame-top {
-  /* Subtle glow under the 1st-place avatar */
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08),
-              0 8px 24px rgba(255, 215, 116, 0.25);
-}
-.avatar-frame :deep(.avatar) {
-  width: 56px;
-  height: 56px;
-  font-size: 18px;
-  border: 2px solid color-mix(in srgb, var(--bg) 70%, transparent);
-}
-.avatar-frame :deep(.avatar-lg) {
-  width: 56px;
-  height: 56px;
-  font-size: 18px;
-}
-.ava-spot.rank-1 .avatar-frame :deep(.avatar) {
-  width: 72px;
-  height: 72px;
-  font-size: 22px;
-}
-
-.rank-coin {
-  position: absolute;
-  top: -2px;
-  inset-inline-end: -2px;
-  width: 22px;
-  height: 22px;
+  bottom: -4px;
+  inset-inline-start: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, #ffd874, #d99738);
+  color: #4a2c00;
+  font-weight: 800;
+  font-size: 14px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  border: 3px solid var(--bg);
+  box-shadow: 0 4px 10px rgba(217, 151, 56, 0.4);
+}
+.featured-name {
+  font-size: 26px;
   font-weight: 800;
-  color: #2c1a0a;
-  border: 2px solid var(--bg);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  letter-spacing: -0.02em;
+  text-align: center;
 }
-.rank-coin.gold {
-  background: linear-gradient(180deg, #ffd874, #d99738);
-  color: #4a2c00;
-}
-.rank-coin.silver {
-  background: linear-gradient(180deg, #e8eaed, #b0b6c0);
-  color: #2c2f33;
-}
-.rank-coin.bronze {
-  background: linear-gradient(180deg, #d99764, #a05a2a);
-  color: #2c1a0a;
-}
-
-.ava-name {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-  max-width: 100px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ava-spot.rank-1 .ava-name {
-  font-size: 13px;
-  font-weight: 700;
-  max-width: 110px;
-}
-
-/* Score pill — vivid gradient on the podium, subtle tint inside list rows */
-.score-pill {
+.featured-pill {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  padding: 5px 12px 5px 6px;
+  gap: 6px;
+  padding: 8px 16px 8px 8px;
   border-radius: var(--radius-pill);
-  background: linear-gradient(135deg, var(--brand-grad-from), var(--brand-grad-to));
-  color: #fff;
-  font-size: 12px;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 14px;
   font-weight: 700;
-  box-shadow: var(--brand-shadow);
-  white-space: nowrap;
+  animation: pill-pulse 2.4s ease-in-out infinite;
+}
+@keyframes pill-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
 }
 .score-icon {
   display: inline-flex;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.22);
-  border-radius: 6px;
+  background: var(--success);
   color: #fff;
-}
-.score-pill-row {
-  background: var(--brand-soft);
-  color: var(--brand);
-  box-shadow: none;
-}
-.score-pill-row .score-icon {
-  background: var(--brand);
-  color: #fff;
+  border-radius: 7px;
 }
 
-/* === 3D-ish podium blocks — each rank gets its own metallic tint === */
-.podium-blocks {
-  display: grid;
-  grid-template-columns: 1fr 1.1fr 1fr;
-  align-items: end;
-  gap: 8px;
-  position: relative;
-  z-index: 1;
-}
-.block {
-  position: relative;
-  border-radius: 16px 16px 6px 6px;
+/* === User list rows === */
+.user-list {
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding-top: 18px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.22),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.10),
-    0 12px 20px rgba(0, 0, 0, 0.10);
-  animation: block-grow 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-  transform-origin: bottom center;
+  flex-direction: column;
+  gap: 10px;
 }
-.block::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  inset-inline: 0;
-  height: 20px;
-  border-radius: 16px 16px 0 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.22), transparent);
-  pointer-events: none;
+.user-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: 22px;
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  animation: row-slide 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transition: transform 0.15s ease;
 }
-.block span {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 42px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1;
-  color: rgba(255, 255, 255, 0.85);
-  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+.user-row:active {
+  transform: scale(0.98);
 }
-.block-1 {
-  height: 130px;
-  background: linear-gradient(180deg, #ffd874, #d99738);
-  animation-delay: 0.18s;
-}
-.block-1 span { color: rgba(74, 44, 0, 0.55); }
-.block-2 {
-  height: 92px;
-  background: linear-gradient(180deg, #e8eaed, #9aa0aa);
-  animation-delay: 0.05s;
-}
-.block-2 span { color: rgba(30, 30, 40, 0.4); }
-.block-3 {
-  height: 70px;
-  background: linear-gradient(180deg, #d99764, #a05a2a);
-  animation-delay: 0.28s;
-}
-.block-3 span { color: rgba(40, 24, 8, 0.45); }
-@keyframes block-grow {
+@keyframes row-slide {
   from {
     opacity: 0;
-    transform: scaleY(0.4);
+    transform: translateY(16px);
   }
+}
+.user-row-highlight {
+  background: #ffffff;
+  color: #15171a;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+.user-row-highlight .user-name {
+  color: #15171a;
+}
+.user-row-highlight .user-sub {
+  color: rgba(20, 20, 24, 0.55);
+}
+.user-row-self {
+  border: 1.5px solid color-mix(in srgb, var(--brand) 45%, transparent);
 }
 
-/* === List card (rows 4+) === */
-.list-card {
-  margin-top: 6px;
-  background: var(--card);
-  border-radius: var(--radius-card);
-  padding: 6px 14px;
-  box-shadow: var(--shadow-sm);
-}
-.list-row {
-  display: grid;
-  grid-template-columns: 22px auto 1fr auto;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--hairline);
-  animation: row-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
-}
-.list-row:last-child {
-  border-bottom: none;
-}
-.list-row.list-self {
-  background: var(--brand-soft);
-  border-radius: 12px;
-  padding-inline: 10px;
-  margin-inline: -10px;
-  border-bottom-color: transparent;
-}
-@keyframes row-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
-/* Stagger first 8 rows */
-.list-row:nth-child(1) { animation-delay: 0.05s; }
-.list-row:nth-child(2) { animation-delay: 0.10s; }
-.list-row:nth-child(3) { animation-delay: 0.15s; }
-.list-row:nth-child(4) { animation-delay: 0.20s; }
-.list-row:nth-child(5) { animation-delay: 0.25s; }
-.list-row:nth-child(6) { animation-delay: 0.30s; }
-.list-row:nth-child(7) { animation-delay: 0.35s; }
-.list-row:nth-child(8) { animation-delay: 0.40s; }
-.list-rank {
+.user-row :deep(.avatar) {
+  width: 44px;
+  height: 44px;
   font-size: 14px;
+  flex-shrink: 0;
+  border: 2px solid var(--card);
+}
+
+.user-info {
+  flex: 1;
+  min-width: 0;
+}
+.user-name {
+  font-size: 16px;
   font-weight: 700;
-  color: var(--muted);
-  text-align: center;
-}
-.list-name {
-  font-size: 14px;
-  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
   display: flex;
   align-items: center;
   gap: 6px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.user-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 2px;
+  font-weight: 500;
 }
 .list-you {
   font-size: 9px;
   padding: 2px 6px;
 }
-.flame-tag {
-  font-size: 13px;
-  filter: drop-shadow(0 2px 4px rgba(245, 158, 11, 0.3));
-}
 
-/* Your-rank pin (only when out of the visible list) */
-.your-pin {
-  display: grid;
-  grid-template-columns: 22px auto 1fr auto;
+/* Colored rank circle on the right (cycles through pastel colors) */
+.user-rank {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 14px;
-  background: var(--brand-soft);
-  border: 1.5px solid color-mix(in srgb, var(--brand) 35%, transparent);
-  border-radius: var(--radius-card);
-  margin-top: 8px;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 14px;
+  flex-shrink: 0;
 }
+.rc-0 { background: #c5b8ff; color: #2a1f5c; }   /* lavender */
+.rc-1 { background: #ffd874; color: #5a3e00; }   /* yellow */
+.rc-2 { background: #b8e1ff; color: #0a3a66; }   /* sky */
+.rc-3 { background: #c2efd2; color: #14442a; }   /* mint */
+.rc-4 { background: #ffc6a8; color: #5c2200; }   /* peach */
+.rc-5 { background: #f8b6ff; color: #5c1058; }   /* pink */
 
 .metric-help {
-  margin-top: 6px;
+  margin-top: 4px;
   font-size: 11px;
   color: var(--muted);
   text-align: center;
@@ -815,6 +636,12 @@ async function onJoin(): Promise<void> {
   text-align: center;
 }
 
+.skeleton-row {
+  background: var(--card);
+  box-shadow: none;
+}
+
+/* Join form (kept) */
 .join-form {
   display: flex;
   flex-direction: column;
@@ -824,10 +651,5 @@ async function onJoin(): Promise<void> {
 .join-form .field-input {
   text-align: center;
   font-weight: 600;
-}
-
-.skeleton-row {
-  border-bottom: 1px solid var(--hairline);
-  padding: 12px 0;
 }
 </style>
