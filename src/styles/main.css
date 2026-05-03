@@ -98,19 +98,19 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    /* Deeper, more neutral dark — the muddy-brown was making the
-       whole UI feel dim. Move to a near-black with a faint warm tilt. */
-    --bg: #0b0c0e;
-    --bg-elevated: #16181c;
-    --card: #16181c;
-    --surface-tint: #1c1f24;
-    --border: #24272d;
+    /* Neutral dark — no blue/violet tilt. The warm coral primary
+       does the colorwork; the surface stays out of the way. */
+    --bg: #0e0e10;
+    --bg-elevated: #18181b;
+    --card: #18181b;
+    --surface-tint: #1f1f24;
+    --border: #2a2a30;
     --hairline: rgba(255, 255, 255, 0.07);
 
     --text: #f4f1ec;
-    --muted: #a39c92;
-    --faint: #393c42;
-    --subtle: #6b6f78;
+    --muted: #a39d94;
+    --faint: #3a3a40;
+    --subtle: #6c6c74;
 
     /* Brighter, more saturated accents in dark mode for contrast */
     --brand: #ff9a6b;
@@ -167,17 +167,17 @@
 }
 
 [data-theme='dark'] {
-  --bg: #0b0c0e;
-  --bg-elevated: #16181c;
-  --card: #16181c;
-  --surface-tint: #1c1f24;
-  --border: #24272d;
+  --bg: #0e0e10;
+  --bg-elevated: #18181b;
+  --card: #18181b;
+  --surface-tint: #1f1f24;
+  --border: #2a2a30;
   --hairline: rgba(255, 255, 255, 0.07);
 
   --text: #f4f1ec;
-  --muted: #a39c92;
-  --faint: #393c42;
-  --subtle: #6b6f78;
+  --muted: #a39d94;
+  --faint: #3a3a40;
+  --subtle: #6c6c74;
 
   --brand: #ff9a6b;
   --brand-soft: rgba(255, 154, 107, 0.14);
@@ -237,13 +237,12 @@ body {
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-feature-settings: 'cv11', 'ss01', 'ss03';
-  /* Multi-blob gradient mesh for that warm, joyful, premium feel.
-     Three soft radial gradients give the page subtle depth without
-     drawing attention away from cards. */
+  /* Warm gradient mesh — coral + warm peach + a hint of mint. No
+     violet/blue, so the dark mode never picks up a navy tilt. */
   background:
-    radial-gradient(900px 540px at 100% -8%, color-mix(in srgb, var(--brand) 18%, transparent), transparent 55%),
-    radial-gradient(700px 420px at -10% 100%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 55%),
-    radial-gradient(500px 320px at 60% 50%, color-mix(in srgb, var(--success) 8%, transparent), transparent 60%),
+    radial-gradient(900px 540px at 100% -8%, color-mix(in srgb, var(--brand) 16%, transparent), transparent 55%),
+    radial-gradient(700px 420px at -10% 100%, color-mix(in srgb, var(--brand) 10%, transparent), transparent 55%),
+    radial-gradient(500px 320px at 60% 50%, color-mix(in srgb, var(--success) 6%, transparent), transparent 60%),
     var(--bg);
   background-attachment: fixed;
   color: var(--text);
