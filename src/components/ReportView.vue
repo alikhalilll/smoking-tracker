@@ -308,12 +308,11 @@ function shortDate(dateStr: string): string {
   margin-bottom: 1.75rem;
 }
 .section-title {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--muted);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
   margin-bottom: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 .summary-grid {
   display: grid;
