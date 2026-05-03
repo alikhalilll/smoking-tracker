@@ -558,18 +558,18 @@ function handleReset(): void {
 
 <style scoped>
 .section-title {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--muted);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
   margin-bottom: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 .info-card {
   background: var(--card);
-  border-radius: 10px;
-  padding: 14px 16px;
+  border-radius: 18px;
+  padding: 16px;
   margin-bottom: 10px;
+  box-shadow: var(--shadow-sm);
 }
 .info-label {
   font-size: 13px;

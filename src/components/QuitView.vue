@@ -393,12 +393,11 @@ function shortDate(dateStr: string): string {
 
 <style scoped>
 .section-title {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--muted);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
   margin-bottom: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 .intro {
   font-size: 13px;
@@ -407,16 +406,15 @@ function shortDate(dateStr: string): string {
   margin-bottom: 1.5rem;
 }
 .baseline-card {
-  background: var(--card);
-  border-radius: 12px;
-  padding: 18px 16px;
+  background: linear-gradient(135deg, var(--brand-soft), var(--accent-soft));
+  border-radius: var(--radius-card);
+  padding: 22px 16px;
   text-align: center;
 }
 .baseline-label {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-weight: 600;
   margin-bottom: 12px;
 }
 .baseline-row {
@@ -463,16 +461,20 @@ function shortDate(dateStr: string): string {
   width: 100%;
   text-align: start;
   background: var(--card);
-  border: 1.5px solid transparent;
-  border-radius: 12px;
-  padding: 14px 16px;
+  border: 1.5px solid var(--hairline);
+  border-radius: var(--radius-card);
+  padding: 16px 18px;
   font-family: inherit;
   cursor: pointer;
-  transition: border-color 0.15s, transform 0.1s;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+.intensity-card:hover {
+  border-color: color-mix(in srgb, var(--brand) 30%, transparent);
+  box-shadow: var(--shadow-md);
 }
 .intensity-card:active {
   transform: scale(0.99);
-  border-color: var(--faint);
 }
 .intensity-label {
   font-size: 14px;
@@ -523,9 +525,9 @@ function shortDate(dateStr: string): string {
   flex-shrink: 0;
 }
 .today-card {
-  background: var(--card);
-  border-radius: 14px;
-  padding: 22px 18px 18px;
+  background: linear-gradient(135deg, var(--brand-soft), var(--accent-soft));
+  border-radius: var(--radius-card);
+  padding: 24px 20px 20px;
   margin-bottom: 1.25rem;
 }
 .today-target-row {
