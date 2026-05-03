@@ -374,8 +374,39 @@ async function onJoin(): Promise<void> {
 /* === Podium scene === */
 .podium-scene {
   position: relative;
-  padding: 4px 0 0;
-  margin: 8px -4px 0;
+  padding: 16px 8px 8px;
+  margin: 4px 0 0;
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--brand) 14%, transparent),
+    color-mix(in srgb, var(--accent) 12%, transparent) 70%,
+    color-mix(in srgb, var(--success) 10%, transparent)
+  );
+  border-radius: 28px;
+  overflow: hidden;
+}
+.podium-scene::before,
+.podium-scene::after {
+  content: '';
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(36px);
+  pointer-events: none;
+  opacity: 0.55;
+}
+.podium-scene::before {
+  width: 220px;
+  height: 220px;
+  background: var(--brand);
+  top: -100px;
+  inset-inline-start: -60px;
+}
+.podium-scene::after {
+  width: 180px;
+  height: 180px;
+  background: var(--accent);
+  bottom: -80px;
+  inset-inline-end: -50px;
 }
 
 .podium-avatars {
@@ -394,16 +425,27 @@ async function onJoin(): Promise<void> {
   align-items: center;
   text-align: center;
   gap: 6px;
+  animation: spot-rise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 .ava-spot.rank-1 {
   /* Lift 1st higher than the rest */
   transform: translateY(-22px);
+  animation-delay: 0.18s;
 }
 .ava-spot.rank-2 {
   transform: translateY(8px);
+  animation-delay: 0.05s;
 }
 .ava-spot.rank-3 {
   transform: translateY(20px);
+  animation-delay: 0.28s;
+}
+@keyframes spot-rise {
+  from {
+    opacity: 0;
+    /* Start a little lower than the resting position */
+    transform: translateY(40px) scale(0.85);
+  }
 }
 
 .avatar-frame {
@@ -479,40 +521,41 @@ async function onJoin(): Promise<void> {
   max-width: 110px;
 }
 
-/* Score pill (the purple coin badge) */
+/* Score pill — vivid gradient on the podium, subtle tint inside list rows */
 .score-pill {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px 4px 5px;
+  gap: 5px;
+  padding: 5px 12px 5px 6px;
   border-radius: var(--radius-pill);
-  background: var(--accent);
+  background: linear-gradient(135deg, var(--brand-grad-from), var(--brand-grad-to));
   color: #fff;
   font-size: 12px;
   font-weight: 700;
-  box-shadow: 0 2px 8px rgba(124, 92, 255, 0.28);
+  box-shadow: var(--brand-shadow);
+  white-space: nowrap;
 }
 .score-icon {
   display: inline-flex;
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.18);
-  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 6px;
   color: #fff;
 }
 .score-pill-row {
-  background: var(--accent-soft);
-  color: var(--accent);
+  background: var(--brand-soft);
+  color: var(--brand);
   box-shadow: none;
 }
 .score-pill-row .score-icon {
-  background: var(--accent);
+  background: var(--brand);
   color: #fff;
 }
 
-/* === 3D-ish podium blocks === */
+/* === 3D-ish podium blocks — each rank gets its own metallic tint === */
 .podium-blocks {
   display: grid;
   grid-template-columns: 1fr 1.1fr 1fr;
@@ -523,53 +566,60 @@ async function onJoin(): Promise<void> {
 }
 .block {
   position: relative;
-  border-radius: 14px 14px 6px 6px;
+  border-radius: 16px 16px 6px 6px;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding-top: 14px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--surface-tint) 80%, var(--bg)),
-    var(--surface-tint) 100%
-  );
-  /* Embossed top edge highlight + bottom shadow for the 3D feel */
+  padding-top: 18px;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.12),
-    inset 0 -2px 0 rgba(0, 0, 0, 0.05),
-    0 8px 16px rgba(0, 0, 0, 0.06);
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.10),
+    0 12px 20px rgba(0, 0, 0, 0.10);
+  animation: block-grow 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  transform-origin: bottom center;
 }
 .block::before {
-  /* A soft top "face" overlay to suggest a beveled top */
   content: '';
   position: absolute;
   top: 0;
   inset-inline: 0;
-  height: 18px;
-  border-radius: 14px 14px 0 0;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--bg) 60%, var(--surface-tint)),
-    transparent
-  );
+  height: 20px;
+  border-radius: 16px 16px 0 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.22), transparent);
   pointer-events: none;
 }
 .block span {
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 38px;
+  font-size: 42px;
   font-weight: 800;
-  color: color-mix(in srgb, var(--text) 18%, transparent);
   letter-spacing: -0.02em;
   line-height: 1;
+  color: rgba(255, 255, 255, 0.85);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
 }
 .block-1 {
   height: 130px;
+  background: linear-gradient(180deg, #ffd874, #d99738);
+  animation-delay: 0.18s;
 }
+.block-1 span { color: rgba(74, 44, 0, 0.55); }
 .block-2 {
   height: 92px;
+  background: linear-gradient(180deg, #e8eaed, #9aa0aa);
+  animation-delay: 0.05s;
 }
+.block-2 span { color: rgba(30, 30, 40, 0.4); }
 .block-3 {
   height: 70px;
+  background: linear-gradient(180deg, #d99764, #a05a2a);
+  animation-delay: 0.28s;
+}
+.block-3 span { color: rgba(40, 24, 8, 0.45); }
+@keyframes block-grow {
+  from {
+    opacity: 0;
+    transform: scaleY(0.4);
+  }
 }
 
 /* === List card (rows 4+) === */
@@ -587,6 +637,7 @@ async function onJoin(): Promise<void> {
   gap: 12px;
   padding: 12px 0;
   border-bottom: 1px solid var(--hairline);
+  animation: row-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 .list-row:last-child {
   border-bottom: none;
@@ -598,6 +649,21 @@ async function onJoin(): Promise<void> {
   margin-inline: -10px;
   border-bottom-color: transparent;
 }
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+/* Stagger first 8 rows */
+.list-row:nth-child(1) { animation-delay: 0.05s; }
+.list-row:nth-child(2) { animation-delay: 0.10s; }
+.list-row:nth-child(3) { animation-delay: 0.15s; }
+.list-row:nth-child(4) { animation-delay: 0.20s; }
+.list-row:nth-child(5) { animation-delay: 0.25s; }
+.list-row:nth-child(6) { animation-delay: 0.30s; }
+.list-row:nth-child(7) { animation-delay: 0.35s; }
+.list-row:nth-child(8) { animation-delay: 0.40s; }
 .list-rank {
   font-size: 14px;
   font-weight: 700;

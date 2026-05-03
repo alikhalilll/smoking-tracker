@@ -53,16 +53,22 @@ export function useSync(data: Ref<AppData>): UseSync {
 
     // Step 1 — push any not-yet-synced local entries first, so offline
     // writes don't get wiped by the authoritative replace below.
+    // Use upsert with ignoreDuplicates so a stale `synced: false` flag
+    // (e.g. browser killed mid-push) doesn't crash the whole pull
+    // with a primary-key collision.
     const unsyncedLocal = data.value.entries.filter((e) => !e.synced)
     if (unsyncedLocal.length > 0) {
-      const { error: insertErr } = await supabase.from('entries').insert(
-        unsyncedLocal.map((e) => ({
-          id: e.id,
-          user_id: user.value!.id,
-          time: e.time,
-          date: e.date,
-        }))
-      )
+      const { error: insertErr } = await supabase
+        .from('entries')
+        .upsert(
+          unsyncedLocal.map((e) => ({
+            id: e.id,
+            user_id: user.value!.id,
+            time: e.time,
+            date: e.date,
+          })),
+          { onConflict: 'id', ignoreDuplicates: true }
+        )
       if (insertErr) {
         setStatus('error', insertErr.message)
         return
@@ -154,19 +160,25 @@ export function useSync(data: Ref<AppData>): UseSync {
     )
     const localIds = new Set(data.value.entries.map((e) => e.id))
 
-    // Insert local-only by id and mark them as synced once the server confirms.
+    // Insert local-only by id and mark them as synced once the server
+    // confirms. Use upsert/ignoreDuplicates so a server-side row we
+    // don't yet know about (e.g. raced from another tab) doesn't 409
+    // the whole batch.
     const toInsert: SmokeEntry[] = data.value.entries.filter(
       (e) => !serverIds.has(e.id)
     )
     if (toInsert.length > 0) {
-      const { error: insertErr } = await supabase.from('entries').insert(
-        toInsert.map((e) => ({
-          id: e.id,
-          user_id: user.value!.id,
-          time: e.time,
-          date: e.date,
-        }))
-      )
+      const { error: insertErr } = await supabase
+        .from('entries')
+        .upsert(
+          toInsert.map((e) => ({
+            id: e.id,
+            user_id: user.value!.id,
+            time: e.time,
+            date: e.date,
+          })),
+          { onConflict: 'id', ignoreDuplicates: true }
+        )
       if (insertErr) {
         setStatus('error', insertErr.message)
         return

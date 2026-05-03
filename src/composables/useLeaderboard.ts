@@ -1,7 +1,7 @@
 import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { supabase } from '../supabase'
 import { useAuth } from './useAuth'
-import { formatLocalDate, getToday } from './useDate'
+import { formatLocalDate, getToday, daysBetween } from './useDate'
 import type { AppData, LeaderboardEntry } from '../types'
 
 const STORAGE_KEY = 'smoking-tracker-leaderboard-prefs'
@@ -57,27 +57,30 @@ function computeMetrics(data: AppData): ComputedMetrics {
 
   const days = Object.keys(byDay).length || 1
   const dailyAvg = Math.round((totalLogged / days) * 10) / 10
+  const today = getToday()
 
-  // Smoke-free: days since last log.
+  // Smoke-free: days since last log. If the user has never logged,
+  // fall back to days since they started tracking — otherwise a
+  // brand-new user always shows 0 even after weeks of not smoking.
   let smokeFreeDays = 0
   if (entries.length > 0) {
     const sorted = [...entries].sort((a, b) =>
       a.time.localeCompare(b.time)
     )
     const lastDate = sorted[sorted.length - 1].date
-    const today = getToday()
     if (lastDate < today) {
-      const a = new Date(lastDate + 'T00:00:00').getTime()
-      const b = new Date(today + 'T00:00:00').getTime()
-      smokeFreeDays = Math.round((b - a) / 86_400_000)
+      smokeFreeDays = daysBetween(lastDate, today)
     }
+  } else if (data.startDate && data.startDate <= today) {
+    smokeFreeDays = Math.max(0, daysBetween(data.startDate, today))
   }
 
-  // Reduction: compare baseline (plan baseline OR avg of first 7 logged
-  // days) to recent (avg of last 7 calendar days).
+  // Reduction: compare baseline (plan baseline OR avg of first logged
+  // days, up to 7) to recent (avg of last 7 calendar days). Only count
+  // a baseline when there's enough data to be meaningful.
   const sortedDates = Object.keys(byDay).sort()
   let baseline = 0
-  if (data.quitPlan?.baseline) {
+  if (data.quitPlan?.baseline && data.quitPlan.baseline > 0) {
     baseline = data.quitPlan.baseline
   } else if (sortedDates.length >= 3) {
     const firstWeek = sortedDates.slice(0, 7)
@@ -85,18 +88,21 @@ function computeMetrics(data: AppData): ComputedMetrics {
     baseline = sum / firstWeek.length
   }
 
+  // Recent: average of last 7 calendar days from today (inclusive).
+  // Only meaningful if we actually have data — otherwise reduction
+  // from "I haven't started" to "I haven't started" is meaningless.
   let recent = 0
   if (sortedDates.length > 0) {
-    const last7 = []
+    let sum = 0
     for (let i = 0; i < 7; i++) {
       const d = formatLocalDate(new Date(Date.now() - i * 86_400_000))
-      last7.push(byDay[d] ?? 0)
+      sum += byDay[d] ?? 0
     }
-    recent = last7.reduce((s, n) => s + n, 0) / 7
+    recent = sum / 7
   }
 
   let reductionPct = 0
-  if (baseline > 0) {
+  if (baseline > 0 && sortedDates.length >= 3) {
     reductionPct = Math.max(
       0,
       Math.round(((baseline - recent) / baseline) * 1000) / 10
@@ -135,16 +141,23 @@ export function useLeaderboard(data: Ref<AppData>): UseLeaderboard {
     if (!supabase || !isAuthed.value) return
     loading.value = true
     error.value = null
+    // Always include a deterministic tiebreaker so the order doesn't
+    // shuffle between identical scores. Recent activity (updated_at)
+    // breaks the smoke-free tie; smoke-free streak breaks the
+    // reduction tie (more progress in absolute days wins).
     const [sf, rd] = await Promise.all([
       supabase
         .from('leaderboard_entries')
         .select('*')
         .order('smoke_free_days', { ascending: false })
+        .order('updated_at', { ascending: false })
         .limit(50),
       supabase
         .from('leaderboard_entries')
         .select('*')
         .order('reduction_pct', { ascending: false })
+        .order('smoke_free_days', { ascending: false })
+        .order('updated_at', { ascending: false })
         .limit(50),
     ])
     loading.value = false
@@ -219,11 +232,46 @@ export function useLeaderboard(data: Ref<AppData>): UseLeaderboard {
     { deep: true }
   )
 
+  // Reconcile local opt-in state with the server. If the user opted
+  // in on another device, their row already exists on the server —
+  // we should reflect that here without forcing them to "Join" again.
+  async function reconcileOwnRow(): Promise<void> {
+    if (!supabase || !user.value) return
+    const { data: row, error: err } = await supabase
+      .from('leaderboard_entries')
+      .select('display_name')
+      .eq('user_id', user.value.id)
+      .maybeSingle()
+    if (err) return
+    if (row) {
+      // Server says we're opted in; sync local state if it doesn't agree.
+      const next = {
+        optedIn: true,
+        displayName:
+          row.display_name || prefs.value.displayName || 'Anonymous',
+      }
+      if (
+        next.optedIn !== prefs.value.optedIn ||
+        next.displayName !== prefs.value.displayName
+      ) {
+        prefs.value = next
+        savePrefs(prefs.value)
+      }
+    } else if (prefs.value.optedIn) {
+      // Local says opted in but server has no row — treat server as
+      // truth and back out the local flag.
+      prefs.value = { ...prefs.value, optedIn: false }
+      savePrefs(prefs.value)
+    }
+  }
+
   // Initial fetch when signed in.
   watch(
     isAuthed,
     async (authed) => {
-      if (authed) await refresh()
+      if (!authed) return
+      await reconcileOwnRow()
+      await refresh()
     },
     { immediate: true }
   )

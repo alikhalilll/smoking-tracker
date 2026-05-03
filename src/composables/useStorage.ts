@@ -1,4 +1,4 @@
-import { ref, type Ref } from 'vue'
+import { ref, watch, type Ref } from 'vue'
 import type { AppData, QuitIntensity, QuitPlan } from '../types'
 import { generateTargets, INTENSITY_DURATIONS } from './useQuitPlan'
 import { getToday } from './useDate'
@@ -72,6 +72,11 @@ export function useStorage(): UseStorage {
       console.error('Failed to save:', e)
     }
   }
+
+  // Auto-persist any deep mutation (e.g. useSync flipping `synced: true`
+  // on entries after a successful push). Without this, in-memory updates
+  // are lost on reload and sync re-pushes the same rows → 409 collision.
+  watch(data, save, { deep: true })
 
   function addEntries(count: number): void {
     const now = new Date().toISOString()

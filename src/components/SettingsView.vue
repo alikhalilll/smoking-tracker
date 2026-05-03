@@ -8,7 +8,7 @@
       <div
         class="seg-tab-indicator"
         :style="{
-          width: `${100 / sections.length}%`,
+          width: `calc((100% - 8px) / ${sections.length})`,
           transform: `translateX(${
             sections.findIndex((s) => s.id === section) *
             (isRtl ? -100 : 100)
