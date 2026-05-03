@@ -122,6 +122,30 @@
           {{ t('leaderboard_settings.enable_first') }}
         </div>
       </div>
+
+      <!-- Delete account (only meaningful for signed-in users) -->
+      <div v-if="isAuthed" class="card danger-card">
+        <div class="card-header">
+          <div class="card-icon" style="color: var(--danger); background: var(--danger-soft);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+          </div>
+          <div>
+            <div class="card-title">{{ t('settings.delete_account_title') }}</div>
+            <div class="card-sub">{{ t('settings.delete_account_help') }}</div>
+          </div>
+        </div>
+        <button
+          class="btn danger-btn block"
+          :disabled="deleting"
+          @click="onDeleteAccount"
+        >
+          {{
+            deleting
+              ? t('settings.delete_account_in_progress')
+              : t('settings.delete_account_btn')
+          }}
+        </button>
+      </div>
     </section>
 
     <!-- ===== App (language + theme) ===== -->
@@ -169,6 +193,30 @@
           >
             {{ t(`settings.theme_${opt.value}`) }}
           </button>
+        </div>
+      </div>
+
+      <!-- Haptic feedback (Android only — iOS Safari has no web haptics) -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon icon-mint">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h2M17 12h2M12 5v2M12 17v2"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <div>
+            <div class="card-title">{{ t('settings.haptics_label') }}</div>
+            <div class="card-sub">
+              {{
+                haptics.supported
+                  ? t('settings.haptics_help')
+                  : t('settings.haptics_unsupported')
+              }}
+            </div>
+          </div>
+          <Toggle
+            :model-value="haptics.enabled.value"
+            :disabled="!haptics.supported"
+            @update:model-value="onHapticsToggle"
+          />
         </div>
       </div>
     </section>
@@ -461,6 +509,7 @@ import {
 } from '../composables/useReminders'
 import { useAuth } from '../composables/useAuth'
 import { useEconomy, formatMoney } from '../composables/useEconomy'
+import { useHaptics } from '../composables/useHaptics'
 import { isSupabaseConfigured } from '../supabase'
 import Toggle from './Toggle.vue'
 import Select from './Select.vue'
@@ -508,6 +557,38 @@ const emit = defineEmits<{
 }>()
 
 const economy = useEconomy()
+const haptics = useHaptics()
+
+// Delete-account flow. Local data is wiped via emit('reset') so the
+// parent's resetAll runs (clears entries / quit plan / start date in
+// localStorage). The SECURITY DEFINER `delete_account` RPC drops the
+// auth.users row; cascade FKs clean the rest on the server side.
+const deleting = ref(false)
+async function onDeleteAccount(): Promise<void> {
+  if (deleting.value) return
+  if (!confirm(t('settings.delete_account_confirm'))) return
+  deleting.value = true
+  try {
+    const res = await auth.deleteAccount()
+    if (!res.ok) {
+      alert(res.error ?? 'Failed to delete account')
+      return
+    }
+    // Wipe local data — the user is now signed out, but their
+    // localStorage still has stale entries we don't want lingering.
+    emit('reset')
+  } finally {
+    deleting.value = false
+  }
+}
+
+function onHapticsToggle(): void {
+  const next = !haptics.enabled.value
+  haptics.setEnabled(next)
+  // Fire a quick tap on enable so the user feels confirmation that
+  // it's working (and a no-op on iOS, which is the honest behavior).
+  if (next) haptics.fire('tap')
+}
 const CURRENCIES: ReadonlyArray<string> = [
   'USD', 'EUR', 'GBP', 'EGP', 'SAR', 'AED', 'JOD', 'TRY', 'CAD', 'AUD', 'INR', 'PKR',
 ]

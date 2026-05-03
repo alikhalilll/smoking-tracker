@@ -14,7 +14,7 @@ const STORAGE_KEY = 'smoking-tracker-economy'
 const DEFAULT_SETTINGS: EconomySettings = {
   pricePerPack: 0,
   cigsPerPack: 20,
-  currency: 'USD',
+  currency: 'EGP',
 }
 
 interface LegacyShape {

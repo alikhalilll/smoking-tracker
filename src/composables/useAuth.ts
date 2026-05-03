@@ -41,6 +41,10 @@ export interface UseAuth {
     password: string
   ) => Promise<{ ok: boolean; error?: string; needsConfirm?: boolean }>
   signOut: () => Promise<void>
+  /** Permanently delete the current user's account + all server data.
+   *  Requires the `delete_account()` SQL function with SECURITY DEFINER
+   *  (see SUPABASE_SETUP.md). Signs out locally on success. */
+  deleteAccount: () => Promise<{ ok: boolean; error?: string }>
 }
 
 export function useAuth(): UseAuth {
@@ -107,6 +111,18 @@ export function useAuth(): UseAuth {
     async signOut(): Promise<void> {
       if (!supabase) return
       await supabase.auth.signOut()
+    },
+
+    async deleteAccount(): Promise<{ ok: boolean; error?: string }> {
+      if (!supabase) return { ok: false, error: 'Supabase not configured' }
+      // SECURITY DEFINER function — runs with elevated privileges so it
+      // can drop the auth.users row. Cascade FKs clean up entries /
+      // quit_plans / leaderboard_entries / user_settings.
+      const { error } = await supabase.rpc('delete_account')
+      if (error) return { ok: false, error: error.message }
+      // Tear down the local session immediately.
+      await supabase.auth.signOut()
+      return { ok: true }
     },
   }
 }

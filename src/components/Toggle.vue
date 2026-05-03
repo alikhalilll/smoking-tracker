@@ -12,6 +12,8 @@
 </template>
 
 <script setup lang="ts">
+import { useHaptics } from '../composables/useHaptics'
+
 interface Props {
   modelValue: boolean
   disabled?: boolean
@@ -22,8 +24,11 @@ const emit = defineEmits<{
   'update:modelValue': [value: boolean]
 }>()
 
+const haptics = useHaptics()
+
 function onClick(): void {
   if (props.disabled) return
+  haptics.fire('tap')
   emit('update:modelValue', !props.modelValue)
 }
 </script>

@@ -160,6 +160,7 @@ import {
   type DateValue,
 } from '@internationalized/date'
 import { useI18n, intlLocale } from '../i18n'
+import { useHaptics } from '../composables/useHaptics'
 
 interface Props {
   modelValue: Date | null
@@ -179,6 +180,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const appLocaleTag = computed<string>(() => intlLocale())
+const haptics = useHaptics()
 
 // Internal working copy. Reset to modelValue every time the sheet opens
 // so a Cancel doesn't leak a stale draft into the next open.
@@ -260,6 +262,7 @@ function setPeriod(p: 'AM' | 'PM'): void {
 }
 
 function onSave(): void {
+  haptics.fire('success')
   // Final clamp on Save in case maxDate moved forward (or just to be
   // belt-and-braces against any unclamped path above).
   emit('update:modelValue', clampToMax(new Date(draft.value)))
