@@ -301,24 +301,36 @@
           v-if="reminders.settings.value.bedtimeEnabled"
           class="bedtime-times"
         >
-          <label class="time-field">
+          <div class="time-field">
             <span class="time-label">{{ t('reminders.bedtime_start') }}</span>
-            <input
-              type="time"
-              class="time-input"
-              :value="reminders.settings.value.bedtimeStart"
-              @change="onBedtimeStartChange"
+            <VueDatePicker
+              :model-value="bedtimeStartObj"
+              time-picker
+              :clearable="false"
+              :is24="true"
+              :auto-apply="true"
+              :format="'HH:mm'"
+              :teleport="true"
+              :dark="isDark"
+              minutes-increment="5"
+              @update:model-value="onBedtimeStartPicked"
             />
-          </label>
-          <label class="time-field">
+          </div>
+          <div class="time-field">
             <span class="time-label">{{ t('reminders.bedtime_end') }}</span>
-            <input
-              type="time"
-              class="time-input"
-              :value="reminders.settings.value.bedtimeEnd"
-              @change="onBedtimeEndChange"
+            <VueDatePicker
+              :model-value="bedtimeEndObj"
+              time-picker
+              :clearable="false"
+              :is24="true"
+              :auto-apply="true"
+              :format="'HH:mm'"
+              :teleport="true"
+              :dark="isDark"
+              minutes-increment="5"
+              @update:model-value="onBedtimeEndPicked"
             />
-          </label>
+          </div>
         </div>
       </div>
     </section>
@@ -395,6 +407,8 @@ import {
 import { useAuth } from '../composables/useAuth'
 import { isSupabaseConfigured } from '../supabase'
 import Toggle from './Toggle.vue'
+import { VueDatePicker } from '@vuepic/vue-datepicker'
+import '@vuepic/vue-datepicker/dist/main.css'
 import type { UseSync } from '../composables/useSync'
 import type { UseLeaderboard } from '../composables/useLeaderboard'
 
@@ -478,14 +492,49 @@ function onBedtimeToggle(enabled: boolean): void {
   reminders.setBedtime({ enabled })
   emit('reminders-changed')
 }
-function onBedtimeStartChange(e: Event): void {
-  reminders.setBedtime({ start: (e.target as HTMLInputElement).value })
+
+interface PickerTime {
+  hours: number
+  minutes: number
+  seconds?: number
+}
+
+function hmToObj(hm: string): PickerTime {
+  const [h, m] = hm.split(':').map((v) => parseInt(v, 10) || 0)
+  return { hours: h, minutes: m }
+}
+function objToHm(t: PickerTime | null): string {
+  if (!t) return '00:00'
+  return `${String(t.hours).padStart(2, '0')}:${String(t.minutes).padStart(2, '0')}`
+}
+
+const bedtimeStartObj = computed<PickerTime>(() =>
+  hmToObj(reminders.settings.value.bedtimeStart)
+)
+const bedtimeEndObj = computed<PickerTime>(() =>
+  hmToObj(reminders.settings.value.bedtimeEnd)
+)
+
+function onBedtimeStartPicked(t: PickerTime | null): void {
+  reminders.setBedtime({ start: objToHm(t) })
   emit('reminders-changed')
 }
-function onBedtimeEndChange(e: Event): void {
-  reminders.setBedtime({ end: (e.target as HTMLInputElement).value })
+function onBedtimeEndPicked(t: PickerTime | null): void {
+  reminders.setBedtime({ end: objToHm(t) })
   emit('reminders-changed')
 }
+
+// Dark theme detection so the picker matches the app
+const isDark = computed<boolean>(() => {
+  if (typeof document === 'undefined') return false
+  const explicit = document.documentElement.getAttribute('data-theme')
+  if (explicit === 'dark') return true
+  if (explicit === 'light') return false
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+  )
+})
 
 interface DiagSnapshot {
   buildId: string
@@ -909,7 +958,7 @@ function handleReset(): void {
   border-top: 1px solid var(--hairline);
 }
 
-/* Bedtime — chunky time inputs styled to match the app cards */
+/* Bedtime — uses VueDatePicker (time-only), themed to match the app */
 .bedtime-times {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -919,61 +968,54 @@ function handleReset(): void {
 .time-field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px;
+  gap: 6px;
+  padding: 12px 14px;
   background: var(--surface-tint);
   border-radius: 16px;
   border: 1.5px solid transparent;
   transition: border-color 0.15s ease, background 0.15s ease;
-  cursor: pointer;
 }
 .time-field:focus-within {
   border-color: var(--brand);
-  background: var(--brand-soft);
 }
 .time-label {
-  font-size: 11px;
+  font-size: 10px;
   color: var(--muted);
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.time-input {
+
+/* === VueDatePicker theme overrides ===
+   Brand the input + popup with the app's design tokens. The library
+   exposes its own CSS variables; we just remap them. */
+.time-field :deep(.dp__input) {
   appearance: none;
-  -webkit-appearance: none;
   border: none;
   background: transparent;
   color: var(--text);
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 700;
-  letter-spacing: -0.02em;
-  padding: 0;
+  letter-spacing: -0.01em;
+  padding: 0 0 0 6px;
   width: 100%;
+  text-align: start;
+}
+.time-field :deep(.dp__input_icon),
+.time-field :deep(.dp__clear_icon),
+.time-field :deep(.dp__input_wrap) > svg {
+  color: var(--muted);
+}
+.time-field :deep(.dp__input_icon) {
+  inset-inline-start: auto;
+  inset-inline-end: 0;
+}
+.time-field :deep(.dp__input_wrap) {
   cursor: pointer;
 }
-.time-input:focus {
-  outline: none;
-}
-/* Hide the default browser clear button and tweak Webkit's clock icon */
-.time-input::-webkit-calendar-picker-indicator {
-  background: transparent;
-  color: transparent;
-  cursor: pointer;
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-.time-input::-webkit-clear-button,
-.time-input::-webkit-inner-spin-button {
-  display: none;
-  -webkit-appearance: none;
-}
-.time-field {
-  position: relative;
-}
+
 .info-label {
   font-size: 12px;
   font-weight: 600;
