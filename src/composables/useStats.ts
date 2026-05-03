@@ -324,17 +324,6 @@ export function useStats(data: Ref<AppData>) {
 
 import { t, intlLocale } from '../i18n'
 
-export function timeAgo(isoStr: string): string {
-  const diff = Date.now() - new Date(isoStr).getTime()
-  const mins = Math.floor(diff / 60_000)
-  if (mins < 1) return t('time_ago.just_now')
-  if (mins < 60) return t('time_ago.minutes', { n: mins })
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24)
-    return t('time_ago.hours_minutes', { h: hrs, m: mins % 60 })
-  return t('time_ago.days', { n: Math.floor(hrs / 24) })
-}
-
 export function formatDuration(ms: number | null | undefined): string {
   if (ms == null || isNaN(ms)) return t('duration.none')
   if (ms < 1000) return t('duration.seconds', { n: 0 })

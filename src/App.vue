@@ -47,7 +47,7 @@
       <HomeView
         v-if="view === 'home'"
         :today-count="todayCount"
-        :last-smoke-text="lastSmokeText ?? undefined"
+        :last-smoke-time="lastSmoke ?? undefined"
         :last7="last7"
         :max-last7="maxLast7"
         :daily-avg="dailyAvg"
@@ -157,7 +157,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useStorage } from './composables/useStorage'
-import { useStats, timeAgo } from './composables/useStats'
+import { useStats } from './composables/useStats'
 import { useQuitPlan } from './composables/useQuitPlan'
 import { useReminders, resolvedNotificationLocale } from './composables/useReminders'
 import { useSync } from './composables/useSync'
@@ -263,22 +263,6 @@ const greetingName = computed(() => {
   if (ldrName) return ldrName
   if (email) return email.split('@')[0]
   return t('app.greet_friend')
-})
-
-// Update "time ago" every minute
-const tick = ref(0)
-let tickInterval: ReturnType<typeof setInterval> | null = null
-onMounted(() => {
-  tickInterval = setInterval(() => tick.value++, 60_000)
-})
-onUnmounted(() => {
-  if (tickInterval) clearInterval(tickInterval)
-})
-
-const lastSmokeText = computed<string | null>(() => {
-  if (!lastSmoke.value) return null
-  void tick.value
-  return timeAgo(lastSmoke.value)
 })
 
 const reminders = useReminders()

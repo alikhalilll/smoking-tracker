@@ -34,7 +34,7 @@ const ar = {
   },
   home: {
     cigarettes_today: 'سجائر اليوم',
-    last_one: 'آخر واحدة {ago}',
+    since_last: 'منذ آخر سيجارة',
     log_one: 'سجّل سيجارة',
     log_many: 'سجّل {n} سجائر',
     undo_last: 'تراجع',
@@ -178,12 +178,6 @@ const ar = {
     days_only: '{d}ي',
     days_hours: '{d}ي {h}س',
     none: '—',
-  },
-  time_ago: {
-    just_now: 'الآن',
-    minutes: 'قبل {n}د',
-    hours_minutes: 'قبل {h}س {m}د',
-    days: 'قبل {n}ي',
   },
   footer: {
     copyright: '© {from}–{to} علي خليل',
