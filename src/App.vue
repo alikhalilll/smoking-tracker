@@ -161,6 +161,7 @@ import { useStats, timeAgo } from './composables/useStats'
 import { useQuitPlan } from './composables/useQuitPlan'
 import { useReminders, resolvedNotificationLocale } from './composables/useReminders'
 import { useSync } from './composables/useSync'
+import { useSettingsSync } from './composables/useSettingsSync'
 import { useLeaderboard } from './composables/useLeaderboard'
 import { useAuth } from './composables/useAuth'
 import { useAuthModal } from './composables/useAuthModal'
@@ -245,6 +246,9 @@ const quit = useQuitPlan(data, byDay, dailyAvg)
 
 const sync = isSupabaseConfigured() ? useSync(data) : null
 const leaderboard = isSupabaseConfigured() ? useLeaderboard(data) : null
+// Cross-device settings (theme, language, reminder prefs). Side effects
+// only — the composable wires its own watchers and pull triggers.
+if (isSupabaseConfigured()) useSettingsSync()
 
 // Personalized greeting (e-learning vibe)
 const greeting = computed(() => {

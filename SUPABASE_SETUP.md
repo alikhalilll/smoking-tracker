@@ -100,6 +100,26 @@ create policy "leaderboard update own"
   on public.leaderboard_entries for update using (auth.uid() = user_id);
 create policy "leaderboard delete own"
   on public.leaderboard_entries for delete using (auth.uid() = user_id);
+
+-- user_settings: theme, language, and reminder preferences. Stored as a
+-- single JSONB blob so adding a new setting later is a code change, not
+-- a migration. Last-write-wins via updated_at.
+create table public.user_settings (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  settings jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+alter table public.user_settings enable row level security;
+
+create policy "users see their own settings"
+  on public.user_settings for select using (auth.uid() = user_id);
+create policy "users insert their own settings"
+  on public.user_settings for insert with check (auth.uid() = user_id);
+create policy "users update their own settings"
+  on public.user_settings for update using (auth.uid() = user_id);
+create policy "users delete their own settings"
+  on public.user_settings for delete using (auth.uid() = user_id);
 ```
 
 Click **Run**.

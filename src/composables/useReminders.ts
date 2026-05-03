@@ -9,11 +9,13 @@ export interface ReminderSettings {
   gapMinutes: number
   /** Language for notification text. 'auto' follows the app locale. */
   notificationLocale: NotificationLocale
-  /** When true, suppress notifications between bedtimeStart and bedtimeEnd. */
-  bedtimeEnabled: boolean
-  /** "HH:MM" 24-hour, local time. */
+  /**
+   * Sleep window — always present. Notifications pause inside it, and
+   * gap analytics subtract any overlap so a 10-hour overnight gap with
+   * 8h of sleep counts as a 2h awake gap.
+   * "HH:MM" 24-hour, local time. End may be < start (wraps midnight).
+   */
   bedtimeStart: string
-  /** "HH:MM" 24-hour, local time. May be < bedtimeStart (wraps midnight). */
   bedtimeEnd: string
 }
 
@@ -23,9 +25,8 @@ const DEFAULT_SETTINGS: ReminderSettings = {
   enabled: false,
   gapMinutes: 30,
   notificationLocale: 'auto',
-  bedtimeEnabled: false,
-  bedtimeStart: '22:00',
-  bedtimeEnd: '07:00',
+  bedtimeStart: '00:30',
+  bedtimeEnd: '09:00',
 }
 
 /** "HH:MM" → minutes since midnight. */
@@ -63,16 +64,28 @@ function load(): ReminderSettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return { ...DEFAULT_SETTINGS }
-    const parsed = JSON.parse(raw) as Partial<ReminderSettings>
+    // The old shape had a `bedtimeEnabled` toggle. When it was `false`
+    // the user never opted into bedtime, so any stored times were just
+    // stale defaults from the prior version (22:00–07:00). Drop those
+    // and use the new defaults so existing users don't silently start
+    // subtracting a sleep window they never chose.
+    const parsed = JSON.parse(raw) as Partial<ReminderSettings> & {
+      bedtimeEnabled?: boolean
+    }
+    const userOptedIntoBedtime = parsed.bedtimeEnabled !== false
     const loc = parsed.notificationLocale
     const validLoc: NotificationLocale =
       loc === 'auto' || loc === 'en' || loc === 'ar' ? loc : 'auto'
     const startHM =
-      typeof parsed.bedtimeStart === 'string' && HM_RE.test(parsed.bedtimeStart)
+      userOptedIntoBedtime &&
+      typeof parsed.bedtimeStart === 'string' &&
+      HM_RE.test(parsed.bedtimeStart)
         ? parsed.bedtimeStart
         : DEFAULT_SETTINGS.bedtimeStart
     const endHM =
-      typeof parsed.bedtimeEnd === 'string' && HM_RE.test(parsed.bedtimeEnd)
+      userOptedIntoBedtime &&
+      typeof parsed.bedtimeEnd === 'string' &&
+      HM_RE.test(parsed.bedtimeEnd)
         ? parsed.bedtimeEnd
         : DEFAULT_SETTINGS.bedtimeEnd
     return {
@@ -82,7 +95,6 @@ function load(): ReminderSettings {
           ? parsed.gapMinutes
           : DEFAULT_SETTINGS.gapMinutes,
       notificationLocale: validLoc,
-      bedtimeEnabled: !!parsed.bedtimeEnabled,
       bedtimeStart: startHM,
       bedtimeEnd: endHM,
     }
@@ -279,7 +291,9 @@ export interface UseReminders {
   setEnabled: (b: boolean) => void
   setGap: (minutes: number) => void
   setNotificationLocale: (loc: NotificationLocale) => void
-  setBedtime: (opts: { enabled?: boolean; start?: string; end?: string }) => void
+  setBedtime: (opts: { start?: string; end?: string }) => void
+  /** Apply settings pulled from the cloud without echoing back to push. */
+  applyRemote: (s: ReminderSettings) => void
   /** Schedule the next reminder. Call after each log, or to (re)start the cycle. */
   scheduleNext: (titleAndBody: { title: string; body: string }) => void
   /** Fire one notification immediately. Returns a diagnostic object so the UI can show a meaningful error. */
@@ -319,17 +333,9 @@ export function useReminders(): UseReminders {
     save(settings.value)
   }
 
-  function setBedtime(opts: {
-    enabled?: boolean
-    start?: string
-    end?: string
-  }): void {
+  function setBedtime(opts: { start?: string; end?: string }): void {
     settings.value = {
       ...settings.value,
-      bedtimeEnabled:
-        opts.enabled !== undefined
-          ? opts.enabled
-          : settings.value.bedtimeEnabled,
       bedtimeStart:
         opts.start && HM_RE.test(opts.start)
           ? opts.start
@@ -339,6 +345,11 @@ export function useReminders(): UseReminders {
           ? opts.end
           : settings.value.bedtimeEnd,
     }
+    save(settings.value)
+  }
+
+  function applyRemote(s: ReminderSettings): void {
+    settings.value = { ...s }
     save(settings.value)
   }
 
@@ -352,7 +363,6 @@ export function useReminders(): UseReminders {
 
     let ms = baseMs
     if (
-      settings.value.bedtimeEnabled &&
       isInBedtime(
         fireAt,
         settings.value.bedtimeStart,
@@ -367,7 +377,6 @@ export function useReminders(): UseReminders {
       // One last guard in case the user crosses into bedtime between
       // scheduling and firing.
       if (
-        !settings.value.bedtimeEnabled ||
         !isInBedtime(
           new Date(),
           settings.value.bedtimeStart,
@@ -461,6 +470,7 @@ export function useReminders(): UseReminders {
     setGap,
     setNotificationLocale,
     setBedtime,
+    applyRemote,
     scheduleNext,
     sendTest,
     cancel,

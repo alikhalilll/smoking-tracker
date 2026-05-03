@@ -11,6 +11,65 @@ import type {
 } from '../types'
 
 import { formatLocalDate as formatDate, getToday } from './useDate'
+import { useReminders } from './useReminders'
+
+/**
+ * Returns [startMs, endMs] of the bedtime episode that *starts* on the
+ * given calendar date. If the window wraps midnight (start > end), the
+ * episode ends on the following day.
+ */
+function bedtimeEpisodeStarting(
+  date: Date,
+  startHM: string,
+  endHM: string
+): [number, number] {
+  const [hS, mS] = startHM.split(':').map((v) => parseInt(v, 10) || 0)
+  const [hE, mE] = endHM.split(':').map((v) => parseInt(v, 10) || 0)
+  const start = new Date(date)
+  start.setHours(hS, mS, 0, 0)
+  const end = new Date(date)
+  end.setHours(hE, mE, 0, 0)
+  if (end.getTime() <= start.getTime()) {
+    end.setDate(end.getDate() + 1)
+  }
+  return [start.getTime(), end.getTime()]
+}
+
+/**
+ * Subtract sleep overlap from a raw gap so analytics only count time
+ * the user was awake. A 10h overnight gap with 8h of sleep in it
+ * becomes 2h. Times are inclusive at start, exclusive at end.
+ */
+export function awakeGapMs(
+  prevMs: number,
+  currMs: number,
+  startHM: string,
+  endHM: string
+): number {
+  const total = currMs - prevMs
+  if (total <= 0) return total
+  if (startHM === endHM) return total
+
+  // Iterate every calendar day whose bedtime episode could overlap
+  // [prev, curr] — that's from the day before `prev` (in case the
+  // wrapping window started yesterday) through the day of `curr`.
+  const cursor = new Date(prevMs)
+  cursor.setHours(0, 0, 0, 0)
+  cursor.setDate(cursor.getDate() - 1)
+  const last = new Date(currMs)
+  last.setHours(0, 0, 0, 0)
+
+  let sleep = 0
+  while (cursor.getTime() <= last.getTime()) {
+    const [bs, be] = bedtimeEpisodeStarting(cursor, startHM, endHM)
+    const overlapStart = Math.max(bs, prevMs)
+    const overlapEnd = Math.min(be, currMs)
+    if (overlapEnd > overlapStart) sleep += overlapEnd - overlapStart
+    cursor.setDate(cursor.getDate() + 1)
+  }
+
+  return Math.max(0, total - sleep)
+}
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
 
@@ -24,22 +83,31 @@ const GAP_BUCKET_DEFS: Array<Pick<GapDistributionBucket, 'label' | 'minMs' | 'ma
 ]
 
 export function useStats(data: Ref<AppData>) {
+  const reminders = useReminders()
+
   const sortedEntries = computed(() =>
     [...data.value.entries].sort(
       (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime()
     )
   )
 
-  // Each entry annotated with the gap (ms) from the chronologically previous
-  // entry. First entry overall has gapMs = null.
+  // Each entry annotated with the *awake* gap (ms) from the chronologically
+  // previous entry — bedtime overlap is subtracted so an overnight 10h gap
+  // with 8h of sleep counts as 2h. First entry overall has gapMs = null.
   const entriesWithGaps = computed<AnnotatedEntry[]>(() => {
     const arr = sortedEntries.value
+    const { bedtimeStart, bedtimeEnd } = reminders.settings.value
     return arr.map((e, i) => ({
       ...e,
       gapMs:
         i === 0
           ? null
-          : new Date(e.time).getTime() - new Date(arr[i - 1].time).getTime(),
+          : awakeGapMs(
+              new Date(arr[i - 1].time).getTime(),
+              new Date(e.time).getTime(),
+              bedtimeStart,
+              bedtimeEnd
+            ),
     }))
   })
 
@@ -85,14 +153,20 @@ export function useStats(data: Ref<AppData>) {
     return Math.min(...days.value.map((d) => byDay.value[d]))
   })
 
-  // Gaps between distinct smoking events. Excludes 0ms gaps from batch-logged
-  // entries so min/avg/max are not skewed.
+  // Awake gaps between distinct smoking events. Sleep overlap is removed
+  // (so an overnight 10h gap with 8h sleep counts as 2h), and 0ms gaps
+  // from batch-logged entries are excluded so min/avg/max aren't skewed.
   const allGapsMs = computed<number[]>(() => {
     const arr = sortedEntries.value
+    const { bedtimeStart, bedtimeEnd } = reminders.settings.value
     const gaps: number[] = []
     for (let i = 1; i < arr.length; i++) {
-      const g =
-        new Date(arr[i].time).getTime() - new Date(arr[i - 1].time).getTime()
+      const g = awakeGapMs(
+        new Date(arr[i - 1].time).getTime(),
+        new Date(arr[i].time).getTime(),
+        bedtimeStart,
+        bedtimeEnd
+      )
       if (g > 0) gaps.push(g)
     }
     return gaps
