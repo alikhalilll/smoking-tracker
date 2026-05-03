@@ -301,9 +301,13 @@
           v-if="reminders.settings.value.bedtimeEnabled"
           class="bedtime-times"
         >
-          <div class="time-field">
+          <div class="time-field" @click="openStartPicker">
             <span class="time-label">{{ t('reminders.bedtime_start') }}</span>
+            <button type="button" class="time-trigger">
+              {{ formatPickerTime(bedtimeStartObj) }}
+            </button>
             <VueDatePicker
+              ref="startPicker"
               :model-value="bedtimeStartObj"
               time-picker
               :clearable="false"
@@ -312,18 +316,18 @@
               :teleport="true"
               :dark="isDark"
               minutes-increment="5"
+              :hide-input-icon="true"
+              class="hidden-picker"
               @update:model-value="onBedtimeStartPicked"
-            >
-              <template #trigger>
-                <button type="button" class="time-trigger">
-                  {{ formatPickerTime(bedtimeStartObj) }}
-                </button>
-              </template>
-            </VueDatePicker>
+            />
           </div>
-          <div class="time-field">
+          <div class="time-field" @click="openEndPicker">
             <span class="time-label">{{ t('reminders.bedtime_end') }}</span>
+            <button type="button" class="time-trigger">
+              {{ formatPickerTime(bedtimeEndObj) }}
+            </button>
             <VueDatePicker
+              ref="endPicker"
               :model-value="bedtimeEndObj"
               time-picker
               :clearable="false"
@@ -332,14 +336,10 @@
               :teleport="true"
               :dark="isDark"
               minutes-increment="5"
+              :hide-input-icon="true"
+              class="hidden-picker"
               @update:model-value="onBedtimeEndPicked"
-            >
-              <template #trigger>
-                <button type="button" class="time-trigger">
-                  {{ formatPickerTime(bedtimeEndObj) }}
-                </button>
-              </template>
-            </VueDatePicker>
+            />
           </div>
         </div>
       </div>
@@ -550,6 +550,16 @@ function onBedtimeStartPicked(t: PickerTime | null): void {
 function onBedtimeEndPicked(t: PickerTime | null): void {
   reminders.setBedtime({ end: objToHm(t) })
   emit('reminders-changed')
+}
+
+// Refs to imperatively open each hidden picker when its card is tapped.
+const startPicker = ref<{ openMenu: () => void } | null>(null)
+const endPicker = ref<{ openMenu: () => void } | null>(null)
+function openStartPicker(): void {
+  startPicker.value?.openMenu()
+}
+function openEndPicker(): void {
+  endPicker.value?.openMenu()
 }
 
 // Dark theme detection so the picker matches the app
@@ -1014,8 +1024,13 @@ function handleReset(): void {
   text-transform: uppercase;
 }
 
-/* The picker is invisible — only its #trigger slot renders.
-   Our own button shows the formatted time. */
+/* The whole .time-field card is the click target; our button shows
+   the formatted time, and the actual VueDatePicker instance is
+   visually hidden — we open it imperatively via a ref. The popup
+   still teleports to <body> so it shows up normally on click. */
+.time-field {
+  cursor: pointer;
+}
 .time-trigger {
   appearance: none;
   border: none;
@@ -1030,9 +1045,24 @@ function handleReset(): void {
   font-weight: 700;
   letter-spacing: -0.01em;
   color: var(--text);
+  pointer-events: none; /* let the parent .time-field receive the click */
 }
-.time-trigger:active {
-  opacity: 0.7;
+.hidden-picker {
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+}
+.hidden-picker :deep(.dp__main),
+.hidden-picker :deep(.dp__input_wrap),
+.hidden-picker :deep(.dp__input) {
+  width: 0;
+  height: 0;
+  padding: 0;
+  border: none;
+  visibility: hidden;
 }
 
 .info-label {
