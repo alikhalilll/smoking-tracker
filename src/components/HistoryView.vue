@@ -135,6 +135,7 @@ import {
   formatTime,
 } from '../composables/useStats'
 import { useI18n } from '../i18n'
+import { useConfirm } from '../composables/useConfirm'
 import type { DayReport, GapStats } from '../types'
 import DateTimePicker from './DateTimePicker.vue'
 
@@ -161,9 +162,17 @@ function toggle(d: string): void {
   expanded.value[d] = !expanded.value[d]
 }
 
-function onDeleteDay(d: string): void {
+const { confirm } = useConfirm()
+
+async function onDeleteDay(d: string): Promise<void> {
   const count = props.byDay[d] ?? 0
-  if (!confirm(t('history.delete_day_confirm', { count, date: d }))) return
+  const ok = await confirm({
+    title: t('history.delete_day_btn'),
+    body: t('history.delete_day_confirm', { count, date: d }),
+    confirmText: t('confirm.delete'),
+    variant: 'danger',
+  })
+  if (!ok) return
   emit('delete-day', d)
 }
 

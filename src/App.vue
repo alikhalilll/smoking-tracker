@@ -157,6 +157,9 @@
     <!-- Auth modal (opened on demand) -->
     <AuthModal />
 
+    <!-- App-wide confirm drawer (replaces native confirm()) -->
+    <ConfirmDrawer />
+
     <!-- Toast host -->
     <Toast />
   </div>
@@ -184,6 +187,7 @@ import LeaderboardView from './components/LeaderboardView.vue'
 import SettingsView from './components/SettingsView.vue'
 import ReportView from './components/ReportView.vue'
 import AuthModal from './components/AuthModal.vue'
+import ConfirmDrawer from './components/ConfirmDrawer.vue'
 import Toast from './components/Toast.vue'
 import type { QuitIntensity } from './types'
 
