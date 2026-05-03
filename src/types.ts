@@ -17,6 +17,14 @@ export interface AppData {
   entries: SmokeEntry[]
   startDate: string
   quitPlan?: QuitPlan
+  /**
+   * ms timestamp of the user's most recent explicit plan abandon. Used
+   * by sync to keep a stale server row from re-appearing if a pull
+   * races with a delete that's still in flight: server rows whose
+   * `updated_at` is older than this stamp are treated as stale and
+   * deleted instead of pulled back into local state.
+   */
+  quitPlanClearedAt?: number
 }
 
 export type QuitIntensity = 'quick' | 'standard' | 'gradual' | 'extended'

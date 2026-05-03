@@ -3,6 +3,7 @@ import { supabase } from '../supabase'
 import { useAuth } from './useAuth'
 import { useTheme, type ThemeMode } from './useTheme'
 import { useReminders, type ReminderSettings } from './useReminders'
+import { useEconomy, type EconomySettings } from './useEconomy'
 import {
   currentLocale,
   applyRemoteLocale,
@@ -20,6 +21,7 @@ interface SyncedSettings {
   theme: ThemeMode
   locale: Locale
   reminders: ReminderSettings
+  economy?: EconomySettings
 }
 
 interface ServerRow {
@@ -60,6 +62,7 @@ export function useSettingsSync(): UseSettingsSync {
   const { isAuthed, user } = useAuth()
   const theme = useTheme()
   const reminders = useReminders()
+  const economy = useEconomy()
 
   const status: Ref<SettingsSyncStatus> = ref('idle')
   const lastError: Ref<string | null> = ref(null)
@@ -79,6 +82,7 @@ export function useSettingsSync(): UseSettingsSync {
       theme: theme.mode.value,
       locale: currentLocale.value,
       reminders: { ...reminders.settings.value },
+      economy: { ...economy.settings.value },
     }
   }
 
@@ -93,6 +97,9 @@ export function useSettingsSync(): UseSettingsSync {
       }
       if (s.reminders && typeof s.reminders === 'object') {
         reminders.applyRemote(s.reminders)
+      }
+      if (s.economy && typeof s.economy === 'object') {
+        economy.applyRemote(s.economy)
       }
     } finally {
       applyingRemote = false
@@ -180,6 +187,7 @@ export function useSettingsSync(): UseSettingsSync {
       () => theme.mode.value,
       currentLocale,
       () => reminders.settings.value,
+      () => economy.settings.value,
     ],
     () => {
       if (applyingRemote) return

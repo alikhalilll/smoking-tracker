@@ -53,7 +53,7 @@ function onClick(): void {
 .thumb {
   position: absolute;
   top: 3px;
-  left: 3px;
+  inset-inline-start: 3px;
   width: 22px;
   height: 22px;
   border-radius: 50%;

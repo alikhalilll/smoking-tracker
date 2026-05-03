@@ -181,7 +181,57 @@
         <div class="stat-label">{{ t('home.best_day') }}</div>
         <div class="stat-value tabular">{{ bestDay }}</div>
       </div>
+      <div
+        v-if="moneyMode != null"
+        class="stat-card"
+        :class="moneyMode === 'saved' ? 'stat-money' : ''"
+      >
+        <div class="stat-icon icon-mint">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        </div>
+        <div class="stat-label">{{ moneyLabel }}</div>
+        <div class="stat-value tabular">{{ formatMoney(moneyAmount, currency) }}</div>
+      </div>
     </div>
+
+    <!-- Health milestones — only meaningful once at least one cig logged -->
+    <section v-if="hasEntries" class="health-section">
+      <div class="health-header">
+        <h3 class="h-section" style="margin: 0">{{ t('home.health_section') }}</h3>
+        <span v-if="nextMilestone" class="health-next">
+          {{
+            t('home.health_next', {
+              label: t(`health.${nextMilestone.key}.label`),
+              time: formatRemaining(nextMilestone.remainingMs),
+            })
+          }}
+        </span>
+      </div>
+      <div class="milestones-grid">
+        <div
+          v-for="m in milestones"
+          :key="m.key"
+          class="milestone"
+          :class="{ reached: m.reached }"
+        >
+          <div class="milestone-emoji">{{ m.emoji }}</div>
+          <div class="milestone-text">
+            <div class="milestone-label">{{ t(`health.${m.key}.label`) }}</div>
+            <div class="milestone-progress-row">
+              <div class="milestone-bar">
+                <div
+                  class="milestone-bar-fill"
+                  :style="{ width: Math.round(m.progress * 100) + '%' }"
+                />
+              </div>
+              <div class="milestone-pct tabular">
+                {{ Math.round(m.progress * 100) }}%
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <!-- Generate report + Share -->
     <div v-if="hasEntries" class="bottom-actions">
@@ -204,6 +254,9 @@ import { share } from '../composables/useShare'
 import { getToday } from '../composables/useDate'
 import { useCountUp } from '../composables/useCountUp'
 import { useToast } from '../composables/useToast'
+import { useEconomy, formatMoney } from '../composables/useEconomy'
+import { useHealthMilestones } from '../composables/useHealthMilestones'
+import { formatDuration } from '../composables/useStats'
 import Confetti from './Confetti.vue'
 import type { DayBucket } from '../types'
 
@@ -239,6 +292,39 @@ const isPulsing = ref(false)
 const showCheck = ref(false)
 const confettiTrigger = ref(0)
 
+// Economy: when the user has a smoke-free streak, show "money saved
+// during this streak". Otherwise (they're actively smoking), show
+// "total spent" so the card never silently disappears on a relapse.
+// Returns null only when no price is configured.
+const economy = useEconomy()
+const currency = computed(() => economy.settings.value.currency)
+const moneyMode = computed<'saved' | 'spent' | null>(() => {
+  if (economy.pricePerCigarette.value <= 0) return null
+  return (props.smokeFreeDays ?? 0) > 0 ? 'saved' : 'spent'
+})
+const moneyAmount = computed<number>(() => {
+  const price = economy.pricePerCigarette.value
+  if (moneyMode.value === 'saved') {
+    return price * props.dailyAvg * (props.smokeFreeDays ?? 0)
+  }
+  return price * props.totalSmoked
+})
+const moneyLabel = computed<string>(() =>
+  moneyMode.value === 'saved' ? t('home.money_saved') : t('home.money_spent')
+)
+
+// Health milestones tick relative to the last logged cigarette.
+const lastSmokeRef = toRef(props, 'lastSmokeTime')
+const lastSmokeOrNull = computed<string | null>(
+  () => lastSmokeRef.value ?? null
+)
+const { all: milestones, next: nextMilestone } =
+  useHealthMilestones(lastSmokeOrNull)
+
+function formatRemaining(ms: number): string {
+  return formatDuration(ms)
+}
+
 const animatedTodayCount = useCountUp(toRef(props, 'todayCount'))
 
 // Live stopwatch since the last logged cigarette. Ticks every second
@@ -255,8 +341,11 @@ onUnmounted(() => {
 
 const stopwatch = computed<string | null>(() => {
   if (!props.lastSmokeTime) return null
-  const elapsed = now.value - new Date(props.lastSmokeTime).getTime()
-  if (elapsed < 0) return null
+  // Clamp to 0 — right after logging, `now.value` (1s ticks) can briefly
+  // trail the freshly-stamped entry time. Without the clamp, elapsed goes
+  // negative for a fraction of a second and the whole block disappears
+  // instead of resetting to 00:00:00.
+  const elapsed = Math.max(0, now.value - new Date(props.lastSmokeTime).getTime())
   const totalSec = Math.floor(elapsed / 1000)
   const days = Math.floor(totalSec / 86400)
   const hours = Math.floor((totalSec % 86400) / 3600)
@@ -644,6 +733,97 @@ async function onShare(): Promise<void> {
   letter-spacing: -0.025em;
   color: var(--text);
   line-height: 1;
+}
+
+/* Health milestones */
+.health-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.health-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.health-next {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.milestones-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--card);
+  border-radius: var(--radius-card);
+  padding: 14px;
+  box-shadow: var(--shadow-sm);
+}
+.milestone {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 4px;
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+.milestone.reached {
+  opacity: 1;
+}
+.milestone-emoji {
+  font-size: 22px;
+  width: 32px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.milestone-text {
+  flex: 1;
+  min-width: 0;
+}
+.milestone-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.milestone-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.milestone-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--surface-tint);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.milestone-bar-fill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--brand-grad-from),
+    var(--brand-grad-to)
+  );
+  transition: width 0.4s ease;
+}
+.milestone.reached .milestone-bar-fill {
+  background: var(--success);
+}
+.milestone-pct {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  min-width: 28px;
+  text-align: end;
+  letter-spacing: 0.02em;
+}
+
+/* Money saved card stands out a touch */
+.stat-money .stat-value {
+  color: var(--success);
 }
 
 /* Bottom actions */

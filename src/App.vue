@@ -72,6 +72,8 @@
         :gap-stats="gapStats"
         :day-reports="dayReports"
         @open-report="showReport = true"
+        @delete-day="handleDeleteDay"
+        @edit-entry="handleEditEntry"
       />
 
       <QuitView
@@ -107,6 +109,7 @@
         :sync="sync"
         :leaderboard="leaderboard"
         :is-authed="auth.isAuthed.value"
+        :entries="data.entries"
         @reset="handleReset"
         @reminders-changed="handleRemindersChanged"
         @open-auth="openAuth"
@@ -132,9 +135,9 @@
       </button>
     </nav>
 
-    <!-- Full report overlay -->
+    <!-- Full report drawer -->
     <ReportView
-      v-if="showReport"
+      v-model:open="showReport"
       :total-smoked="totalSmoked"
       :total-days="totalDays"
       :daily-avg="dailyAvg"
@@ -216,6 +219,8 @@ const {
   data,
   addEntries,
   undoLast,
+  deleteDay,
+  editEntryTime,
   resetAll,
   startQuitPlan,
   abandonQuitPlan,
@@ -329,6 +334,20 @@ function handleStartQuit(payload: {
   baseline: number
 }): void {
   startQuitPlan(payload.intensity, payload.baseline)
+}
+
+function handleDeleteDay(date: string): void {
+  // Local removal triggers useSync's debounced pushDiff, which mirrors
+  // the deletion to Supabase via its server-only-id delete pass.
+  deleteDay(date)
+  haptics.fire('tap')
+}
+
+function handleEditEntry(payload: { id: string; iso: string }): void {
+  // Marks entry as synced=false; pushDiff's UPSERT pass will UPDATE the
+  // row on the next debounce tick.
+  editEntryTime(payload.id, payload.iso)
+  haptics.fire('tap')
 }
 
 async function handleReset(): Promise<void> {
