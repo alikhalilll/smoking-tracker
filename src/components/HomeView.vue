@@ -79,8 +79,9 @@
           <div class="counter-label">{{ t('home.cigarettes_today') }}</div>
         </div>
       </div>
-      <div v-if="lastSmokeText" class="last-smoke">
-        {{ t('home.last_one', { ago: lastSmokeText }) }}
+      <div v-if="stopwatch" class="gap-stopwatch">
+        <div class="stopwatch-time tabular">{{ stopwatch }}</div>
+        <div class="stopwatch-label">{{ t('home.since_last') }}</div>
       </div>
     </div>
 
@@ -197,7 +198,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, toRef } from 'vue'
+import { ref, computed, watch, toRef, onMounted, onUnmounted } from 'vue'
 import { useI18n, intlLocale } from '../i18n'
 import { share } from '../composables/useShare'
 import { getToday } from '../composables/useDate'
@@ -210,7 +211,7 @@ const { t } = useI18n()
 
 interface Props {
   todayCount: number
-  lastSmokeText?: string
+  lastSmokeTime?: string
   last7: DayBucket[]
   maxLast7: number
   dailyAvg: number
@@ -239,6 +240,32 @@ const showCheck = ref(false)
 const confettiTrigger = ref(0)
 
 const animatedTodayCount = useCountUp(toRef(props, 'todayCount'))
+
+// Live stopwatch since the last logged cigarette. Ticks every second
+// while the component is mounted; the computed gates display so we
+// render nothing before the first log.
+const now = ref(Date.now())
+let nowTimer: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+  nowTimer = setInterval(() => (now.value = Date.now()), 1000)
+})
+onUnmounted(() => {
+  if (nowTimer) clearInterval(nowTimer)
+})
+
+const stopwatch = computed<string | null>(() => {
+  if (!props.lastSmokeTime) return null
+  const elapsed = now.value - new Date(props.lastSmokeTime).getTime()
+  if (elapsed < 0) return null
+  const totalSec = Math.floor(elapsed / 1000)
+  const days = Math.floor(totalSec / 86400)
+  const hours = Math.floor((totalSec % 86400) / 3600)
+  const minutes = Math.floor((totalSec % 3600) / 60)
+  const seconds = totalSec % 60
+  const pad = (n: number): string => n.toString().padStart(2, '0')
+  const hms = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+  return days > 0 ? `${days}d ${hms}` : hms
+})
 
 // Progress ring fills relative to either the quit-plan target (if any)
 // or the daily average baseline. When today exceeds the target the ring
@@ -430,10 +457,25 @@ async function onShare(): Promise<void> {
   margin-top: 6px;
   font-weight: 500;
 }
-.last-smoke {
-  font-size: 12px;
-  color: var(--subtle);
+.gap-stopwatch {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.stopwatch-time {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.stopwatch-label {
+  font-size: 11px;
   font-weight: 500;
+  color: var(--subtle);
+  letter-spacing: 0.02em;
 }
 
 /* Log card */

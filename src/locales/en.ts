@@ -34,7 +34,7 @@ const en = {
   },
   home: {
     cigarettes_today: 'cigarettes today',
-    last_one: 'last one {ago}',
+    since_last: 'since last cigarette',
     log_one: 'Log 1 cigarette',
     log_many: 'Log {n} cigarettes',
     undo_last: 'Undo last',
@@ -178,12 +178,6 @@ const en = {
     days_only: '{d}d',
     days_hours: '{d}d {h}h',
     none: '—',
-  },
-  time_ago: {
-    just_now: 'just now',
-    minutes: '{n}m ago',
-    hours_minutes: '{h}h {m}m ago',
-    days: '{n}d ago',
   },
   footer: {
     copyright: '© {from}–{to} Ali Khalil',
