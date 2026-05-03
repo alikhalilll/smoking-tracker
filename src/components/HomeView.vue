@@ -150,31 +150,31 @@
       </div>
     </div>
 
-    <!-- Stats grid (tinted skill-card vibe) -->
+    <!-- Stats grid: white cards with tinted icon bubbles -->
     <div class="stats-grid">
-      <div class="stat-card tinted-card tinted-peach">
-        <div class="stat-icon">
+      <div class="stat-card">
+        <div class="stat-icon icon-peach">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
         </div>
         <div class="stat-label">{{ t('home.daily_avg') }}</div>
         <div class="stat-value tabular">{{ dailyAvg }}</div>
       </div>
-      <div class="stat-card tinted-card tinted-mint">
-        <div class="stat-icon">
+      <div class="stat-card">
+        <div class="stat-icon icon-mint">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h12"/></svg>
         </div>
         <div class="stat-label">{{ t('home.total_logged') }}</div>
         <div class="stat-value tabular">{{ totalSmoked }}</div>
       </div>
-      <div class="stat-card tinted-card tinted-lavender">
-        <div class="stat-icon">
+      <div class="stat-card">
+        <div class="stat-icon icon-lavender">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>
         </div>
         <div class="stat-label">{{ t('home.days_tracked') }}</div>
         <div class="stat-value tabular">{{ totalDays }}</div>
       </div>
-      <div class="stat-card tinted-card tinted-sun">
-        <div class="stat-icon">
+      <div class="stat-card">
+        <div class="stat-icon icon-sun">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 9 22 10 17 14 18 22 12 18 6 22 7 14 2 10 9 9"/></svg>
         </div>
         <div class="stat-label">{{ t('home.best_day') }}</div>
@@ -551,35 +551,45 @@ async function onShare(): Promise<void> {
   letter-spacing: 0.04em;
 }
 
-/* Stats grid */
+/* Stats grid — white cards with tinted icon bubbles (wellness vibe) */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 .stat-card {
   position: relative;
+  background: var(--card);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 .stat-icon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.5);
-  margin-bottom: 4px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
 }
+.stat-icon.icon-peach { background: var(--tint-peach-bg); color: var(--tint-peach-fg); }
+.stat-icon.icon-mint { background: var(--tint-mint-bg); color: var(--tint-mint-fg); }
+.stat-icon.icon-lavender { background: var(--tint-lavender-bg); color: var(--tint-lavender-fg); }
+.stat-icon.icon-sun { background: var(--tint-sun-bg); color: var(--tint-sun-fg); }
 .stat-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
-  opacity: 0.85;
+  color: var(--muted);
 }
 .stat-value {
-  font-size: 28px;
+  font-size: 32px;
   font-weight: 800;
-  letter-spacing: -0.02em;
-  margin-top: -2px;
+  letter-spacing: -0.025em;
+  color: var(--text);
+  line-height: 1;
 }
 
 /* Bottom actions */

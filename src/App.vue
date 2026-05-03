@@ -96,8 +96,10 @@
       />
     </main>
 
-    <!-- Floating Liquid Glass nav (always at bottom) -->
-    <nav class="nav-bar glass" :style="indicatorStyle">
+    <!-- Floating bottom nav — solid dark pill with a circular
+         indicator that morphs to the active icon (wellness vibe).
+         Uses CSS variables so it inverts cleanly in dark mode. -->
+    <nav class="nav-bar" :style="indicatorStyle">
       <div class="nav-indicator" />
       <button
         v-for="(tab, i) in tabs"
@@ -108,7 +110,6 @@
         @click="onTabClick(tab.id, i)"
       >
         <span class="nav-icon" v-html="tab.icon"></span>
-        <span class="nav-label">{{ t(`tabs.${tab.id}`) }}</span>
       </button>
     </nav>
 
@@ -384,25 +385,25 @@ async function onSignOut(): Promise<void> {
   min-height: 100dvh;
 }
 
-/* Greeting header */
+/* Greeting header — bigger, bolder, "Hey, Michelle" energy */
 .greet {
-  padding: 28px 4px 16px;
+  padding: 24px 4px 18px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
 }
 .greet-eyebrow {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--muted);
   font-weight: 500;
 }
 .greet-name {
-  font-size: 26px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.025em;
   color: var(--text);
-  line-height: 1.15;
+  line-height: 1.1;
   margin-top: 2px;
 }
 .greet-action {
@@ -413,35 +414,52 @@ async function onSignOut(): Promise<void> {
   /* Animated view transitions could go here later */
 }
 
-/* Floating glass nav */
+/* Floating dark pill nav (wellness reference).
+   `left: 50%` + `transform: translateX(-50%)` for centering so it
+   stays put in both LTR and RTL — translateX is always physical. */
 .nav-bar {
   position: fixed;
-  inset-inline-start: 50%;
+  left: 50%;
   transform: translateX(-50%);
   bottom: max(14px, env(safe-area-inset-bottom));
   display: flex;
-  gap: 0;
+  gap: 4px;
   padding: 8px;
   border-radius: var(--radius-pill);
   z-index: 100;
   max-width: calc(100vw - 24px);
-  overflow: hidden;
+  background: #15171a;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18),
+              0 2px 6px rgba(15, 23, 42, 0.08);
 }
+[data-theme='dark'] .nav-bar,
+:root:not([data-theme='light']) .nav-bar {
+  background: #1f2228;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .nav-bar {
+    background: #1f2228;
+  }
+}
+
+/* The active indicator is a CIRCLE that morphs between the icon
+   positions. left/width are computed from getBoundingClientRect()
+   in JS, so we use physical `left:` (RTL-safe). */
 .nav-indicator {
   position: absolute;
   top: 8px;
   bottom: 8px;
-  inset-inline-start: var(--ind-x, 0);
+  left: var(--ind-x, 0);
   width: var(--ind-w, 0);
-  background: var(--card);
-  border-radius: var(--radius-pill);
-  box-shadow: var(--shadow-sm);
+  background: #fff;
+  border-radius: 50%;
   transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
               width 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
-              inset-inline-start 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+              left 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
   pointer-events: none;
   z-index: 0;
 }
+
 .nav-tab {
   position: relative;
   z-index: 1;
@@ -451,29 +469,18 @@ async function onSignOut(): Promise<void> {
   font-family: inherit;
   cursor: pointer;
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 8px 12px;
-  border-radius: var(--radius-pill);
-  color: var(--muted);
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.6);
   transition: color 0.2s ease;
-  min-width: 56px;
 }
 .nav-tab.active {
-  color: var(--brand);
+  color: #15171a;
 }
 .nav-icon {
   display: flex;
-}
-.nav-label {
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-}
-
-/* RTL: indicator uses inset-inline-start, but transition still works */
-[dir='rtl'] .nav-indicator {
-  /* keep default */
 }
 </style>

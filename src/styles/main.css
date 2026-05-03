@@ -70,14 +70,24 @@
   --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.06);
   --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.10);
 
-  /* Liquid Glass — only used on the floating nav and full-screen modals */
-  --glass-bg: rgba(255, 255, 255, 0.62);
-  --glass-bg-strong: rgba(255, 255, 255, 0.78);
-  --glass-border: rgba(255, 255, 255, 0.45);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.55);
-  --glass-shadow: 0 8px 32px rgba(15, 23, 42, 0.10),
-    0 2px 6px rgba(15, 23, 42, 0.06);
-  --glass-blur: saturate(180%) blur(28px);
+  /* Liquid Glass — only used on the floating nav and full-screen modals.
+     Tuned to approximate iOS 26: heavier blur, generous saturate boost,
+     softer translucent fill, and a top-edge specular highlight that
+     simulates how light catches the lensed surface. */
+  --glass-bg: rgba(255, 255, 255, 0.55);
+  --glass-bg-strong: rgba(255, 255, 255, 0.74);
+  --glass-border: rgba(255, 255, 255, 0.55);
+  --glass-highlight: inset 0 1.5px 0 rgba(255, 255, 255, 0.65),
+                     inset 0 -1px 0 rgba(15, 23, 42, 0.04);
+  --glass-shadow: 0 12px 36px rgba(15, 23, 42, 0.12),
+                  0 2px 6px rgba(15, 23, 42, 0.06);
+  --glass-blur: saturate(200%) blur(40px);
+  --glass-sheen: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.35) 0%,
+    rgba(255, 255, 255, 0.05) 35%,
+    rgba(255, 255, 255, 0) 60%
+  );
 
   /* Geometry */
   --radius-card: 24px;
@@ -88,41 +98,46 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg: #14110d;
-    --bg-elevated: #1f1b16;
-    --card: #1f1b16;
-    --surface-tint: #2a241d;
-    --border: #2e2820;
-    --hairline: rgba(255, 255, 255, 0.06);
+    /* Deeper, more neutral dark — the muddy-brown was making the
+       whole UI feel dim. Move to a near-black with a faint warm tilt. */
+    --bg: #0b0c0e;
+    --bg-elevated: #16181c;
+    --card: #16181c;
+    --surface-tint: #1c1f24;
+    --border: #24272d;
+    --hairline: rgba(255, 255, 255, 0.07);
 
-    --text: #f3ebde;
-    --muted: #b09e8a;
-    --faint: #4d4338;
-    --subtle: #7a6a59;
+    --text: #f4f1ec;
+    --muted: #a39c92;
+    --faint: #393c42;
+    --subtle: #6b6f78;
 
-    --brand: #ff8e5c;
-    --brand-soft: #2a1c12;
+    /* Brighter, more saturated accents in dark mode for contrast */
+    --brand: #ff9a6b;
+    --brand-soft: rgba(255, 154, 107, 0.14);
     --brand-grad-from: #ff8e5c;
     --brand-grad-to: #ffba84;
-    --brand-shadow: 0 8px 24px rgba(255, 142, 92, 0.36);
+    --brand-shadow: 0 8px 24px rgba(255, 142, 92, 0.32);
 
-    --accent: #9b85ff;
-    --accent-soft: #1f1a3a;
-    --success: #34d670;
-    --success-soft: #0d2c19;
+    --accent: #a89aff;
+    --accent-soft: rgba(168, 154, 255, 0.14);
+    --success: #4ade80;
+    --success-soft: rgba(74, 222, 128, 0.14);
     --warning: #fbbf24;
-    --warning-soft: #2a1f08;
-    --danger: #f87171;
-    --danger-soft: #2a1313;
+    --warning-soft: rgba(251, 191, 36, 0.14);
+    --danger: #fb7185;
+    --danger-soft: rgba(251, 113, 133, 0.14);
     --accent-warm: #fbbf24;
 
-    --tint-peach-bg: #3a2519;
-    --tint-peach-fg: #ffb38a;
-    --tint-mint-bg: #163320;
-    --tint-mint-fg: #80e9a8;
-    --tint-lavender-bg: #221a3a;
+    /* Tints used for icon bubbles — keep the bg dark-ish but the fg
+       bright so icons read clearly. */
+    --tint-peach-bg: rgba(255, 154, 107, 0.16);
+    --tint-peach-fg: #ffa078;
+    --tint-mint-bg: rgba(74, 222, 128, 0.14);
+    --tint-mint-fg: #6ee7a3;
+    --tint-lavender-bg: rgba(168, 154, 255, 0.16);
     --tint-lavender-fg: #b8a8ff;
-    --tint-sun-bg: #2f2510;
+    --tint-sun-bg: rgba(251, 191, 36, 0.14);
     --tint-sun-fg: #ffd874;
 
     --btn-bg: #f3ebde;
@@ -135,51 +150,58 @@
 
     --red-border: #5a2424;
 
-    --glass-bg: rgba(28, 25, 21, 0.55);
-    --glass-bg-strong: rgba(28, 25, 21, 0.72);
-    --glass-border: rgba(255, 255, 255, 0.10);
-    --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.10);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45),
-      0 2px 6px rgba(0, 0, 0, 0.25);
+    --glass-bg: rgba(28, 25, 21, 0.45);
+    --glass-bg-strong: rgba(28, 25, 21, 0.68);
+    --glass-border: rgba(255, 255, 255, 0.14);
+    --glass-highlight: inset 0 1.5px 0 rgba(255, 255, 255, 0.16),
+                       inset 0 -1px 0 rgba(0, 0, 0, 0.20);
+    --glass-shadow: 0 12px 36px rgba(0, 0, 0, 0.50),
+                    0 2px 6px rgba(0, 0, 0, 0.30);
+    --glass-sheen: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.10) 0%,
+      rgba(255, 255, 255, 0.02) 35%,
+      rgba(255, 255, 255, 0) 60%
+    );
   }
 }
 
 [data-theme='dark'] {
-  --bg: #14110d;
-  --bg-elevated: #1f1b16;
-  --card: #1f1b16;
-  --surface-tint: #2a241d;
-  --border: #2e2820;
-  --hairline: rgba(255, 255, 255, 0.06);
+  --bg: #0b0c0e;
+  --bg-elevated: #16181c;
+  --card: #16181c;
+  --surface-tint: #1c1f24;
+  --border: #24272d;
+  --hairline: rgba(255, 255, 255, 0.07);
 
-  --text: #f3ebde;
-  --muted: #b09e8a;
-  --faint: #4d4338;
-  --subtle: #7a6a59;
+  --text: #f4f1ec;
+  --muted: #a39c92;
+  --faint: #393c42;
+  --subtle: #6b6f78;
 
-  --brand: #ff8e5c;
-  --brand-soft: #2a1c12;
+  --brand: #ff9a6b;
+  --brand-soft: rgba(255, 154, 107, 0.14);
   --brand-grad-from: #ff8e5c;
   --brand-grad-to: #ffba84;
-  --brand-shadow: 0 8px 24px rgba(255, 142, 92, 0.36);
+  --brand-shadow: 0 8px 24px rgba(255, 142, 92, 0.32);
 
-  --accent: #9b85ff;
-  --accent-soft: #1f1a3a;
-  --success: #34d670;
-  --success-soft: #0d2c19;
+  --accent: #a89aff;
+  --accent-soft: rgba(168, 154, 255, 0.14);
+  --success: #4ade80;
+  --success-soft: rgba(74, 222, 128, 0.14);
   --warning: #fbbf24;
-  --warning-soft: #2a1f08;
-  --danger: #f87171;
-  --danger-soft: #2a1313;
+  --warning-soft: rgba(251, 191, 36, 0.14);
+  --danger: #fb7185;
+  --danger-soft: rgba(251, 113, 133, 0.14);
   --accent-warm: #fbbf24;
 
-  --tint-peach-bg: #3a2519;
-  --tint-peach-fg: #ffb38a;
-  --tint-mint-bg: #163320;
-  --tint-mint-fg: #80e9a8;
-  --tint-lavender-bg: #221a3a;
+  --tint-peach-bg: rgba(255, 154, 107, 0.16);
+  --tint-peach-fg: #ffa078;
+  --tint-mint-bg: rgba(74, 222, 128, 0.14);
+  --tint-mint-fg: #6ee7a3;
+  --tint-lavender-bg: rgba(168, 154, 255, 0.16);
   --tint-lavender-fg: #b8a8ff;
-  --tint-sun-bg: #2f2510;
+  --tint-sun-bg: rgba(251, 191, 36, 0.14);
   --tint-sun-fg: #ffd874;
 
   --btn-bg: #f3ebde;
@@ -192,12 +214,19 @@
 
   --red-border: #5a2424;
 
-  --glass-bg: rgba(28, 25, 21, 0.55);
-  --glass-bg-strong: rgba(28, 25, 21, 0.72);
-  --glass-border: rgba(255, 255, 255, 0.10);
-  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.10);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.45),
-    0 2px 6px rgba(0, 0, 0, 0.25);
+  --glass-bg: rgba(28, 25, 21, 0.45);
+  --glass-bg-strong: rgba(28, 25, 21, 0.68);
+  --glass-border: rgba(255, 255, 255, 0.14);
+  --glass-highlight: inset 0 1.5px 0 rgba(255, 255, 255, 0.16),
+                     inset 0 -1px 0 rgba(0, 0, 0, 0.20);
+  --glass-shadow: 0 12px 36px rgba(0, 0, 0, 0.50),
+                  0 2px 6px rgba(0, 0, 0, 0.30);
+  --glass-sheen: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.10) 0%,
+    rgba(255, 255, 255, 0.02) 35%,
+    rgba(255, 255, 255, 0) 60%
+  );
 }
 
 html,
