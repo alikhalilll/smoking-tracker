@@ -224,43 +224,6 @@
             </button>
           </div>
 
-          <!-- Bedtime: pause notifications during sleep hours -->
-          <div class="bedtime-row" style="margin-top: 14px">
-            <div>
-              <div class="info-label">{{ t('reminders.bedtime_label') }}</div>
-              <div class="card-sub" style="margin-top: 2px">
-                {{ t('reminders.bedtime_help') }}
-              </div>
-            </div>
-            <Toggle
-              :model-value="reminders.settings.value.bedtimeEnabled"
-              @update:model-value="onBedtimeToggle"
-            />
-          </div>
-          <div
-            v-if="reminders.settings.value.bedtimeEnabled"
-            class="bedtime-times"
-          >
-            <label class="time-field">
-              <span class="time-label">{{ t('reminders.bedtime_start') }}</span>
-              <input
-                type="time"
-                class="time-input"
-                :value="reminders.settings.value.bedtimeStart"
-                @change="onBedtimeStartChange"
-              />
-            </label>
-            <label class="time-field">
-              <span class="time-label">{{ t('reminders.bedtime_end') }}</span>
-              <input
-                type="time"
-                class="time-input"
-                :value="reminders.settings.value.bedtimeEnd"
-                @change="onBedtimeEndChange"
-              />
-            </label>
-          </div>
-
           <div
             v-if="reminders.permission.value !== 'granted'"
             class="permission-warning"
@@ -315,6 +278,48 @@
             </button>
           </div>
         </details>
+      </div>
+
+      <!-- Bedtime — its own card, always visible regardless of the
+           reminders toggle so the user can configure quiet hours up
+           front. The setting still only matters once reminders are on. -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon icon-lavender">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+          </div>
+          <div>
+            <div class="card-title">{{ t('reminders.bedtime_label') }}</div>
+            <div class="card-sub">{{ t('reminders.bedtime_help') }}</div>
+          </div>
+          <Toggle
+            :model-value="reminders.settings.value.bedtimeEnabled"
+            @update:model-value="onBedtimeToggle"
+          />
+        </div>
+        <div
+          v-if="reminders.settings.value.bedtimeEnabled"
+          class="bedtime-times"
+        >
+          <label class="time-field">
+            <span class="time-label">{{ t('reminders.bedtime_start') }}</span>
+            <input
+              type="time"
+              class="time-input"
+              :value="reminders.settings.value.bedtimeStart"
+              @change="onBedtimeStartChange"
+            />
+          </label>
+          <label class="time-field">
+            <span class="time-label">{{ t('reminders.bedtime_end') }}</span>
+            <input
+              type="time"
+              class="time-input"
+              :value="reminders.settings.value.bedtimeEnd"
+              @change="onBedtimeEndChange"
+            />
+          </label>
+        </div>
       </div>
     </section>
 
@@ -904,47 +909,70 @@ function handleReset(): void {
   border-top: 1px solid var(--hairline);
 }
 
-/* Bedtime */
-.bedtime-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-  padding-top: 14px;
-  border-top: 1px solid var(--hairline);
-}
+/* Bedtime — chunky time inputs styled to match the app cards */
 .bedtime-times {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 12px;
+  gap: 12px;
+  margin-top: 14px;
 }
 .time-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  padding: 14px;
+  background: var(--surface-tint);
+  border-radius: 16px;
+  border: 1.5px solid transparent;
+  transition: border-color 0.15s ease, background 0.15s ease;
+  cursor: pointer;
+}
+.time-field:focus-within {
+  border-color: var(--brand);
+  background: var(--brand-soft);
 }
 .time-label {
   font-size: 11px;
   color: var(--muted);
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 .time-input {
   appearance: none;
-  border: 1.5px solid var(--hairline);
-  border-radius: 12px;
-  background: var(--card);
+  -webkit-appearance: none;
+  border: none;
+  background: transparent;
   color: var(--text);
-  font-family: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  padding: 10px 12px;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  padding: 0;
+  width: 100%;
+  cursor: pointer;
 }
 .time-input:focus {
   outline: none;
-  border-color: var(--brand);
-  box-shadow: 0 0 0 4px var(--brand-soft);
+}
+/* Hide the default browser clear button and tweak Webkit's clock icon */
+.time-input::-webkit-calendar-picker-indicator {
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.time-input::-webkit-clear-button,
+.time-input::-webkit-inner-spin-button {
+  display: none;
+  -webkit-appearance: none;
+}
+.time-field {
+  position: relative;
 }
 .info-label {
   font-size: 12px;
