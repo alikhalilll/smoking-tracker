@@ -1,4 +1,9 @@
 const en = {
+  confirm: {
+    ok: 'OK',
+    cancel: 'Cancel',
+    delete: 'Delete',
+  },
   app: {
     brand: 'Smoke tracker',
     greet_morning: 'Good morning',
@@ -192,6 +197,7 @@ const en = {
     delete_account_btn: 'Delete my account',
     delete_account_in_progress: 'Deleting…',
     delete_account_confirm: 'This permanently deletes your account, your logs, your quit plan, and your leaderboard entry. There is no undo. Continue?',
+    delete_account_failed: 'Couldn\'t delete the account. Try again or contact support.',
     offline_label: 'Works offline',
     offline_value: 'This app runs as a PWA. Add it to your home screen for the best experience.',
     economy_title: 'Cigarette price',

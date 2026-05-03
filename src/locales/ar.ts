@@ -1,4 +1,9 @@
 const ar = {
+  confirm: {
+    ok: 'موافق',
+    cancel: 'إلغاء',
+    delete: 'حذف',
+  },
   app: {
     brand: 'متعقّب التدخين',
     greet_morning: 'صباح الخير',
@@ -192,6 +197,7 @@ const ar = {
     delete_account_btn: 'حذف حسابي',
     delete_account_in_progress: 'جارٍ الحذف…',
     delete_account_confirm: 'سيتم حذف حسابك وسجلاتك وخطة الإقلاع وبيانات لوحة الترتيب نهائيًا. لا يمكن التراجع. هل تريد المتابعة؟',
+    delete_account_failed: 'تعذّر حذف الحساب. حاول مرة أخرى أو راسل الدعم.',
     offline_label: 'يعمل دون اتصال',
     offline_value: 'يعمل هذا التطبيق كـ PWA. أضفه إلى الشاشة الرئيسية لأفضل تجربة.',
     economy_title: 'سعر السيجارة',

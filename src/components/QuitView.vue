@@ -222,6 +222,7 @@ import {
   ALL_INTENSITIES,
 } from '../composables/useQuitPlan'
 import { useI18n, intlLocale, tArray } from '../i18n'
+import { useConfirm } from '../composables/useConfirm'
 import type {
   QuitDay,
   QuitIntensity,
@@ -365,14 +366,20 @@ const incentiveMessage = computed(() => {
   return ''
 })
 
-function confirmAbandon(): void {
+const { confirm: confirmDrawer } = useConfirm()
+
+async function confirmAbandon(): Promise<void> {
   if (props.isComplete) {
     emit('abandon')
     return
   }
-  if (confirm(t('quit.abandon_confirm'))) {
-    emit('abandon')
-  }
+  const ok = await confirmDrawer({
+    title: t('quit.abandon'),
+    body: t('quit.abandon_confirm'),
+    confirmText: t('quit.abandon'),
+    variant: 'danger',
+  })
+  if (ok) emit('abandon')
 }
 
 function formatDate(dateStr: string): string {

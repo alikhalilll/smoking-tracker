@@ -510,6 +510,8 @@ import {
 import { useAuth } from '../composables/useAuth'
 import { useEconomy, formatMoney } from '../composables/useEconomy'
 import { useHaptics } from '../composables/useHaptics'
+import { useConfirm } from '../composables/useConfirm'
+import { useToast } from '../composables/useToast'
 import { isSupabaseConfigured } from '../supabase'
 import Toggle from './Toggle.vue'
 import Select from './Select.vue'
@@ -559,19 +561,26 @@ const emit = defineEmits<{
 const economy = useEconomy()
 const haptics = useHaptics()
 
-// Delete-account flow. Local data is wiped via emit('reset') so the
-// parent's resetAll runs (clears entries / quit plan / start date in
-// localStorage). The SECURITY DEFINER `delete_account` RPC drops the
-// auth.users row; cascade FKs clean the rest on the server side.
+// Delete-account flow. Confirmation goes through the vaul-driven
+// confirm drawer; errors surface as a toast. Local data is wiped via
+// emit('reset') so the parent's resetAll runs.
+const { confirm: confirmDrawer } = useConfirm()
+const { show: showToast } = useToast()
 const deleting = ref(false)
 async function onDeleteAccount(): Promise<void> {
   if (deleting.value) return
-  if (!confirm(t('settings.delete_account_confirm'))) return
+  const ok = await confirmDrawer({
+    title: t('settings.delete_account_btn'),
+    body: t('settings.delete_account_confirm'),
+    confirmText: t('settings.delete_account_btn'),
+    variant: 'danger',
+  })
+  if (!ok) return
   deleting.value = true
   try {
     const res = await auth.deleteAccount()
     if (!res.ok) {
-      alert(res.error ?? 'Failed to delete account')
+      showToast(res.error ?? t('settings.delete_account_failed'), 'danger')
       return
     }
     // Wipe local data — the user is now signed out, but their
@@ -876,10 +885,14 @@ const visibleSyncStatus = computed(() => {
   return null
 })
 
-function handleReset(): void {
-  if (confirm(t('settings.reset_confirm'))) {
-    emit('reset')
-  }
+async function handleReset(): Promise<void> {
+  const ok = await confirmDrawer({
+    title: t('settings.reset_btn'),
+    body: t('settings.reset_confirm'),
+    confirmText: t('settings.reset_btn'),
+    variant: 'danger',
+  })
+  if (ok) emit('reset')
 }
 </script>
 
