@@ -4,17 +4,18 @@
       <DrawerOverlay class="sheet-overlay" />
       <DrawerContent class="sheet-content report-sheet">
         <div class="sheet-handle-row"><span class="sheet-handle" /></div>
-        <div class="report-top">
-          <div>
-            <DrawerTitle class="brand">{{ t('report.title') }}</DrawerTitle>
-            <div class="generated-at">
-              {{ t('report.generated_at', { when: generatedAt }) }}
+        <div class="report-scroll">
+          <div class="report-top">
+            <div>
+              <DrawerTitle class="brand">{{ t('report.title') }}</DrawerTitle>
+              <div class="generated-at">
+                {{ t('report.generated_at', { when: generatedAt }) }}
+              </div>
             </div>
+            <button class="close-btn" @click="emit('close')">
+              {{ t('report.close') }}
+            </button>
           </div>
-          <button class="close-btn" @click="emit('close')">
-            {{ t('report.close') }}
-          </button>
-        </div>
 
       <!-- Summary -->
       <section class="report-section">
@@ -150,7 +151,8 @@
         </div>
       </section>
 
-        <div style="height: 2rem" />
+          <div style="height: 2rem" />
+        </div>
       </DrawerContent>
     </DrawerPortal>
   </DrawerRoot>
@@ -277,17 +279,18 @@ function shortDate(dateStr: string): string {
 </script>
 
 <style scoped>
-/* Report-specific layout. Long-form content, so this sheet opts back
-   into outer scroll (the base .sheet-content disables it because the
-   Select list and time pickers are short and rely on inner scroll
-   instead — vaul's drag handler conflicts with both having overflow). */
-.report-sheet {
-  padding-left: 16px;
-  padding-right: 16px;
-  max-height: 92vh;
+/* Report has long content — scroll is delegated to an inner wrapper
+   so the DrawerContent itself stays non-scrollable. Putting overflow
+   on the drawer surface conflicts with vaul's [data-vaul-drawer]
+   { touch-action: none } and breaks touch scrolling on mobile. */
+.report-scroll {
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  margin: 0 -16px;
+  padding: 0 16px;
 }
 .report-top {
   display: flex;
