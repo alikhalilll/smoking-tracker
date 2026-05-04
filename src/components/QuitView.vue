@@ -5,7 +5,7 @@
       <div class="section-title">{{ t('quit.title') }}</div>
       <div class="intro">{{ t('quit.intro') }}</div>
 
-      <div class="baseline-card">
+      <div class="baseline-card" data-onboard="quit-baseline">
         <div class="baseline-label">{{ t('quit.suggested_baseline') }}</div>
         <div class="baseline-row">
           <button class="round-btn" @click="decBaseline">−</button>
@@ -18,7 +18,7 @@
       <div class="section-title" style="margin-top: 1.75rem">
         {{ t('quit.pick_pace') }}
       </div>
-      <div class="intensity-list">
+      <div class="intensity-list" data-onboard="quit-intensity-list">
         <button
           v-for="intensity in intensities"
           :key="intensity"

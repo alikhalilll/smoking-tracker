@@ -28,8 +28,8 @@
     </div>
 
     <!-- ===== Account ===== -->
-    <section v-if="section === 'account'" class="sec">
-      <div class="card">
+    <section v-if="section === 'account'" :key="section" class="sec sec-anim">
+      <div class="card" data-onboard="settings-account">
         <div v-if="!supabaseConfigured" class="info-value">
           {{ t('cloud.not_configured') }}
         </div>
@@ -88,7 +88,11 @@
       </div>
 
       <!-- Leaderboard prefs (only when signed in + supabase configured) -->
-      <div v-if="leaderboard && isAuthed" class="card">
+      <div
+        v-if="leaderboard && isAuthed"
+        class="card"
+        data-onboard="settings-display-name"
+      >
         <div class="card-header">
           <div class="card-icon icon-sun">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M17 4H7v6a5 5 0 0 0 10 0V4z"/><path d="M17 6h2a2 2 0 0 1 0 4h-2M7 6H5a2 2 0 0 0 0 4h2"/></svg>
@@ -149,8 +153,8 @@
     </section>
 
     <!-- ===== App (language + theme) ===== -->
-    <section v-else-if="section === 'app'" class="sec">
-      <div class="card">
+    <section v-else-if="section === 'app'" :key="section" class="sec sec-anim">
+      <div class="card" data-onboard="settings-language">
         <div class="card-header">
           <div class="card-icon icon-lavender">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -173,7 +177,7 @@
         </div>
       </div>
 
-      <div class="card">
+      <div class="card" data-onboard="settings-theme">
         <div class="card-header">
           <div class="card-icon icon-peach">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
@@ -196,8 +200,24 @@
         </div>
       </div>
 
-      <!-- Haptic feedback (Android only — iOS Safari has no web haptics) -->
+      <!-- Replay onboarding tour -->
       <div class="card">
+        <div class="card-header">
+          <div class="card-icon icon-sun">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 2"/></svg>
+          </div>
+          <div>
+            <div class="card-title">{{ t('onboarding.replay_title') }}</div>
+            <div class="card-sub">{{ t('onboarding.replay_help') }}</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost block" @click="replayTour">
+          {{ t('onboarding.replay_btn') }}
+        </button>
+      </div>
+
+      <!-- Haptic feedback (Android only — iOS Safari has no web haptics) -->
+      <div class="card" data-onboard="settings-haptics">
         <div class="card-header">
           <div class="card-icon icon-mint">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h2M17 12h2M12 5v2M12 17v2"/><circle cx="12" cy="12" r="3"/></svg>
@@ -222,8 +242,8 @@
     </section>
 
     <!-- ===== Reminders ===== -->
-    <section v-else-if="section === 'reminders'" class="sec">
-      <div class="card">
+    <section v-else-if="section === 'reminders'" :key="section" class="sec sec-anim">
+      <div class="card" data-onboard="settings-reminders">
         <div class="card-header">
           <div class="card-icon icon-mint">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -331,7 +351,7 @@
       <!-- Bedtime — required. Notifications pause inside this window AND
            gap analytics subtract any sleep overlap so an overnight gap
            doesn't get counted as awake time. -->
-      <div class="card">
+      <div class="card" data-onboard="settings-bedtime">
         <div class="card-header">
           <div class="card-icon icon-lavender">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -361,8 +381,8 @@
     </section>
 
     <!-- ===== Data ===== -->
-    <section v-else-if="section === 'data'" class="sec">
-      <div class="card">
+    <section v-else-if="section === 'data'" :key="section" class="sec sec-anim">
+      <div class="card" data-onboard="settings-data-stats">
         <div class="card-header">
           <div class="card-icon icon-lavender">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>
@@ -390,7 +410,7 @@
       </div>
 
       <!-- Cigarette price (drives the "money saved" widget on Home) -->
-      <div class="card">
+      <div class="card" data-onboard="settings-economy">
         <div class="card-header">
           <div class="card-icon icon-mint">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -452,7 +472,7 @@
       </div>
 
       <!-- CSV export -->
-      <div class="card">
+      <div class="card" data-onboard="settings-export">
         <div class="card-header">
           <div class="card-icon icon-lavender">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -467,7 +487,7 @@
         </button>
       </div>
 
-      <div class="card danger-card">
+      <div class="card danger-card" data-onboard="settings-reset">
         <div class="card-header">
           <div class="card-icon icon-peach" style="color: var(--danger); background: var(--danger-soft);">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
@@ -482,7 +502,7 @@
         </button>
       </div>
 
-      <div class="card pwa-card">
+      <div class="card pwa-card" data-onboard="settings-pwa">
         <div class="card-header">
           <div class="card-icon icon-mint">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
@@ -496,7 +516,7 @@
 
       <!-- Hard refresh — clears the SW caches, unregisters the worker,
            and reloads. Use this when the PWA is stuck on an old version. -->
-      <div class="card">
+      <div class="card" data-onboard="settings-hard-refresh">
         <div class="card-header">
           <div class="card-icon icon-lavender">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -515,7 +535,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n, tIn, type Locale } from '../i18n'
 import { useTheme, type ThemeMode } from '../composables/useTheme'
 import {
@@ -529,12 +549,17 @@ import { useEconomy, formatMoney } from '../composables/useEconomy'
 import { useHaptics } from '../composables/useHaptics'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
+import { useOnboarding } from '../composables/useOnboarding'
 import { isSupabaseConfigured } from '../supabase'
 import Toggle from './Toggle.vue'
 import Select from './Select.vue'
 import TimePicker from './TimePicker.vue'
 import type { UseSync } from '../composables/useSync'
 import type { UseLeaderboard } from '../composables/useLeaderboard'
+
+// Onboarding state is read up front so the section ref can be
+// initialized from a tour-requested section before any watcher fires.
+const onboarding = useOnboarding()
 
 type SectionId = 'account' | 'app' | 'reminders' | 'data'
 const sections: ReadonlyArray<{ id: SectionId }> = [
@@ -543,7 +568,85 @@ const sections: ReadonlyArray<{ id: SectionId }> = [
   { id: 'reminders' },
   { id: 'data' },
 ]
-const section = ref<SectionId>('account')
+
+const SECTION_STORAGE_KEY = 'st-settings-section'
+
+function isSection(s: string | null | undefined): s is SectionId {
+  return (
+    s === 'account' || s === 'app' || s === 'reminders' || s === 'data'
+  )
+}
+
+// The active sub-section is mirrored into the URL hash (so a
+// refresh / shared link lands on the same section) and into
+// localStorage (so coming back to Settings via the nav restores
+// where you were last). The hash takes precedence on first read.
+function readHashSection(): SectionId | null {
+  if (typeof window === 'undefined') return null
+  const raw = window.location.hash.replace(/^#\/?/, '')
+  const parts = raw.split('/')
+  if (parts[0] !== 'settings') return null
+  return isSection(parts[1]) ? parts[1] : null
+}
+
+function readRememberedSection(): SectionId {
+  if (typeof window === 'undefined') return 'account'
+  try {
+    const raw = localStorage.getItem(SECTION_STORAGE_KEY)
+    if (isSection(raw)) return raw
+  } catch {
+    // ignore — privacy mode or storage disabled
+  }
+  return 'account'
+}
+
+// If the onboarding tour is mid-flight when SettingsView mounts (e.g.
+// the user just clicked Next on the welcome step and the view is now
+// switching to Settings for the language step), respect the tour's
+// requested section as the highest-priority initial value — beating
+// both the hash and the remembered section. Without this, the
+// onboarding watcher below wouldn't fire on mount (no `immediate`
+// + value already set), and the user would land on the wrong tab.
+const initialSection: SectionId =
+  onboarding.desiredSettingsSection.value ??
+  readHashSection() ??
+  readRememberedSection()
+
+const section = ref<SectionId>(initialSection)
+
+watch(section, (s) => {
+  try {
+    localStorage.setItem(SECTION_STORAGE_KEY, s)
+  } catch {
+    // ignore
+  }
+  if (typeof window !== 'undefined') {
+    const next = `#/settings/${s}`
+    if (window.location.hash !== next) {
+      window.history.replaceState(null, '', next)
+    }
+  }
+})
+
+function onSettingsHashChange(): void {
+  const s = readHashSection()
+  if (s && s !== section.value) section.value = s
+}
+
+// Onboarding can request a specific Settings section so the tour
+// spotlight lands on the right card. We watch the composable's
+// desired-section ref and switch when it's set.
+watch(
+  () => onboarding.desiredSettingsSection.value,
+  (s) => {
+    if (s) section.value = s
+  }
+)
+function replayTour(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event('onboarding-replay'))
+  }
+}
 
 const NOTIFICATION_LOCALE_OPTIONS: ReadonlyArray<{
   value: NotificationLocale
@@ -858,6 +961,21 @@ async function copyDiag(): Promise<void> {
 // Populate the panel once on mount so the user sees status before clicking.
 onMounted(() => {
   void refreshDiag()
+  if (typeof window !== 'undefined') {
+    window.addEventListener('hashchange', onSettingsHashChange)
+    // Mirror the initial section to the URL only if the user landed
+    // on the bare "#/settings" without a sub-route.
+    const cur = window.location.hash
+    const next = `#/settings/${section.value}`
+    if (cur !== next && cur.startsWith('#/settings')) {
+      window.history.replaceState(null, '', next)
+    }
+  }
+})
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('hashchange', onSettingsHashChange)
+  }
 })
 
 // --- Cloud sync ---
@@ -1002,6 +1120,16 @@ async function handleReset(): Promise<void> {
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+/* Animate the section swap so jumping between Account/App/Reminders/
+   Data — including during the onboarding tour — feels like a deck of
+   cards being shuffled rather than an instant content swap. */
+.sec-anim {
+  animation: sec-slide 0.32s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes sec-slide {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
 /* Cards */

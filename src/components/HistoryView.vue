@@ -1,6 +1,6 @@
 <template>
   <div class="fade-in">
-    <div v-if="days.length === 0" class="empty-state card">
+    <div v-if="days.length === 0" class="empty-state card" data-onboard="history-empty">
       <div class="empty-hero">📒</div>
       <p>{{ t('history.empty') }}</p>
     </div>
@@ -16,7 +16,7 @@
           {{ t('home.generate_report') }}
         </button>
       </div>
-      <div class="report-grid">
+      <div class="report-grid" data-onboard="history-gap">
         <div class="report-card">
           <div class="report-bullet icon-peach"></div>
           <div class="report-label">{{ t('history.avg_gap') }}</div>
@@ -44,7 +44,7 @@
         {{ t('history.daily_breakdown') }}
       </h2>
 
-      <div class="day-list">
+      <div class="day-list" data-onboard="history-list">
         <div
           v-for="(d, i) in days"
           :key="d"
@@ -127,7 +127,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import {
   getDayLabel,
   getColor,
@@ -156,7 +156,23 @@ const emit = defineEmits<{
   'edit-entry': [payload: { id: string; iso: string }]
 }>()
 
+// Most-recent day expanded by default. The `days` array is sorted
+// descending in useStats, so days[0] is the latest day with entries.
+// We only auto-open on the first time a day key appears so the user's
+// manual collapses stick across re-renders.
 const expanded = ref<Record<string, boolean>>({})
+const autoOpened = ref<string | null>(null)
+watch(
+  () => props.days,
+  (days) => {
+    const top = days[0]
+    if (top && autoOpened.value !== top) {
+      expanded.value[top] = true
+      autoOpened.value = top
+    }
+  },
+  { immediate: true }
+)
 
 function toggle(d: string): void {
   expanded.value[d] = !expanded.value[d]

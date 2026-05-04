@@ -41,11 +41,28 @@
       <button
         v-else
         class="btn btn-pill btn-ghost greet-action"
+        data-onboard="header-signin"
         @click="openAuth"
       >
         {{ t('cloud.sign_in') }}
       </button>
     </header>
+
+    <!-- Onboarding entry pill — shown until the user dismisses it
+         or until the onboarding flow has been completed once. -->
+    <button
+      v-if="showOnboardingCta"
+      class="onboard-cta"
+      data-onboard="tour-cta"
+      @click="startTour"
+    >
+      <span class="onboard-cta-emoji">✨</span>
+      <span class="onboard-cta-body">
+        <span class="onboard-cta-title">{{ t('onboarding.cta_title') }}</span>
+        <span class="onboard-cta-sub">{{ t('onboarding.cta_sub') }}</span>
+      </span>
+      <svg class="onboard-cta-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline :points="isRtl ? '15 18 9 12 15 6' : '9 18 15 12 9 6'"/></svg>
+    </button>
 
     <!-- Views -->
     <main class="view-host">
@@ -162,11 +179,14 @@
 
     <!-- Toast host -->
     <Toast />
+
+    <!-- In-page onboarding tour -->
+    <OnboardingOverlay />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useStorage } from './composables/useStorage'
 import { useStats } from './composables/useStats'
 import { useQuitPlan } from './composables/useQuitPlan'
@@ -189,6 +209,8 @@ import ReportView from './components/ReportView.vue'
 import AuthModal from './components/AuthModal.vue'
 import ConfirmDrawer from './components/ConfirmDrawer.vue'
 import Toast from './components/Toast.vue'
+import OnboardingOverlay from './components/OnboardingOverlay.vue'
+import { useOnboarding, type OnboardingStep } from './composables/useOnboarding'
 import type { QuitIntensity } from './types'
 
 type TabId = 'home' | 'history' | 'quit' | 'leaderboard' | 'settings'
@@ -201,7 +223,7 @@ const ICONS: Record<TabId, string> = {
   settings: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
 }
 
-const { t } = useI18n()
+const { t, isRtl } = useI18n()
 const supabaseConfigured = isSupabaseConfigured()
 
 const tabs = computed<ReadonlyArray<{ id: TabId; icon: string }>>(() => {
@@ -217,14 +239,18 @@ const tabs = computed<ReadonlyArray<{ id: TabId; icon: string }>>(() => {
 function readHashView(): TabId {
   if (typeof window === 'undefined') return 'home'
   const raw = window.location.hash.replace(/^#\/?/, '')
+  // The settings view embeds a sub-section as a second hash segment
+  // (e.g. #/settings/app). Strip it off here — SettingsView reads
+  // that segment for itself and we only care about the top-level tab.
+  const main = raw.split('/')[0]
   if (
-    raw === 'home' ||
-    raw === 'history' ||
-    raw === 'quit' ||
-    raw === 'leaderboard' ||
-    raw === 'settings'
+    main === 'home' ||
+    main === 'history' ||
+    main === 'quit' ||
+    main === 'leaderboard' ||
+    main === 'settings'
   ) {
-    return raw
+    return main as TabId
   }
   return 'home'
 }
@@ -236,6 +262,14 @@ const haptics = useHaptics()
 function setView(id: TabId): void {
   view.value = id
   if (typeof window !== 'undefined') {
+    // Preserve any sub-route that's already encoded in the hash
+    // (e.g. "#/settings/app") when this call is just navigating to
+    // the same top-level tab — otherwise we'd clobber the settings
+    // section the user was on.
+    const currentMain = window.location.hash
+      .replace(/^#\/?/, '')
+      .split('/')[0]
+    if (currentMain === id) return
     const next = `#/${id}`
     if (window.location.hash !== next) {
       // replaceState avoids stacking history entries every time the
@@ -427,6 +461,306 @@ async function onSignOut(): Promise<void> {
   await auth.signOut()
   showToast(t('cloud.signed_out_toast'))
 }
+
+// === Onboarding tour ===
+const onboarding = useOnboarding()
+
+const showOnboardingCta = computed(() => {
+  if (onboarding.active.value) return false
+  if (onboarding.completed.value) return false
+  return true
+})
+
+function buildTourSteps(): OnboardingStep[] {
+  const hasEntries = (): boolean => data.value.entries.length > 0
+  const steps: OnboardingStep[] = [
+    // 1. Welcome
+    {
+      id: 'welcome',
+      view: 'home',
+      selector: null,
+      titleKey: 'onboarding.steps.welcome.title',
+      bodyKey: 'onboarding.steps.welcome.body',
+    },
+    // 2. Language (Settings → App)
+    {
+      id: 'language',
+      view: 'settings',
+      settingsSection: 'app',
+      selector: '[data-onboard="settings-language"]',
+      titleKey: 'onboarding.steps.language.title',
+      bodyKey: 'onboarding.steps.language.body',
+    },
+    // 3. Theme
+    {
+      id: 'theme',
+      view: 'settings',
+      settingsSection: 'app',
+      selector: '[data-onboard="settings-theme"]',
+      titleKey: 'onboarding.steps.theme.title',
+      bodyKey: 'onboarding.steps.theme.body',
+    },
+    // 4. Haptics
+    {
+      id: 'haptics',
+      view: 'settings',
+      settingsSection: 'app',
+      selector: '[data-onboard="settings-haptics"]',
+      titleKey: 'onboarding.steps.haptics.title',
+      bodyKey: 'onboarding.steps.haptics.body',
+    },
+    // 5. Sign-in (Settings → Account)
+    {
+      id: 'signin',
+      view: 'settings',
+      settingsSection: 'account',
+      selector: '[data-onboard="settings-account"]',
+      titleKey: 'onboarding.steps.signin.title',
+      bodyKey: 'onboarding.steps.signin.body',
+      condition: () => supabaseConfigured,
+    },
+    // 6. Display name for leaderboard
+    {
+      id: 'name',
+      view: 'settings',
+      settingsSection: 'account',
+      selector: '[data-onboard="settings-display-name"]',
+      titleKey: 'onboarding.steps.name.title',
+      bodyKey: 'onboarding.steps.name.body',
+      condition: () => supabaseConfigured && auth.isAuthed.value,
+    },
+    // 7. Reminders
+    {
+      id: 'reminders',
+      view: 'settings',
+      settingsSection: 'reminders',
+      selector: '[data-onboard="settings-reminders"]',
+      titleKey: 'onboarding.steps.reminders.title',
+      bodyKey: 'onboarding.steps.reminders.body',
+    },
+    // 8. Bedtime
+    {
+      id: 'bedtime',
+      view: 'settings',
+      settingsSection: 'reminders',
+      selector: '[data-onboard="settings-bedtime"]',
+      titleKey: 'onboarding.steps.bedtime.title',
+      bodyKey: 'onboarding.steps.bedtime.body',
+    },
+    // 9. Data tab — tracking-since stats
+    {
+      id: 'data-stats',
+      view: 'settings',
+      settingsSection: 'data',
+      selector: '[data-onboard="settings-data-stats"]',
+      titleKey: 'onboarding.steps.data_stats.title',
+      bodyKey: 'onboarding.steps.data_stats.body',
+    },
+    // 10. Pack price
+    {
+      id: 'price',
+      view: 'settings',
+      settingsSection: 'data',
+      selector: '[data-onboard="settings-economy"]',
+      titleKey: 'onboarding.steps.price.title',
+      bodyKey: 'onboarding.steps.price.body',
+    },
+    // 11. CSV export
+    {
+      id: 'export',
+      view: 'settings',
+      settingsSection: 'data',
+      selector: '[data-onboard="settings-export"]',
+      titleKey: 'onboarding.steps.export.title',
+      bodyKey: 'onboarding.steps.export.body',
+    },
+    // 12. Reset all data
+    {
+      id: 'reset',
+      view: 'settings',
+      settingsSection: 'data',
+      selector: '[data-onboard="settings-reset"]',
+      titleKey: 'onboarding.steps.reset.title',
+      bodyKey: 'onboarding.steps.reset.body',
+    },
+    // 13. Works offline (PWA)
+    {
+      id: 'pwa',
+      view: 'settings',
+      settingsSection: 'data',
+      selector: '[data-onboard="settings-pwa"]',
+      titleKey: 'onboarding.steps.pwa.title',
+      bodyKey: 'onboarding.steps.pwa.body',
+    },
+    // 14. Hard refresh
+    {
+      id: 'hard-refresh',
+      view: 'settings',
+      settingsSection: 'data',
+      selector: '[data-onboard="settings-hard-refresh"]',
+      titleKey: 'onboarding.steps.hard_refresh.title',
+      bodyKey: 'onboarding.steps.hard_refresh.body',
+    },
+    // 12. Home — status chip (only if visible)
+    {
+      id: 'home-status',
+      view: 'home',
+      selector: '[data-onboard="home-status"]',
+      titleKey: 'onboarding.steps.home_status.title',
+      bodyKey: 'onboarding.steps.home_status.body',
+      condition: () =>
+        quit.todayTarget.value != null ||
+        (quit.isComplete.value && (smokeFreeDays.value ?? 0) > 0),
+    },
+    // 13. Home — hero ring + counter
+    {
+      id: 'home-hero',
+      view: 'home',
+      selector: '[data-onboard="home-hero"]',
+      titleKey: 'onboarding.steps.home_hero.title',
+      bodyKey: 'onboarding.steps.home_hero.body',
+    },
+    // 14. Home — log composer
+    {
+      id: 'home-log',
+      view: 'home',
+      selector: '[data-onboard="home-log"]',
+      titleKey: 'onboarding.steps.home_log.title',
+      bodyKey: 'onboarding.steps.home_log.body',
+    },
+    // 15. Home — last 7 days chart
+    {
+      id: 'home-chart',
+      view: 'home',
+      selector: '[data-onboard="home-chart"]',
+      titleKey: 'onboarding.steps.home_chart.title',
+      bodyKey: 'onboarding.steps.home_chart.body',
+    },
+    // 16. Home — stats grid
+    {
+      id: 'home-stats',
+      view: 'home',
+      selector: '[data-onboard="home-stats"]',
+      titleKey: 'onboarding.steps.home_stats.title',
+      bodyKey: 'onboarding.steps.home_stats.body',
+    },
+    // 17. Home — health milestones (only after a log exists)
+    {
+      id: 'home-health',
+      view: 'home',
+      selector: '[data-onboard="home-health"]',
+      titleKey: 'onboarding.steps.home_health.title',
+      bodyKey: 'onboarding.steps.home_health.body',
+      condition: hasEntries,
+    },
+    // 18. Home — bottom actions
+    {
+      id: 'home-actions',
+      view: 'home',
+      selector: '[data-onboard="home-actions"]',
+      titleKey: 'onboarding.steps.home_actions.title',
+      bodyKey: 'onboarding.steps.home_actions.body',
+      condition: hasEntries,
+    },
+    // 19. History — gap report
+    {
+      id: 'history-gap',
+      view: 'history',
+      selector: '[data-onboard="history-gap"]',
+      titleKey: 'onboarding.steps.history_gap.title',
+      bodyKey: 'onboarding.steps.history_gap.body',
+      condition: hasEntries,
+    },
+    // 20. History — daily breakdown
+    {
+      id: 'history-list',
+      view: 'history',
+      selector: '[data-onboard="history-list"]',
+      titleKey: 'onboarding.steps.history_list.title',
+      bodyKey: 'onboarding.steps.history_list.body',
+      condition: hasEntries,
+    },
+    // 21. History — empty state (no entries yet)
+    {
+      id: 'history-empty',
+      view: 'history',
+      selector: '[data-onboard="history-empty"]',
+      titleKey: 'onboarding.steps.history_empty.title',
+      bodyKey: 'onboarding.steps.history_empty.body',
+      condition: () => !hasEntries(),
+    },
+    // 22. Quit — baseline
+    {
+      id: 'quit-baseline',
+      view: 'quit',
+      selector: '[data-onboard="quit-baseline"]',
+      titleKey: 'onboarding.steps.quit_baseline.title',
+      bodyKey: 'onboarding.steps.quit_baseline.body',
+      condition: () => !quit.isActive.value,
+    },
+    // 23. Quit — pace
+    {
+      id: 'quit-pace',
+      view: 'quit',
+      selector: '[data-onboard="quit-intensity-list"]',
+      titleKey: 'onboarding.steps.quit_pace.title',
+      bodyKey: 'onboarding.steps.quit_pace.body',
+      condition: () => !quit.isActive.value,
+    },
+    // 24. Leaderboard
+    {
+      id: 'leaderboard',
+      view: 'leaderboard',
+      selector: '[data-onboard="leaderboard-head"]',
+      titleKey: 'onboarding.steps.leaderboard.title',
+      bodyKey: 'onboarding.steps.leaderboard.body',
+      condition: () => supabaseConfigured,
+    },
+    // 25. Done
+    {
+      id: 'done',
+      view: 'home',
+      selector: null,
+      titleKey: 'onboarding.steps.done.title',
+      bodyKey: 'onboarding.steps.done.body',
+    },
+  ]
+  return steps
+}
+
+function startTour(): void {
+  onboarding.start(buildTourSteps())
+}
+
+// When the tour lands on the sign-in step, automatically open the
+// auth modal so the user can complete sign-in inline. We don't
+// auto-advance afterwards — the user closes the modal and chooses
+// Next themselves, so the tour stays under their control. If they
+// successfully sign in, downstream steps (display name, etc.) are
+// re-evaluated and become visible thanks to runtime conditions.
+watch(
+  () => onboarding.step.value?.id,
+  (id) => {
+    if (id === 'signin' && supabaseConfigured && !auth.isAuthed.value) {
+      openAuth()
+    }
+  }
+)
+
+// Listen for the "replay tour" trigger from Settings.
+function onReplayTour(): void {
+  startTour()
+}
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener('onboarding-replay', onReplayTour)
+  }
+})
+onUnmounted(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener('onboarding-replay', onReplayTour)
+  }
+})
 </script>
 
 <style scoped>
@@ -556,6 +890,105 @@ async function onSignOut(): Promise<void> {
 }
 .greet-action {
   flex-shrink: 0;
+}
+
+/* Onboarding entry pill — sits between the greet header and the
+   first view, gently inviting the user to start a guided tour.
+   Pulses softly and rotates the sparkle to feel alive without
+   being noisy. */
+.onboard-cta {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  appearance: none;
+  border: 1.5px solid color-mix(in srgb, var(--brand) 30%, transparent);
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--brand) 14%, var(--card)),
+    color-mix(in srgb, var(--accent) 12%, var(--card))
+  );
+  color: var(--text);
+  padding: 12px 14px;
+  border-radius: var(--radius-card);
+  cursor: pointer;
+  margin-bottom: 12px;
+  font-family: inherit;
+  text-align: start;
+  transition: transform 0.1s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 0 color-mix(in srgb, var(--brand) 0%, transparent);
+  animation: cta-breathe 3.6s ease-in-out infinite;
+  overflow: hidden;
+}
+.onboard-cta::after {
+  /* A faint sweeping shine that traverses the pill on a loop. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, #fff 18%, transparent) 50%,
+    transparent 70%
+  );
+  transform: translateX(-130%);
+  animation: cta-shine 4.2s ease-in-out infinite;
+  pointer-events: none;
+}
+.onboard-cta:hover {
+  border-color: color-mix(in srgb, var(--brand) 50%, transparent);
+}
+.onboard-cta:active { transform: scale(0.99); }
+.onboard-cta-emoji {
+  font-size: 22px;
+  line-height: 1;
+  display: inline-block;
+  animation: cta-spark 2.6s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.onboard-cta-body { display: flex; flex-direction: column; flex: 1; min-width: 0; position: relative; z-index: 1; }
+.onboard-cta-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.onboard-cta-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.onboard-cta-chev {
+  color: var(--brand);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+  animation: cta-chev 1.8s ease-in-out infinite;
+}
+@keyframes cta-breathe {
+  0%, 100% {
+    box-shadow: var(--shadow-sm), 0 0 0 0 color-mix(in srgb, var(--brand) 0%, transparent);
+  }
+  50% {
+    box-shadow:
+      var(--shadow-sm),
+      0 0 0 6px color-mix(in srgb, var(--brand) 14%, transparent);
+  }
+}
+@keyframes cta-shine {
+  0%   { transform: translateX(-130%); }
+  60%  { transform: translateX(130%); }
+  100% { transform: translateX(130%); }
+}
+@keyframes cta-spark {
+  0%, 100% { transform: rotate(-8deg) scale(1); }
+  50%      { transform: rotate(10deg) scale(1.12); }
+}
+@keyframes cta-chev {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(3px); }
 }
 
 .view-host {
