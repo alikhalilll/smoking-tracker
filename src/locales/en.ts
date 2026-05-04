@@ -294,6 +294,133 @@ const en = {
     sync_now: 'Sync now',
     background_sync: 'Syncing in the background',
   },
+  onboarding: {
+    cta_title: 'Take a quick tour',
+    cta_sub: "We'll walk you through the app and the few things to set up.",
+    back: 'Back',
+    skip: 'Skip',
+    next: 'Next',
+    done: 'Done',
+    close: 'Close tour',
+    step_of: 'Step {n} of {total}',
+    replay_title: 'Replay tour',
+    replay_help: 'Walk through the app again — useful after a reset or when something feels off.',
+    replay_btn: 'Start the tour',
+    steps: {
+      welcome: {
+        title: 'Welcome 👋',
+        body: "Here's a quick tour. We'll walk through every screen — Skip jumps to the next step, the × in the corner exits.",
+      },
+      language: {
+        title: 'Pick your language',
+        body: 'Switch between English and العربية. The whole app — including notifications — follows your choice.',
+      },
+      theme: {
+        title: 'Choose a theme',
+        body: 'Light, dark, or follow your system. Pick whichever feels easier on your eyes.',
+      },
+      haptics: {
+        title: 'Haptic feedback',
+        body: 'A gentle vibration when you tap. Works on Android — iOS Safari has no haptics for web apps.',
+      },
+      signin: {
+        title: 'Account & sync',
+        body: 'Sign in with your email to back up your logs across devices and unlock the leaderboard. Optional — the app fully works offline either way.',
+      },
+      name: {
+        title: 'Display name',
+        body: 'How you appear on the public leaderboard. Leave it blank to stay private.',
+      },
+      reminders: {
+        title: 'Smoking reminders',
+        body: "Notifications nudge you each time your chosen gap passes — a gentle push to wait it out a bit longer.",
+      },
+      bedtime: {
+        title: 'Sleep schedule',
+        body: 'Reminders pause inside this window, and sleep hours are excluded from your gap stats — so a 10-hour overnight gap with 8 hours of sleep counts as a 2-hour awake gap.',
+      },
+      data_stats: {
+        title: 'Your tracking summary',
+        body: 'When you started, how many cigarettes you\'ve logged, days tracked, and your daily average — your full history at a glance.',
+      },
+      price: {
+        title: 'Pack price',
+        body: 'Enter the price of a pack and your currency so the app can show how much money you save (or spend) over time.',
+      },
+      export: {
+        title: 'Export your data',
+        body: 'Download every logged cigarette as a CSV — yours to keep, share, or analyze elsewhere.',
+      },
+      reset: {
+        title: 'Reset all data',
+        body: 'A nuclear button that wipes every entry, your quit plan, and resets the app to first-launch state. Useful before you start fresh.',
+      },
+      pwa: {
+        title: 'Works offline',
+        body: 'This is a PWA — add it to your home screen and it runs without internet. Your logs stay local and sync the moment you\'re back online.',
+      },
+      hard_refresh: {
+        title: 'Hard refresh',
+        body: 'If the app feels stuck on an old version, this clears the offline cache and pulls everything fresh from the server.',
+      },
+      home_status: {
+        title: 'Daily status',
+        body: 'A quick chip at the top of Home: your quit-plan target for today, or your smoke-free streak after you finish a plan.',
+      },
+      home_hero: {
+        title: "Today's count",
+        body: 'The big ring at the top counts cigarettes logged today. The arc fills as you approach your target or daily average.',
+      },
+      home_log: {
+        title: 'Log a cigarette',
+        body: "Use the − / + to set how many, then tap to log. Logged by mistake? There's an Undo just below the button.",
+      },
+      home_chart: {
+        title: 'Last 7 days',
+        body: 'A glance at your week. Today is the highlighted bar — useful for spotting whether your streak is climbing or cooling down.',
+      },
+      home_stats: {
+        title: 'Your stats',
+        body: 'Daily average, total logged, days tracked, your best day, and money saved or spent — all updating live.',
+      },
+      home_health: {
+        title: 'Body recovering',
+        body: 'Once you log even one cigarette and stop, the milestones tick forward — pulse normalizing in 20 minutes, lungs clearing in a month, and on.',
+      },
+      home_actions: {
+        title: 'Report & share',
+        body: 'Generate a full breakdown of your patterns, or share a snapshot of your progress with a friend who keeps you honest.',
+      },
+      history_gap: {
+        title: 'Gap report',
+        body: 'Average, median, longest, and shortest gaps between cigarettes. The longer the gaps grow, the closer you are to quitting.',
+      },
+      history_list: {
+        title: 'Daily breakdown',
+        body: "Tap any day to expand it and see each cigarette's exact time. You can edit times, delete an entry, or wipe the whole day.",
+      },
+      history_empty: {
+        title: 'History — empty for now',
+        body: "Log your first cigarette from Home and this page comes alive: per-day breakdowns, gap stats, and editable entries.",
+      },
+      quit_baseline: {
+        title: 'Quit — your baseline',
+        body: "Your starting point: how many cigarettes per day you're at right now. The app pre-fills it from your average; bump it up or down if needed.",
+      },
+      quit_pace: {
+        title: 'Quit — pick a pace',
+        body: 'Quick (7 days), Standard (14), Gradual (28), or Extended (50). Pick whichever pace feels right — you can abandon and start a new plan anytime.',
+      },
+      leaderboard: {
+        title: 'Leaderboard',
+        body: 'A friendly public board ranking by smoke-free streak or biggest reduction. Sign in and pick a display name to join — leave anytime.',
+      },
+      done: {
+        title: "You're all set 🎉",
+        body: "That's the tour. Replay it any time from Settings → App. Now go log your first cigarette — or skip straight to the quit plan.",
+      },
+    },
+  },
   reminders: {
     section_title: 'Smoking reminders',
     enable_label: 'Don’t-smoke nudges',

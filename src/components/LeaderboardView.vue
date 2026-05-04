@@ -1,6 +1,6 @@
 <template>
   <div class="fade-in lb-view">
-    <div class="head">
+    <div class="head" data-onboard="leaderboard-head">
       <h1 class="lb-headline">
         {{ t('leaderboard.title') }}
         <span class="trophy" aria-hidden="true">🏆</span>

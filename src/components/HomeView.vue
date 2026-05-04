@@ -4,6 +4,7 @@
     <button
       v-if="quitIsComplete && (smokeFreeDays ?? 0) > 0"
       class="status-chip chip-success"
+      data-onboard="home-status"
       @click="emit('open-quit')"
     >
       <span class="status-icon">🌱</span>
@@ -29,6 +30,7 @@
             ? 'chip-danger'
             : ''
       "
+      data-onboard="home-status"
       @click="emit('open-quit')"
     >
       <span class="status-icon">🎯</span>
@@ -41,7 +43,7 @@
     </button>
 
     <!-- Hero counter ring -->
-    <div class="hero">
+    <div class="hero" data-onboard="home-hero">
       <div class="ring-wrap" :class="{ pulsing: isPulsing }">
         <Confetti :trigger="confettiTrigger" />
         <svg class="ring" viewBox="0 0 120 120">
@@ -86,7 +88,7 @@
     </div>
 
     <!-- Log composer -->
-    <div class="log-card card">
+    <div class="log-card card" data-onboard="home-log">
       <div class="log-stepper">
         <button class="step-btn" @click="decrement" :aria-label="'minus'">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg>
@@ -97,7 +99,11 @@
         </button>
       </div>
 
-      <button class="btn btn-primary log-btn" @click="handleLog">
+      <button
+        class="btn btn-primary log-btn"
+        data-onboard="log-button"
+        @click="handleLog"
+      >
         <svg
           v-if="showCheck"
           class="check-icon"
@@ -123,7 +129,7 @@
     </div>
 
     <!-- Last 7 days chart -->
-    <div class="chart-section">
+    <div class="chart-section" data-onboard="home-chart">
       <h3 class="h-section">{{ t('home.last_7_days') }}</h3>
       <div class="bar-chart">
         <div v-for="(d, i) in last7" :key="i" class="bar-col">
@@ -152,7 +158,7 @@
     </div>
 
     <!-- Stats grid: white cards with tinted icon bubbles -->
-    <div class="stats-grid">
+    <div class="stats-grid" data-onboard="home-stats">
       <div class="stat-card">
         <div class="stat-icon icon-peach">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
@@ -195,7 +201,7 @@
     </div>
 
     <!-- Health milestones — only meaningful once at least one cig logged -->
-    <section v-if="hasEntries" class="health-section">
+    <section v-if="hasEntries" class="health-section" data-onboard="home-health">
       <div class="health-header">
         <h3 class="h-section" style="margin: 0">{{ t('home.health_section') }}</h3>
         <span v-if="nextMilestone" class="health-next">
@@ -234,7 +240,7 @@
     </section>
 
     <!-- Generate report + Share -->
-    <div v-if="hasEntries" class="bottom-actions">
+    <div v-if="hasEntries" class="bottom-actions" data-onboard="home-actions">
       <button class="btn btn-ghost" @click="emit('open-report')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-5"/></svg>
         {{ t('home.generate_report') }}
