@@ -473,6 +473,11 @@ const showOnboardingCta = computed(() => {
 
 function buildTourSteps(): OnboardingStep[] {
   const hasEntries = (): boolean => data.value.entries.length > 0
+
+  // Page-level main flow: six stops, one per top-level page. Each
+  // page step has an optional `children` array — when present, the
+  // tooltip surfaces an "Explore in detail" CTA the user can opt
+  // into to drill through that page's sub-elements.
   const steps: OnboardingStep[] = [
     // 1. Welcome
     {
@@ -482,232 +487,133 @@ function buildTourSteps(): OnboardingStep[] {
       titleKey: 'onboarding.steps.welcome.title',
       bodyKey: 'onboarding.steps.welcome.body',
     },
-    // 2. Language (Settings → App)
+    // 2. Home
     {
-      id: 'language',
-      view: 'settings',
-      settingsSection: 'app',
-      selector: '[data-onboard="settings-language"]',
-      titleKey: 'onboarding.steps.language.title',
-      bodyKey: 'onboarding.steps.language.body',
-    },
-    // 3. Theme
-    {
-      id: 'theme',
-      view: 'settings',
-      settingsSection: 'app',
-      selector: '[data-onboard="settings-theme"]',
-      titleKey: 'onboarding.steps.theme.title',
-      bodyKey: 'onboarding.steps.theme.body',
-    },
-    // 4. Haptics
-    {
-      id: 'haptics',
-      view: 'settings',
-      settingsSection: 'app',
-      selector: '[data-onboard="settings-haptics"]',
-      titleKey: 'onboarding.steps.haptics.title',
-      bodyKey: 'onboarding.steps.haptics.body',
-    },
-    // 5. Sign-in (Settings → Account)
-    {
-      id: 'signin',
-      view: 'settings',
-      settingsSection: 'account',
-      selector: '[data-onboard="settings-account"]',
-      titleKey: 'onboarding.steps.signin.title',
-      bodyKey: 'onboarding.steps.signin.body',
-      condition: () => supabaseConfigured,
-    },
-    // 6. Display name for leaderboard
-    {
-      id: 'name',
-      view: 'settings',
-      settingsSection: 'account',
-      selector: '[data-onboard="settings-display-name"]',
-      titleKey: 'onboarding.steps.name.title',
-      bodyKey: 'onboarding.steps.name.body',
-      condition: () => supabaseConfigured && auth.isAuthed.value,
-    },
-    // 7. Reminders
-    {
-      id: 'reminders',
-      view: 'settings',
-      settingsSection: 'reminders',
-      selector: '[data-onboard="settings-reminders"]',
-      titleKey: 'onboarding.steps.reminders.title',
-      bodyKey: 'onboarding.steps.reminders.body',
-    },
-    // 8. Bedtime
-    {
-      id: 'bedtime',
-      view: 'settings',
-      settingsSection: 'reminders',
-      selector: '[data-onboard="settings-bedtime"]',
-      titleKey: 'onboarding.steps.bedtime.title',
-      bodyKey: 'onboarding.steps.bedtime.body',
-    },
-    // 9. Data tab — tracking-since stats
-    {
-      id: 'data-stats',
-      view: 'settings',
-      settingsSection: 'data',
-      selector: '[data-onboard="settings-data-stats"]',
-      titleKey: 'onboarding.steps.data_stats.title',
-      bodyKey: 'onboarding.steps.data_stats.body',
-    },
-    // 10. Pack price
-    {
-      id: 'price',
-      view: 'settings',
-      settingsSection: 'data',
-      selector: '[data-onboard="settings-economy"]',
-      titleKey: 'onboarding.steps.price.title',
-      bodyKey: 'onboarding.steps.price.body',
-    },
-    // 11. CSV export
-    {
-      id: 'export',
-      view: 'settings',
-      settingsSection: 'data',
-      selector: '[data-onboard="settings-export"]',
-      titleKey: 'onboarding.steps.export.title',
-      bodyKey: 'onboarding.steps.export.body',
-    },
-    // 12. Reset all data
-    {
-      id: 'reset',
-      view: 'settings',
-      settingsSection: 'data',
-      selector: '[data-onboard="settings-reset"]',
-      titleKey: 'onboarding.steps.reset.title',
-      bodyKey: 'onboarding.steps.reset.body',
-    },
-    // 13. Works offline (PWA)
-    {
-      id: 'pwa',
-      view: 'settings',
-      settingsSection: 'data',
-      selector: '[data-onboard="settings-pwa"]',
-      titleKey: 'onboarding.steps.pwa.title',
-      bodyKey: 'onboarding.steps.pwa.body',
-    },
-    // 14. Hard refresh
-    {
-      id: 'hard-refresh',
-      view: 'settings',
-      settingsSection: 'data',
-      selector: '[data-onboard="settings-hard-refresh"]',
-      titleKey: 'onboarding.steps.hard_refresh.title',
-      bodyKey: 'onboarding.steps.hard_refresh.body',
-    },
-    // 12. Home — status chip (only if visible)
-    {
-      id: 'home-status',
-      view: 'home',
-      selector: '[data-onboard="home-status"]',
-      titleKey: 'onboarding.steps.home_status.title',
-      bodyKey: 'onboarding.steps.home_status.body',
-      condition: () =>
-        quit.todayTarget.value != null ||
-        (quit.isComplete.value && (smokeFreeDays.value ?? 0) > 0),
-    },
-    // 13. Home — hero ring + counter
-    {
-      id: 'home-hero',
-      view: 'home',
-      selector: '[data-onboard="home-hero"]',
-      titleKey: 'onboarding.steps.home_hero.title',
-      bodyKey: 'onboarding.steps.home_hero.body',
-    },
-    // 14. Home — log composer
-    {
-      id: 'home-log',
+      id: 'home',
       view: 'home',
       selector: '[data-onboard="home-log"]',
-      titleKey: 'onboarding.steps.home_log.title',
-      bodyKey: 'onboarding.steps.home_log.body',
+      titleKey: 'onboarding.steps.home.title',
+      bodyKey: 'onboarding.steps.home.body',
+      children: [
+        {
+          id: 'home-hero',
+          view: 'home',
+          selector: '[data-onboard="home-hero"]',
+          titleKey: 'onboarding.steps.home.children.hero.title',
+          bodyKey: 'onboarding.steps.home.children.hero.body',
+        },
+        {
+          id: 'home-log',
+          view: 'home',
+          selector: '[data-onboard="home-log"]',
+          titleKey: 'onboarding.steps.home.children.log.title',
+          bodyKey: 'onboarding.steps.home.children.log.body',
+        },
+        {
+          id: 'home-chart',
+          view: 'home',
+          selector: '[data-onboard="home-chart"]',
+          titleKey: 'onboarding.steps.home.children.chart.title',
+          bodyKey: 'onboarding.steps.home.children.chart.body',
+        },
+        {
+          id: 'home-stats',
+          view: 'home',
+          selector: '[data-onboard="home-stats"]',
+          titleKey: 'onboarding.steps.home.children.stats.title',
+          bodyKey: 'onboarding.steps.home.children.stats.body',
+        },
+        {
+          id: 'home-health',
+          view: 'home',
+          selector: '[data-onboard="home-health"]',
+          titleKey: 'onboarding.steps.home.children.health.title',
+          bodyKey: 'onboarding.steps.home.children.health.body',
+          condition: hasEntries,
+        },
+        {
+          id: 'home-actions',
+          view: 'home',
+          selector: '[data-onboard="home-actions"]',
+          titleKey: 'onboarding.steps.home.children.actions.title',
+          bodyKey: 'onboarding.steps.home.children.actions.body',
+          condition: hasEntries,
+        },
+      ],
     },
-    // 15. Home — last 7 days chart
+    // 3. History
     {
-      id: 'home-chart',
-      view: 'home',
-      selector: '[data-onboard="home-chart"]',
-      titleKey: 'onboarding.steps.home_chart.title',
-      bodyKey: 'onboarding.steps.home_chart.body',
-    },
-    // 16. Home — stats grid
-    {
-      id: 'home-stats',
-      view: 'home',
-      selector: '[data-onboard="home-stats"]',
-      titleKey: 'onboarding.steps.home_stats.title',
-      bodyKey: 'onboarding.steps.home_stats.body',
-    },
-    // 17. Home — health milestones (only after a log exists)
-    {
-      id: 'home-health',
-      view: 'home',
-      selector: '[data-onboard="home-health"]',
-      titleKey: 'onboarding.steps.home_health.title',
-      bodyKey: 'onboarding.steps.home_health.body',
-      condition: hasEntries,
-    },
-    // 18. Home — bottom actions
-    {
-      id: 'home-actions',
-      view: 'home',
-      selector: '[data-onboard="home-actions"]',
-      titleKey: 'onboarding.steps.home_actions.title',
-      bodyKey: 'onboarding.steps.home_actions.body',
-      condition: hasEntries,
-    },
-    // 19. History — gap report
-    {
-      id: 'history-gap',
+      id: 'history',
       view: 'history',
-      selector: '[data-onboard="history-gap"]',
-      titleKey: 'onboarding.steps.history_gap.title',
-      bodyKey: 'onboarding.steps.history_gap.body',
-      condition: hasEntries,
+      selector: hasEntries()
+        ? '[data-onboard="history-list"] .day-card:first-child'
+        : '[data-onboard="history-empty"]',
+      titleKey: 'onboarding.steps.history.title',
+      bodyKey: 'onboarding.steps.history.body',
+      children: [
+        {
+          id: 'history-gap',
+          view: 'history',
+          selector: '[data-onboard="history-gap"]',
+          titleKey: 'onboarding.steps.history.children.gap.title',
+          bodyKey: 'onboarding.steps.history.children.gap.body',
+          condition: hasEntries,
+        },
+        {
+          id: 'history-day',
+          view: 'history',
+          selector: '[data-onboard="history-list"] .day-card:first-child',
+          titleKey: 'onboarding.steps.history.children.day.title',
+          bodyKey: 'onboarding.steps.history.children.day.body',
+          condition: hasEntries,
+        },
+        {
+          id: 'history-entries',
+          view: 'history',
+          selector:
+            '[data-onboard="history-list"] .day-card:first-child .entries-list',
+          titleKey: 'onboarding.steps.history.children.entries.title',
+          bodyKey: 'onboarding.steps.history.children.entries.body',
+          condition: hasEntries,
+        },
+        {
+          id: 'history-empty',
+          view: 'history',
+          selector: '[data-onboard="history-empty"]',
+          titleKey: 'onboarding.steps.history.children.empty.title',
+          bodyKey: 'onboarding.steps.history.children.empty.body',
+          condition: () => !hasEntries(),
+        },
+      ],
     },
-    // 20. History — daily breakdown
+    // 4. Quit
     {
-      id: 'history-list',
-      view: 'history',
-      selector: '[data-onboard="history-list"]',
-      titleKey: 'onboarding.steps.history_list.title',
-      bodyKey: 'onboarding.steps.history_list.body',
-      condition: hasEntries,
-    },
-    // 21. History — empty state (no entries yet)
-    {
-      id: 'history-empty',
-      view: 'history',
-      selector: '[data-onboard="history-empty"]',
-      titleKey: 'onboarding.steps.history_empty.title',
-      bodyKey: 'onboarding.steps.history_empty.body',
-      condition: () => !hasEntries(),
-    },
-    // 22. Quit — baseline
-    {
-      id: 'quit-baseline',
-      view: 'quit',
-      selector: '[data-onboard="quit-baseline"]',
-      titleKey: 'onboarding.steps.quit_baseline.title',
-      bodyKey: 'onboarding.steps.quit_baseline.body',
-      condition: () => !quit.isActive.value,
-    },
-    // 23. Quit — pace
-    {
-      id: 'quit-pace',
+      id: 'quit',
       view: 'quit',
       selector: '[data-onboard="quit-intensity-list"]',
-      titleKey: 'onboarding.steps.quit_pace.title',
-      bodyKey: 'onboarding.steps.quit_pace.body',
+      titleKey: 'onboarding.steps.quit.title',
+      bodyKey: 'onboarding.steps.quit.body',
       condition: () => !quit.isActive.value,
+      children: [
+        {
+          id: 'quit-baseline',
+          view: 'quit',
+          selector: '[data-onboard="quit-baseline"]',
+          titleKey: 'onboarding.steps.quit.children.baseline.title',
+          bodyKey: 'onboarding.steps.quit.children.baseline.body',
+          condition: () => !quit.isActive.value,
+        },
+        {
+          id: 'quit-pace',
+          view: 'quit',
+          selector: '[data-onboard="quit-intensity-list"]',
+          titleKey: 'onboarding.steps.quit.children.pace.title',
+          bodyKey: 'onboarding.steps.quit.children.pace.body',
+          condition: () => !quit.isActive.value,
+        },
+      ],
     },
-    // 24. Leaderboard
+    // 5. Leaderboard (only when Supabase is configured)
     {
       id: 'leaderboard',
       view: 'leaderboard',
@@ -716,13 +622,89 @@ function buildTourSteps(): OnboardingStep[] {
       bodyKey: 'onboarding.steps.leaderboard.body',
       condition: () => supabaseConfigured,
     },
-    // 25. Done
+    // 6. Settings — page-level + drill-in to each sub-section card.
+    //    Doubles as the closing step.
     {
-      id: 'done',
-      view: 'home',
-      selector: null,
-      titleKey: 'onboarding.steps.done.title',
-      bodyKey: 'onboarding.steps.done.body',
+      id: 'settings',
+      view: 'settings',
+      selector: '[data-onboard="settings-tabs"]',
+      titleKey: 'onboarding.steps.settings.title',
+      bodyKey: 'onboarding.steps.settings.body',
+      children: [
+        {
+          id: 'settings-language',
+          view: 'settings',
+          settingsSection: 'app',
+          selector: '[data-onboard="settings-language"]',
+          titleKey: 'onboarding.steps.settings.children.language.title',
+          bodyKey: 'onboarding.steps.settings.children.language.body',
+        },
+        {
+          id: 'settings-theme',
+          view: 'settings',
+          settingsSection: 'app',
+          selector: '[data-onboard="settings-theme"]',
+          titleKey: 'onboarding.steps.settings.children.theme.title',
+          bodyKey: 'onboarding.steps.settings.children.theme.body',
+        },
+        {
+          id: 'settings-haptics',
+          view: 'settings',
+          settingsSection: 'app',
+          selector: '[data-onboard="settings-haptics"]',
+          titleKey: 'onboarding.steps.settings.children.haptics.title',
+          bodyKey: 'onboarding.steps.settings.children.haptics.body',
+        },
+        {
+          id: 'settings-signin',
+          view: 'settings',
+          settingsSection: 'account',
+          selector: '[data-onboard="settings-account"]',
+          titleKey: 'onboarding.steps.settings.children.signin.title',
+          bodyKey: 'onboarding.steps.settings.children.signin.body',
+          condition: () => supabaseConfigured,
+        },
+        {
+          id: 'settings-reminders',
+          view: 'settings',
+          settingsSection: 'reminders',
+          selector: '[data-onboard="settings-reminders"]',
+          titleKey: 'onboarding.steps.settings.children.reminders.title',
+          bodyKey: 'onboarding.steps.settings.children.reminders.body',
+        },
+        {
+          id: 'settings-bedtime',
+          view: 'settings',
+          settingsSection: 'reminders',
+          selector: '[data-onboard="settings-bedtime"]',
+          titleKey: 'onboarding.steps.settings.children.bedtime.title',
+          bodyKey: 'onboarding.steps.settings.children.bedtime.body',
+        },
+        {
+          id: 'settings-price',
+          view: 'settings',
+          settingsSection: 'data',
+          selector: '[data-onboard="settings-economy"]',
+          titleKey: 'onboarding.steps.settings.children.price.title',
+          bodyKey: 'onboarding.steps.settings.children.price.body',
+        },
+        {
+          id: 'settings-export',
+          view: 'settings',
+          settingsSection: 'data',
+          selector: '[data-onboard="settings-export"]',
+          titleKey: 'onboarding.steps.settings.children.export.title',
+          bodyKey: 'onboarding.steps.settings.children.export.body',
+        },
+        {
+          id: 'settings-reset',
+          view: 'settings',
+          settingsSection: 'data',
+          selector: '[data-onboard="settings-reset"]',
+          titleKey: 'onboarding.steps.settings.children.reset.title',
+          bodyKey: 'onboarding.steps.settings.children.reset.body',
+        },
+      ],
     },
   ]
   return steps

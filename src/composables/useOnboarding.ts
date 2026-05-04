@@ -17,8 +17,12 @@ export interface OnboardingStep {
   selector?: string | null
   titleKey: string
   bodyKey: string
-  /** When false, the step is dropped before the tour starts. */
+  /** Runtime predicate — re-evaluated on every navigation tick. */
   condition?: () => boolean
+  /** Optional drill-in steps. The user opts in via "Explore" — the
+   *  children get spliced into the linear flow right after this step
+   *  and navigation continues forward through them. */
+  children?: OnboardingStep[]
 }
 
 const STORAGE_KEY = 'st-onboarding-v1'
@@ -57,6 +61,7 @@ export interface UseOnboarding {
   step: ComputedRef<OnboardingStep | null>
   isFirst: ComputedRef<boolean>
   isLast: ComputedRef<boolean>
+  hasChildren: ComputedRef<boolean>
   completed: Ref<boolean>
   confettiTick: Ref<number>
   desiredSettingsSection: Ref<SettingsSection | null>
@@ -65,6 +70,7 @@ export interface UseOnboarding {
   prev: () => void
   exit: () => void
   finish: () => void
+  exploreChildren: () => void
 }
 
 export function useOnboarding(): UseOnboarding {
@@ -148,6 +154,27 @@ export function useOnboarding(): UseOnboarding {
     exit()
   }
 
+  // Splice the current step's children into the linear flow right
+  // after the parent, then advance. We zero out the parent's children
+  // afterward so the "Explore" CTA doesn't reappear if the user
+  // navigates back to the parent step.
+  const hasChildren = computed<boolean>(() => {
+    const cur = step.value
+    if (!cur || !cur.children || cur.children.length === 0) return false
+    const visible = cur.children.filter((c) => !c.condition || c.condition())
+    return visible.length > 0
+  })
+
+  function exploreChildren(): void {
+    const cur = step.value
+    if (!cur || !cur.children || cur.children.length === 0) return
+    const inject = cur.children.filter((c) => !c.condition || c.condition())
+    if (inject.length === 0) return
+    steps.value.splice(stepIndex.value + 1, 0, ...inject)
+    cur.children = []
+    next()
+  }
+
   return {
     active,
     stepIndex,
@@ -155,6 +182,7 @@ export function useOnboarding(): UseOnboarding {
     step,
     isFirst,
     isLast,
+    hasChildren,
     completed,
     confettiTick,
     desiredSettingsSection,
@@ -163,5 +191,6 @@ export function useOnboarding(): UseOnboarding {
     prev,
     exit,
     finish,
+    exploreChildren,
   }
 }
