@@ -234,30 +234,30 @@ body {
   background: var(--bg);
 }
 
-/* Themed scrollbars — follow the light/dark tokens so they blend with
-   the surface instead of showing the default OS chrome. */
+/* Themed scrollbars — follow the light/dark tokens so every scrollable
+   container (page, sheet, drawer, overlay) shows the same warm chrome
+   instead of the OS default. Applied via a universal selector so it
+   reaches scoped Vue components too. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: var(--faint) transparent;
+  scrollbar-color: var(--subtle) transparent;
 }
 *::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
-*::-webkit-scrollbar-track {
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background-color: var(--faint);
+  background-color: var(--subtle);
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background-color: var(--subtle);
-}
-*::-webkit-scrollbar-corner {
-  background: transparent;
+  background-color: var(--muted);
 }
 
 body {
