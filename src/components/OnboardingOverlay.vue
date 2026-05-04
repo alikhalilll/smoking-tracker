@@ -426,19 +426,36 @@ const tipStyle = computed(() => {
   border-radius: 18px;
   pointer-events: none;
   background: transparent;
-  /* The glow lives entirely in box-shadow so it radiates OUTWARD
-     from the ring perimeter — never covering the highlighted
-     element's content. A heartbeat pulse rolls through the shadow
-     so the highlight gently breathes without obscuring anything. */
+  /* Static glow as a single box-shadow paint — the heartbeat pulse
+     is a separate pseudo-element below, animated via transform +
+     opacity (composite-only) so we don't repaint a screen-sized
+     shadow 60 times a second. */
   border: 2px solid var(--brand);
-  animation:
-    onb-ring-arrive 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.4) both,
-    onb-ring-pulse 1.8s ease-in-out infinite;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--brand) 12%, transparent),
+    0 0 22px 2px color-mix(in srgb, var(--brand) 18%, transparent);
+  animation: onb-ring-arrive 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
   transition:
     top 0.45s cubic-bezier(0.4, 0, 0.2, 1),
     left 0.45s cubic-bezier(0.4, 0, 0.2, 1),
     width 0.45s cubic-bezier(0.4, 0, 0.2, 1),
     height 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+/* Heartbeat halo — cheap composite-only pulse. */
+.onb-ring::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  border: 2px solid var(--brand);
+  pointer-events: none;
+  animation: onb-ring-halo 1.8s ease-in-out infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+}
+@keyframes onb-ring-halo {
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50%      { transform: scale(1.08); opacity: 0; }
 }
 
 /* === Tooltip card === */
@@ -565,13 +582,25 @@ const tipStyle = computed(() => {
   text-transform: uppercase;
 }
 .onb-eyebrow-dot {
+  position: relative;
   display: inline-block;
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--brand);
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 22%, transparent);
+}
+/* Pulse via a scaling pseudo-element so we composite instead of
+   repainting a box-shadow on every animation frame. */
+.onb-eyebrow-dot::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--brand);
   animation: onb-eyebrow-pulse 1.6s ease-in-out infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
+  z-index: -1;
 }
 .onb-tip-title {
   font-size: 19px;
@@ -747,25 +776,9 @@ const tipStyle = computed(() => {
     opacity: 1;
   }
 }
-@keyframes onb-ring-pulse {
-  0%, 100% {
-    box-shadow:
-      0 0 0 4px color-mix(in srgb, var(--brand) 12%, transparent),
-      0 0 22px 2px color-mix(in srgb, var(--brand) 18%, transparent);
-  }
-  50% {
-    box-shadow:
-      0 0 0 9px color-mix(in srgb, var(--brand) 8%, transparent),
-      0 0 38px 6px color-mix(in srgb, var(--brand) 32%, transparent);
-  }
-}
 @keyframes onb-eyebrow-pulse {
-  0%, 100% {
-    box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 22%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 7px color-mix(in srgb, var(--brand) 12%, transparent);
-  }
+  0%, 100% { transform: scale(1); opacity: 0.55; }
+  50%      { transform: scale(2.4); opacity: 0; }
 }
 @keyframes onb-spark {
   0%, 100% { transform: rotate(-6deg) scale(1); }
@@ -776,5 +789,28 @@ const tipStyle = computed(() => {
   .onb-tip { padding: 16px 16px 14px; border-radius: 18px; }
   .onb-tip-title { font-size: 17px; }
   .onb-tip-hero .onb-tip-title { font-size: 20px; }
+}
+
+/* Honor the user's motion preference — if the OS asks for reduced
+   motion, we kill the looping pulses and content transitions while
+   keeping the spotlight visible (it just doesn't move/pulse). */
+@media (prefers-reduced-motion: reduce) {
+  .onb-mask,
+  .onb-tip,
+  .onb-ring {
+    transition: none !important;
+  }
+  .onb-ring,
+  .onb-ring::after,
+  .onb-eyebrow-dot::after,
+  .onb-explore-btn svg {
+    animation: none !important;
+  }
+  .onb-step-enter-active,
+  .onb-step-leave-active,
+  .onb-fade-enter-active,
+  .onb-fade-leave-active {
+    transition: none !important;
+  }
 }
 </style>

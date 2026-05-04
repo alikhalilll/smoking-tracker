@@ -877,7 +877,9 @@ onUnmounted(() => {
 /* Onboarding entry pill — sits between the greet header and the
    first view, gently inviting the user to start a guided tour.
    Pulses softly and rotates the sparkle to feel alive without
-   being noisy. */
+   being noisy. The "breathing" halo runs as a sibling pseudo-element
+   animated via transform + opacity so it composites instead of
+   repainting a box-shadow every frame. */
 .onboard-cta {
   position: relative;
   display: flex;
@@ -898,12 +900,23 @@ onUnmounted(() => {
   margin-bottom: 12px;
   font-family: inherit;
   text-align: start;
-  transition: transform 0.1s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-  box-shadow:
-    var(--shadow-sm),
-    0 0 0 0 color-mix(in srgb, var(--brand) 0%, transparent);
-  animation: cta-breathe 3.6s ease-in-out infinite;
+  transition: transform 0.1s ease, border-color 0.2s ease;
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
+  isolation: isolate;
+}
+/* Breathing halo — scales + fades a colored layer behind everything,
+   no per-frame box-shadow repaint. */
+.onboard-cta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--brand) 18%, transparent);
+  z-index: -1;
+  animation: cta-breathe 3.6s ease-in-out infinite;
+  will-change: transform, opacity;
+  transform: translateZ(0);
 }
 .onboard-cta::after {
   /* A faint sweeping shine that traverses the pill on a loop. */
@@ -918,6 +931,7 @@ onUnmounted(() => {
   );
   transform: translateX(-130%);
   animation: cta-shine 4.2s ease-in-out infinite;
+  will-change: transform;
   pointer-events: none;
 }
 .onboard-cta:hover {
@@ -950,14 +964,8 @@ onUnmounted(() => {
   animation: cta-chev 1.8s ease-in-out infinite;
 }
 @keyframes cta-breathe {
-  0%, 100% {
-    box-shadow: var(--shadow-sm), 0 0 0 0 color-mix(in srgb, var(--brand) 0%, transparent);
-  }
-  50% {
-    box-shadow:
-      var(--shadow-sm),
-      0 0 0 6px color-mix(in srgb, var(--brand) 14%, transparent);
-  }
+  0%, 100% { transform: scale(1); opacity: 0; }
+  50%      { transform: scale(1.06); opacity: 1; }
 }
 @keyframes cta-shine {
   0%   { transform: translateX(-130%); }
@@ -971,6 +979,16 @@ onUnmounted(() => {
 @keyframes cta-chev {
   0%, 100% { transform: translateX(0); }
   50%      { transform: translateX(3px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onboard-cta,
+  .onboard-cta::before,
+  .onboard-cta::after,
+  .onboard-cta-emoji,
+  .onboard-cta-chev {
+    animation: none !important;
+  }
 }
 
 .view-host {
