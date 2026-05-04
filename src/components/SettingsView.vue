@@ -4,7 +4,7 @@
 
     <!-- Section tabs — segmented control (cleaner than the loud
          gradient pills; the indicator slides between tabs). -->
-    <div class="seg-tabs" role="tablist">
+    <div class="seg-tabs" role="tablist" data-onboard="settings-tabs">
       <div
         class="seg-tab-indicator"
         :style="{

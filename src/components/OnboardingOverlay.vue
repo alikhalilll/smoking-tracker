@@ -25,6 +25,7 @@
              fresh slide-in feel; the outer card transitions between
              positions for smooth motion. -->
         <div
+          ref="tipRef"
           class="onb-tip"
           :class="{ 'onb-tip-hero': !rect }"
           :style="tipStyle"
@@ -64,6 +65,16 @@
               </div>
               <h2 class="onb-tip-title">{{ t(step.titleKey) }}</h2>
               <p class="onb-tip-body">{{ t(step.bodyKey) }}</p>
+              <button
+                v-if="onboarding.hasChildren.value"
+                class="onb-explore-btn"
+                @click="onboarding.exploreChildren()"
+              >
+                <span>{{ t('onboarding.explore_more') }}</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline :points="isRtl ? '15 18 9 12 15 6' : '9 18 15 12 9 6'"/>
+                </svg>
+              </button>
             </div>
           </Transition>
 
@@ -134,10 +145,18 @@ interface Rect {
 const rect = ref<Rect | null>(null)
 const viewport = ref({ w: 0, h: 0 })
 const RING_PAD = 8
-const TIP_GAP = 18
+const TIP_GAP = 16
+const VP_MARGIN = 12
+
+const tipRef = ref<HTMLDivElement | null>(null)
+// Real tooltip dimensions, populated by a ResizeObserver. Falling
+// back to a conservative estimate before the first measurement so
+// the very first paint isn't completely off.
+const tipSize = ref({ w: 320, h: 220 })
 
 let raf = 0
 let pollTimer: ReturnType<typeof setInterval> | null = null
+let tipObserver: ResizeObserver | null = null
 
 function readViewport(): void {
   if (typeof window === 'undefined') return
@@ -235,6 +254,27 @@ onUnmounted(() => {
   window.removeEventListener('resize', onScrollOrResize)
   if (raf) cancelAnimationFrame(raf)
   if (pollTimer) clearInterval(pollTimer)
+  tipObserver?.disconnect()
+  tipObserver = null
+})
+
+// Track the tooltip's real dimensions so the placement math uses
+// the actual rendered height — long bodies wrap on narrow phones and
+// our old 230px estimate routinely under-counted, putting the
+// tooltip's bottom edge off-screen.
+watch(tipRef, (el) => {
+  tipObserver?.disconnect()
+  tipObserver = null
+  if (!el || typeof ResizeObserver === 'undefined') return
+  tipObserver = new ResizeObserver(() => {
+    if (!tipRef.value) return
+    const w = tipRef.value.offsetWidth
+    const h = tipRef.value.offsetHeight
+    if (w !== tipSize.value.w || h !== tipSize.value.h) {
+      tipSize.value = { w, h }
+    }
+  })
+  tipObserver.observe(el)
 })
 
 const progressPct = computed(() => {
@@ -296,37 +336,58 @@ const ringStyle = computed(() => {
   }
 })
 
-// Tooltip placement: prefer below the target; flip above when there's
-// not enough room below. When no target, center it.
+// Tooltip placement uses the measured tooltip height (tipSize) so the
+// math reflects what's actually rendered. Final `top` is hard-clamped
+// to [VP_MARGIN, vh - tipH - VP_MARGIN] — and a max-height + scroll
+// fallback in CSS ensures even an oversized tooltip never extends past
+// the viewport.
 const TIP_W = 340
-const TIP_H_EST = 230
-const TIP_H_HERO = 280
 const tipStyle = computed(() => {
   const vw = viewport.value.w
   const vh = viewport.value.h
   const r = rect.value
+  const tipW = Math.min(TIP_W, vw - 16)
+  const tipH = Math.min(tipSize.value.h, vh - VP_MARGIN * 2)
+
   if (!r) {
     return {
-      left: `${Math.max(8, (vw - TIP_W) / 2)}px`,
-      top: `${Math.max(8, (vh - TIP_H_HERO) / 2)}px`,
-      width: `${Math.min(TIP_W, vw - 16)}px`,
+      left: `${Math.max(8, (vw - tipW) / 2)}px`,
+      top: `${Math.max(VP_MARGIN, (vh - tipH) / 2)}px`,
+      width: `${tipW}px`,
     }
   }
-  const spaceBelow = vh - (r.top + r.height + RING_PAD)
-  const spaceAbove = r.top - RING_PAD
-  const placeBelow = spaceBelow >= TIP_H_EST + TIP_GAP || spaceBelow >= spaceAbove
-  const top = placeBelow
-    ? Math.min(vh - TIP_H_EST - 8, r.top + r.height + RING_PAD + TIP_GAP)
-    : Math.max(8, r.top - RING_PAD - TIP_GAP - TIP_H_EST)
+
+  const spaceBelow = vh - (r.top + r.height + RING_PAD) - VP_MARGIN
+  const spaceAbove = r.top - RING_PAD - VP_MARGIN
+  const fitsBelow = spaceBelow >= tipH + TIP_GAP
+  const fitsAbove = spaceAbove >= tipH + TIP_GAP
+
+  let top: number
+  if (fitsBelow) {
+    top = r.top + r.height + RING_PAD + TIP_GAP
+  } else if (fitsAbove) {
+    top = r.top - RING_PAD - TIP_GAP - tipH
+  } else {
+    // Neither side has natural room — pick the side with more space
+    // and let the final clamp + CSS max-height handle overflow. The
+    // tooltip will overlap the spotlight slightly rather than spill
+    // off-screen.
+    top =
+      spaceBelow >= spaceAbove
+        ? r.top + r.height + RING_PAD + TIP_GAP
+        : r.top - RING_PAD - TIP_GAP - tipH
+  }
+
+  // Hard clamp into viewport so the tooltip is always fully on-screen.
+  const maxTop = Math.max(VP_MARGIN, vh - tipH - VP_MARGIN)
+  top = Math.max(VP_MARGIN, Math.min(maxTop, top))
+
   const centerX = r.left + r.width / 2
-  const left = Math.max(
-    8,
-    Math.min(vw - TIP_W - 8, centerX - TIP_W / 2)
-  )
+  const left = Math.max(8, Math.min(vw - tipW - 8, centerX - tipW / 2))
   return {
     left: `${left}px`,
     top: `${top}px`,
-    width: `${Math.min(TIP_W, vw - 16)}px`,
+    width: `${tipW}px`,
   }
 })
 </script>
@@ -394,7 +455,15 @@ const tipStyle = computed(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  overflow: hidden;
+  /* Last-resort guarantee that the tooltip never extends past the
+     viewport. The placement math already fits it inside the screen
+     using the measured height; this caps overlong content so the
+     user can scroll within the card on small phones. */
+  max-height: calc(100dvh - 24px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   transition:
     top 0.45s cubic-bezier(0.4, 0, 0.2, 1),
     left 0.45s cubic-bezier(0.4, 0, 0.2, 1);
@@ -517,6 +586,38 @@ const tipStyle = computed(() => {
   color: var(--muted);
   line-height: 1.55;
   margin: 0;
+}
+/* "Explore <page>" CTA — only renders when the parent step has
+   children. Inviting brand-coral link with a chevron that nudges. */
+.onb-explore-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  appearance: none;
+  border: 1.5px solid color-mix(in srgb, var(--brand) 32%, transparent);
+  background: color-mix(in srgb, var(--brand) 8%, transparent);
+  color: var(--brand);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  margin-top: 6px;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+.onb-explore-btn:hover {
+  background: color-mix(in srgb, var(--brand) 14%, transparent);
+  border-color: color-mix(in srgb, var(--brand) 50%, transparent);
+}
+.onb-explore-btn:active { transform: scale(0.97); }
+.onb-explore-btn svg {
+  animation: onb-explore-nudge 1.6s ease-in-out infinite;
+}
+@keyframes onb-explore-nudge {
+  0%, 100% { transform: translateX(0); }
+  50%      { transform: translateX(3px); }
 }
 
 /* Actions row */
