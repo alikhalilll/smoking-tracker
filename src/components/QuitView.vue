@@ -9,7 +9,7 @@
         <div class="baseline-label">{{ t('quit.suggested_baseline') }}</div>
         <div class="baseline-row">
           <button class="round-btn" @click="decBaseline">−</button>
-          <div class="baseline-value">{{ baselineInput }}</div>
+          <div class="baseline-value">{{ formatNumber(baselineInput) }}</div>
           <button class="round-btn" @click="incBaseline">+</button>
         </div>
         <div class="baseline-hint">{{ t('quit.baseline_hint') }}</div>
@@ -68,10 +68,10 @@
       <div v-if="!isComplete && todayTarget != null" class="today-card">
         <div class="today-target-row">
           <div class="today-actual" :style="{ color: actualColor }">
-            {{ todayActual }}
+            {{ formatNumber(todayActual) }}
           </div>
           <div class="today-divider">/</div>
-          <div class="today-target">{{ todayTarget }}</div>
+          <div class="today-target">{{ formatNumber(todayTarget ?? 0) }}</div>
         </div>
         <div class="today-meta">
           <span v-if="todayStatus === 'on-track'" class="status-ok">
@@ -99,7 +99,7 @@
 
       <div v-else-if="isComplete" class="today-card complete-card">
         <div class="smoke-free-hero">
-          <div class="smoke-free-number">{{ smokeFreeDays }}</div>
+          <div class="smoke-free-number">{{ formatNumber(smokeFreeDays) }}</div>
           <div class="smoke-free-label">
             {{
               smokeFreeDays === 1
@@ -135,21 +135,21 @@
         <div class="stat-card">
           <div class="stat-label">{{ t('quit.day') }}</div>
           <div class="stat-value">
-            {{ Math.min(progress.daysElapsed + 1, plan.durationDays) }} /
-            {{ plan.durationDays }}
+            {{ formatNumber(Math.min(progress.daysElapsed + 1, plan.durationDays)) }} /
+            {{ formatNumber(plan.durationDays) }}
           </div>
         </div>
         <div class="stat-card">
           <div class="stat-label">{{ t('quit.streak') }}</div>
-          <div class="stat-value">{{ progress.currentStreak }}</div>
+          <div class="stat-value">{{ formatNumber(progress.currentStreak) }}</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">{{ t('quit.on_track_count') }}</div>
-          <div class="stat-value">{{ progress.daysOnTrack }}</div>
+          <div class="stat-value">{{ formatNumber(progress.daysOnTrack) }}</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">{{ t('quit.over_count') }}</div>
-          <div class="stat-value">{{ progress.daysOver }}</div>
+          <div class="stat-value">{{ formatNumber(progress.daysOver) }}</div>
         </div>
       </div>
 
@@ -187,7 +187,7 @@
               class="plan-row"
               :class="{ today: d.when === 'today' }"
             >
-              <div class="plan-day-num">D{{ d.dayIndex + 1 }}</div>
+              <div class="plan-day-num">{{ t('quit.day_short', { n: d.dayIndex + 1 }) }}</div>
               <div class="plan-date">{{ shortDate(d.date) }}</div>
               <div class="plan-target">
                 {{ t('quit.target_short', { n: d.target }) }}
@@ -201,7 +201,7 @@
                     'plan-off': d.status === 'over',
                   }"
                 >
-                  {{ d.actual }}
+                  {{ formatNumber(d.actual) }}
                 </span>
               </div>
             </div>
@@ -221,7 +221,7 @@ import {
   generateTargets,
   ALL_INTENSITIES,
 } from '../composables/useQuitPlan'
-import { useI18n, intlLocale, tArray } from '../i18n'
+import { useI18n, intlLocale, tArray, formatNumber } from '../i18n'
 import { useConfirm } from '../composables/useConfirm'
 import type {
   QuitDay,

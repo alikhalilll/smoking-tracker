@@ -42,24 +42,38 @@ function getPath(obj: unknown, path: string): unknown {
   )
 }
 
+function intlTagFor(loc: Locale): string {
+  return loc === 'ar' ? 'ar-u-nu-arab' : 'en-US'
+}
+
 function interpolate(
   s: string,
-  params?: Record<string, string | number>
+  params: Record<string, string | number> | undefined,
+  loc: Locale
 ): string {
   if (!params) return s
-  return s.replace(/\{(\w+)\}/g, (_, k) =>
-    params[k] != null ? String(params[k]) : `{${k}}`
-  )
+  // Numeric params are routed through the target locale's number
+  // formatter so Arabic mode renders Arabic-Indic digits everywhere a
+  // translation interpolates {n}, {count}, etc. — without touching
+  // each call site. String params pass through verbatim.
+  const tag = intlTagFor(loc)
+  return s.replace(/\{(\w+)\}/g, (_, k) => {
+    const v = params[k]
+    if (v == null) return `{${k}}`
+    if (typeof v === 'number') return new Intl.NumberFormat(tag).format(v)
+    return v
+  })
 }
 
 export function t(
   key: string,
   params?: Record<string, string | number>
 ): string {
-  const dict = LOCALES[currentLocale.value]
+  const loc = currentLocale.value
+  const dict = LOCALES[loc]
   const found = getPath(dict, key)
   if (typeof found !== 'string') return key
-  return interpolate(found, params)
+  return interpolate(found, params, loc)
 }
 
 /** Look up a key in a specific locale, regardless of the current app locale. */
@@ -71,7 +85,7 @@ export function tIn(
   const dict = LOCALES[loc]
   const found = getPath(dict, key)
   if (typeof found !== 'string') return key
-  return interpolate(found, params)
+  return interpolate(found, params, loc)
 }
 
 export function tArray(key: string): readonly string[] {
@@ -101,7 +115,7 @@ export const applyRemoteLocale = setLocale
  * Arabic-Indic numerals (٠١٢…) wherever Intl is used — including the
  * home stopwatch, time/date strings, and currency. */
 export function intlLocale(): string {
-  return currentLocale.value === 'ar' ? 'ar-u-nu-arab' : 'en-US'
+  return intlTagFor(currentLocale.value)
 }
 
 /** Format an integer-or-decimal in the current locale's numbering

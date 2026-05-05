@@ -125,6 +125,7 @@ const en = {
     over_count: 'Over',
     plan_label: 'Plan',
     target_short: 'target {n}',
+    day_short: 'D{n}',
     week_label: 'Week {n}',
     week_summary: 'targets {first}→{last}',
     smoke_free_days_one: 'day smoke-free',

@@ -1,4 +1,5 @@
 import { ref, computed, type ComputedRef, type Ref } from 'vue'
+import { intlLocale } from '../i18n'
 
 export interface EconomySettings {
   /** Price of a pack in `currency`. 0 disables the savings UI. */
@@ -129,13 +130,14 @@ export function useEconomy(): UseEconomy {
 
 export function formatMoney(amount: number, currency: string): string {
   try {
-    return new Intl.NumberFormat(undefined, {
+    // Route through the active app locale so Arabic mode renders
+    // Arabic-Indic digits in the currency string (e.g. "١٬٢٣٤ ج.م.").
+    return new Intl.NumberFormat(intlLocale(), {
       style: 'currency',
       currency,
       maximumFractionDigits: amount >= 100 ? 0 : 2,
     }).format(amount)
   } catch {
-    // Fallback for invalid currency codes — render as a plain number.
     return `${amount.toFixed(2)} ${currency}`
   }
 }

@@ -406,22 +406,22 @@
           </div>
           <div>
             <div class="card-title">{{ t('settings.tracking_since') }}</div>
-            <div class="card-sub tabular">{{ startDate }}</div>
+            <div class="card-sub tabular">{{ formatStartDate(startDate) }}</div>
           </div>
         </div>
 
         <div class="data-grid">
           <div class="data-cell">
             <div class="data-label">{{ t('settings.total_entries') }}</div>
-            <div class="data-value tabular">{{ totalSmoked }}</div>
+            <div class="data-value tabular">{{ formatNumber(totalSmoked) }}</div>
           </div>
           <div class="data-cell">
             <div class="data-label">{{ t('home.days_tracked') }}</div>
-            <div class="data-value tabular">{{ totalDays }}</div>
+            <div class="data-value tabular">{{ formatNumber(totalDays) }}</div>
           </div>
           <div class="data-cell">
             <div class="data-label">{{ t('settings.avg_per_day') }}</div>
-            <div class="data-value tabular">{{ dailyAvg }}</div>
+            <div class="data-value tabular">{{ formatNumber(dailyAvg) }}</div>
           </div>
         </div>
       </div>
@@ -536,7 +536,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useI18n, tIn, type Locale } from '../i18n'
+import { useI18n, tIn, type Locale, intlLocale, formatNumber } from '../i18n'
 import { useTheme, type ThemeMode } from '../composables/useTheme'
 import {
   useReminders,
@@ -642,6 +642,16 @@ watch(
     if (s) section.value = s
   }
 )
+// Render the YYYY-MM-DD `startDate` bucket key in the active locale
+// so Arabic users see Arabic-Indic numerals + a localized format.
+function formatStartDate(d: string): string {
+  return new Date(d + 'T00:00:00').toLocaleDateString(intlLocale(), {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  })
+}
+
 function replayTour(): void {
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new Event('onboarding-replay'))

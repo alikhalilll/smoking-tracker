@@ -147,7 +147,7 @@ function setPeriod(p: 'AM' | 'PM'): void {
   width: 100%;
   text-align: start;
   cursor: pointer;
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: inherit;
   font-variant-numeric: tabular-nums;
 }
 .tp-time {

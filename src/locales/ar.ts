@@ -125,6 +125,7 @@ const ar = {
     over_count: 'تجاوز',
     plan_label: 'الخطة',
     target_short: 'الهدف {n}',
+    day_short: 'يوم {n}',
     week_label: 'الأسبوع {n}',
     week_summary: 'الأهداف {first}→{last}',
     smoke_free_days_one: 'يوم بدون تدخين',
