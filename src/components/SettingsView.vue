@@ -1427,11 +1427,7 @@ async function handleReset(): Promise<void> {
   text-align: center;
 }
 
-
-/* Danger button */
 .danger-btn {
-  background: var(--danger);
-  color: #fff;
   font-size: 13px;
   padding: 12px 18px;
   margin-top: 8px;
