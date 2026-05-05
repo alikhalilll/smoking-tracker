@@ -11,7 +11,7 @@
       <span class="status-body">
         <span class="status-label">{{ t('quit.smoke_free_chip') }}</span>
         <span class="status-value tabular">
-          {{ smokeFreeDays }}
+          {{ formatNumber(smokeFreeDays ?? 0) }}
           {{
             smokeFreeDays === 1
               ? t('quit.smoke_free_days_one')
@@ -37,7 +37,7 @@
       <span class="status-body">
         <span class="status-label">{{ t('home.quit_target_today') }}</span>
         <span class="status-value tabular">
-          {{ todayCount }} / {{ quitTodayTarget }}
+          {{ formatNumber(todayCount) }} / {{ formatNumber(quitTodayTarget ?? 0) }}
         </span>
       </span>
     </button>
@@ -77,7 +77,7 @@
           />
         </svg>
         <div class="ring-content">
-          <div class="counter-number tabular">{{ animatedTodayCount }}</div>
+          <div class="counter-number tabular">{{ formatNumber(animatedTodayCount) }}</div>
           <div class="counter-label">{{ t('home.cigarettes_today') }}</div>
         </div>
       </div>
@@ -93,7 +93,7 @@
         <button class="step-btn" @click="decrement" :aria-label="'minus'">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg>
         </button>
-        <div class="step-count tabular">{{ logCount }}</div>
+        <div class="step-count tabular">{{ formatNumber(logCount) }}</div>
         <button class="step-btn" @click="increment" :aria-label="'plus'">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg>
         </button>
@@ -137,7 +137,7 @@
             class="bar-value tabular"
             :style="{ color: d.count > 0 ? 'var(--text)' : 'var(--subtle)' }"
           >
-            {{ d.count || '·' }}
+            {{ d.count > 0 ? formatNumber(d.count) : '·' }}
           </div>
           <div
             class="bar"
@@ -164,28 +164,28 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
         </div>
         <div class="stat-label">{{ t('home.daily_avg') }}</div>
-        <div class="stat-value tabular">{{ dailyAvg }}</div>
+        <div class="stat-value tabular">{{ formatNumber(dailyAvg) }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon icon-mint">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h12"/></svg>
         </div>
         <div class="stat-label">{{ t('home.total_logged') }}</div>
-        <div class="stat-value tabular">{{ totalSmoked }}</div>
+        <div class="stat-value tabular">{{ formatNumber(totalSmoked) }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon icon-lavender">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>
         </div>
         <div class="stat-label">{{ t('home.days_tracked') }}</div>
-        <div class="stat-value tabular">{{ totalDays }}</div>
+        <div class="stat-value tabular">{{ formatNumber(totalDays) }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon icon-sun">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 9 22 10 17 14 18 22 12 18 6 22 7 14 2 10 9 9"/></svg>
         </div>
         <div class="stat-label">{{ t('home.best_day') }}</div>
-        <div class="stat-value tabular">{{ bestDay }}</div>
+        <div class="stat-value tabular">{{ formatNumber(bestDay) }}</div>
       </div>
       <div
         v-if="moneyMode != null"
@@ -231,7 +231,7 @@
                 />
               </div>
               <div class="milestone-pct tabular">
-                {{ Math.round(m.progress * 100) }}%
+                {{ formatNumber(Math.round(m.progress * 100)) }}%
               </div>
             </div>
           </div>
@@ -255,7 +255,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, toRef, onMounted, onUnmounted } from 'vue'
-import { useI18n, intlLocale } from '../i18n'
+import { useI18n, intlLocale, formatNumber } from '../i18n'
 import { share } from '../composables/useShare'
 import { getToday } from '../composables/useDate'
 import { useCountUp } from '../composables/useCountUp'
@@ -549,6 +549,10 @@ async function onShare(): Promise<void> {
   justify-content: center;
 }
 .counter-number {
+  /* Override the global .tabular mono font so the counter follows
+     the app's language font (Inter for en, Cairo for ar) — the
+     tabular-nums variant from .tabular still keeps digits aligned. */
+  font-family: inherit;
   font-size: 64px;
   font-weight: 700;
   line-height: 1;
@@ -568,6 +572,8 @@ async function onShare(): Promise<void> {
   gap: 2px;
 }
 .stopwatch-time {
+  /* Same override as .counter-number — follow the app font. */
+  font-family: inherit;
   font-size: 22px;
   font-weight: 700;
   letter-spacing: 0.02em;
