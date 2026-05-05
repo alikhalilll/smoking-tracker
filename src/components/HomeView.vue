@@ -773,12 +773,12 @@ async function onShare(): Promise<void> {
 .stopwatch-best {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-  padding: 3px 10px;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 7px 14px;
   border-radius: 999px;
   background: var(--surface-tint);
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--muted);
   letter-spacing: 0.02em;
@@ -795,7 +795,7 @@ async function onShare(): Promise<void> {
   animation: best-pop 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 .sw-best-icon {
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1;
 }
 @keyframes best-pop {

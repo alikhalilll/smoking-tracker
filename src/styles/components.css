@@ -120,6 +120,11 @@
   color: var(--text);
 }
 
+.danger-btn {
+  background: var(--danger);
+  color: #fff;
+}
+
 .btn-pill {
   border-radius: var(--radius-pill);
 }
