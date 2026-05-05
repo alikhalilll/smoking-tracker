@@ -656,6 +656,14 @@ function buildTourSteps(): OnboardingStep[] {
           bodyKey: 'onboarding.steps.settings.children.haptics.body',
         },
         {
+          id: 'settings-hard-refresh',
+          view: 'settings',
+          settingsSection: 'app',
+          selector: '[data-onboard="settings-hard-refresh"]',
+          titleKey: 'onboarding.steps.settings.children.hard_refresh.title',
+          bodyKey: 'onboarding.steps.settings.children.hard_refresh.body',
+        },
+        {
           id: 'settings-signin',
           view: 'settings',
           settingsSection: 'account',

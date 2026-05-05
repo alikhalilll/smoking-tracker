@@ -36,15 +36,53 @@ function bedtimeEpisodeStarting(
 }
 
 /**
+ * Find first index `i` such that `sorted[i] >= value`. Length if none.
+ */
+function lowerBound(sorted: ReadonlyArray<number>, value: number): number {
+  let lo = 0
+  let hi = sorted.length
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1
+    if (sorted[mid] < value) lo = mid + 1
+    else hi = mid
+  }
+  return lo
+}
+
+/**
+ * True if any timestamp in `sorted` falls strictly inside (lo, hi).
+ * Boundary hits (== lo or == hi) don't count — those mark the
+ * transition into / out of sleep, not "during" sleep.
+ */
+function hasEntryStrictlyInside(
+  sorted: ReadonlyArray<number>,
+  lo: number,
+  hi: number
+): boolean {
+  const i = lowerBound(sorted, lo + 1)
+  return i < sorted.length && sorted[i] < hi
+}
+
+/**
  * Subtract sleep overlap from a raw gap so analytics only count time
  * the user was awake. A 10h overnight gap with 8h of sleep in it
- * becomes 2h. Times are inclusive at start, exclusive at end.
+ * becomes 2h.
+ *
+ * Exception: if the user logged a cigarette strictly inside a given
+ * bedtime episode, that whole episode is treated as awake — they
+ * obviously weren't sleeping through it — and its overlap is added
+ * back to the gap. `entrySortedMs` is the full ascending list of
+ * entry timestamps in ms; without it we fall back to the original
+ * "always subtract" behavior.
+ *
+ * Times are inclusive at start, exclusive at end.
  */
 export function awakeGapMs(
   prevMs: number,
   currMs: number,
   startHM: string,
-  endHM: string
+  endHM: string,
+  entrySortedMs: ReadonlyArray<number> = []
 ): number {
   const total = currMs - prevMs
   if (total <= 0) return total
@@ -64,7 +102,13 @@ export function awakeGapMs(
     const [bs, be] = bedtimeEpisodeStarting(cursor, startHM, endHM)
     const overlapStart = Math.max(bs, prevMs)
     const overlapEnd = Math.min(be, currMs)
-    if (overlapEnd > overlapStart) sleep += overlapEnd - overlapStart
+    if (overlapEnd > overlapStart) {
+      // If a cigarette was logged inside this bedtime episode the
+      // user was awake through it — keep the overlap in the gap.
+      if (!hasEntryStrictlyInside(entrySortedMs, bs, be)) {
+        sleep += overlapEnd - overlapStart
+      }
+    }
     cursor.setDate(cursor.getDate() + 1)
   }
 
@@ -91,11 +135,21 @@ export function useStats(data: Ref<AppData>) {
     )
   )
 
+  // Pre-sorted ms timestamps; the awake-gap calc binary-searches into
+  // this to detect smokes that fell inside a bedtime window (= the
+  // user was awake through that episode, so its sleep is added back).
+  const sortedEntriesMs = computed<number[]>(() =>
+    sortedEntries.value.map((e) => new Date(e.time).getTime())
+  )
+
   // Each entry annotated with the *awake* gap (ms) from the chronologically
   // previous entry — bedtime overlap is subtracted so an overnight 10h gap
-  // with 8h of sleep counts as 2h. First entry overall has gapMs = null.
+  // with 8h of sleep counts as 2h, unless the user logged a cigarette
+  // inside that bedtime window (then the sleep stays in the gap). First
+  // entry overall has gapMs = null.
   const entriesWithGaps = computed<AnnotatedEntry[]>(() => {
     const arr = sortedEntries.value
+    const ms = sortedEntriesMs.value
     const { bedtimeStart, bedtimeEnd } = reminders.settings.value
     return arr.map((e, i) => ({
       ...e,
@@ -106,7 +160,8 @@ export function useStats(data: Ref<AppData>) {
               new Date(arr[i - 1].time).getTime(),
               new Date(e.time).getTime(),
               bedtimeStart,
-              bedtimeEnd
+              bedtimeEnd,
+              ms
             ),
     }))
   })
@@ -154,10 +209,13 @@ export function useStats(data: Ref<AppData>) {
   })
 
   // Awake gaps between distinct smoking events. Sleep overlap is removed
-  // (so an overnight 10h gap with 8h sleep counts as 2h), and 0ms gaps
-  // from batch-logged entries are excluded so min/avg/max aren't skewed.
+  // (so an overnight 10h gap with 8h sleep counts as 2h) — except when
+  // a cigarette was logged inside that bedtime window, in which case
+  // the sleep stays in the gap. 0ms gaps from batch-logged entries are
+  // excluded so min/avg/max aren't skewed.
   const allGapsMs = computed<number[]>(() => {
     const arr = sortedEntries.value
+    const ms = sortedEntriesMs.value
     const { bedtimeStart, bedtimeEnd } = reminders.settings.value
     const gaps: number[] = []
     for (let i = 1; i < arr.length; i++) {
@@ -165,7 +223,8 @@ export function useStats(data: Ref<AppData>) {
         new Date(arr[i - 1].time).getTime(),
         new Date(arr[i].time).getTime(),
         bedtimeStart,
-        bedtimeEnd
+        bedtimeEnd,
+        ms
       )
       if (g > 0) gaps.push(g)
     }

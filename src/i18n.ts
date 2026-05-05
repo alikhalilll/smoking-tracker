@@ -94,9 +94,14 @@ export function setLocale(l: Locale): void {
  * but kept distinct so the sync layer has a clear callsite. */
 export const applyRemoteLocale = setLocale
 
-/** Locale tag suitable for Intl APIs. */
+/** Locale tag suitable for Intl APIs.
+ *
+ * The bare `ar` tag yields Latin digits (CLDR's default numbering for
+ * the language is `latn`); pinning the `-u-nu-arab` extension forces
+ * Arabic-Indic numerals (٠١٢…) wherever Intl is used — including the
+ * home stopwatch, time/date strings, and currency. */
 export function intlLocale(): string {
-  return currentLocale.value === 'ar' ? 'ar' : 'en-US'
+  return currentLocale.value === 'ar' ? 'ar-u-nu-arab' : 'en-US'
 }
 
 export interface UseI18n {
