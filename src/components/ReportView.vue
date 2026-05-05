@@ -18,7 +18,7 @@
           </div>
 
       <!-- Summary -->
-      <section class="report-section">
+      <section v-reveal class="report-section">
         <div class="section-title">{{ t('report.summary') }}</div>
         <div class="summary-grid">
           <div class="summary-card">
@@ -53,7 +53,7 @@
       </section>
 
       <!-- Daily timeline -->
-      <section class="report-section">
+      <section v-reveal class="report-section">
         <div class="section-title">{{ t('report.last_30_days') }}</div>
         <div class="daily-chart">
           <div
@@ -83,7 +83,7 @@
       </section>
 
       <!-- Hourly distribution -->
-      <section class="report-section">
+      <section v-reveal class="report-section">
         <div class="section-title">{{ t('report.by_hour') }}</div>
         <div class="hour-chart">
           <div v-for="b in hourlyDistribution" :key="b.hour" class="hour-col">
@@ -110,7 +110,7 @@
       </section>
 
       <!-- Weekday distribution -->
-      <section class="report-section">
+      <section v-reveal class="report-section">
         <div class="section-title">{{ t('report.by_weekday') }}</div>
         <div class="weekday-chart">
           <div
@@ -132,7 +132,7 @@
       </section>
 
       <!-- Gap distribution -->
-      <section class="report-section">
+      <section v-reveal class="report-section">
         <div class="section-title">{{ t('report.gap_distribution') }}</div>
         <div class="gap-rows">
           <div v-for="b in gapDistribution" :key="b.key" class="gap-row">

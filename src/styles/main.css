@@ -290,6 +290,35 @@ html[lang='ar'] body {
   font-variant-numeric: tabular-nums;
 }
 
+/* Scroll-reveal — applied via the global v-reveal directive. The
+   element starts gently lifted, blurred and faded; once it crosses
+   the viewport edge the directive adds .is-revealed and the
+   transition lands the element in place. Honors prefers-reduced-
+   motion at the directive level (it skips straight to is-revealed). */
+.reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  filter: blur(6px);
+  transition: opacity 0.7s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 0.7s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: opacity, transform, filter;
+}
+.reveal.is-revealed {
+  opacity: 1;
+  transform: translateY(0);
+  filter: blur(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal.is-revealed {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+}
+
 /* Section labels — friendlier (no longer uppercase by default) */
 html[lang='ar'] .section-title,
 html[lang='ar'] .baseline-label,

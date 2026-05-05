@@ -29,7 +29,7 @@
 
     <!-- ===== Account ===== -->
     <section v-if="section === 'account'" :key="section" class="sec sec-anim">
-      <div class="card" data-onboard="settings-account">
+      <div v-reveal class="card" data-onboard="settings-account">
         <div v-if="!supabaseConfigured" class="info-value">
           {{ t('cloud.not_configured') }}
         </div>
@@ -90,6 +90,7 @@
       <!-- Leaderboard prefs (only when signed in + supabase configured) -->
       <div
         v-if="leaderboard && isAuthed"
+        v-reveal
         class="card"
         data-onboard="settings-display-name"
       >
@@ -128,7 +129,7 @@
       </div>
 
       <!-- Delete account (only meaningful for signed-in users) -->
-      <div v-if="isAuthed" class="card danger-card">
+      <div v-if="isAuthed" v-reveal class="card danger-card">
         <div class="card-header">
           <div class="card-icon" style="color: var(--danger); background: var(--danger-soft);">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
@@ -154,7 +155,7 @@
 
     <!-- ===== App (language + theme) ===== -->
     <section v-else-if="section === 'app'" :key="section" class="sec sec-anim">
-      <div class="card" data-onboard="settings-language">
+      <div v-reveal class="card" data-onboard="settings-language">
         <div class="card-header">
           <div class="card-icon icon-lavender">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
@@ -177,7 +178,7 @@
         </div>
       </div>
 
-      <div class="card" data-onboard="settings-theme">
+      <div v-reveal class="card" data-onboard="settings-theme">
         <div class="card-header">
           <div class="card-icon icon-peach">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>
@@ -201,7 +202,7 @@
       </div>
 
       <!-- Replay onboarding tour -->
-      <div class="card">
+      <div v-reveal class="card">
         <div class="card-header">
           <div class="card-icon icon-sun">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 2"/></svg>
@@ -217,7 +218,7 @@
       </div>
 
       <!-- Haptic feedback (Android only — iOS Safari has no web haptics) -->
-      <div class="card" data-onboard="settings-haptics">
+      <div v-reveal class="card" data-onboard="settings-haptics">
         <div class="card-header">
           <div class="card-icon icon-mint">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h2M17 12h2M12 5v2M12 17v2"/><circle cx="12" cy="12" r="3"/></svg>
@@ -242,7 +243,7 @@
 
       <!-- Hard refresh — clears the SW caches, unregisters the worker,
            and reloads. Use this when the PWA is stuck on an old version. -->
-      <div class="card" data-onboard="settings-hard-refresh">
+      <div v-reveal class="card" data-onboard="settings-hard-refresh">
         <div class="card-header">
           <div class="card-icon icon-lavender">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
@@ -260,7 +261,7 @@
 
     <!-- ===== Reminders ===== -->
     <section v-else-if="section === 'reminders'" :key="section" class="sec sec-anim">
-      <div class="card" data-onboard="settings-reminders">
+      <div v-reveal class="card" data-onboard="settings-reminders">
         <div class="card-header">
           <div class="card-icon icon-mint">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
@@ -368,7 +369,7 @@
       <!-- Bedtime — required. Notifications pause inside this window AND
            gap analytics subtract any sleep overlap so an overnight gap
            doesn't get counted as awake time. -->
-      <div class="card" data-onboard="settings-bedtime">
+      <div v-reveal class="card" data-onboard="settings-bedtime">
         <div class="card-header">
           <div class="card-icon icon-lavender">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
@@ -399,7 +400,7 @@
 
     <!-- ===== Data ===== -->
     <section v-else-if="section === 'data'" :key="section" class="sec sec-anim">
-      <div class="card" data-onboard="settings-data-stats">
+      <div v-reveal class="card" data-onboard="settings-data-stats">
         <div class="card-header">
           <div class="card-icon icon-lavender">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>
@@ -427,7 +428,7 @@
       </div>
 
       <!-- Cigarette price (drives the "money saved" widget on Home) -->
-      <div class="card" data-onboard="settings-economy">
+      <div v-reveal class="card" data-onboard="settings-economy">
         <div class="card-header">
           <div class="card-icon icon-mint">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
@@ -489,7 +490,7 @@
       </div>
 
       <!-- CSV export -->
-      <div class="card" data-onboard="settings-export">
+      <div v-reveal class="card" data-onboard="settings-export">
         <div class="card-header">
           <div class="card-icon icon-lavender">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -504,7 +505,7 @@
         </button>
       </div>
 
-      <div class="card danger-card" data-onboard="settings-reset">
+      <div v-reveal class="card danger-card" data-onboard="settings-reset">
         <div class="card-header">
           <div class="card-icon icon-peach" style="color: var(--danger); background: var(--danger-soft);">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
@@ -519,7 +520,7 @@
         </button>
       </div>
 
-      <div class="card pwa-card" data-onboard="settings-pwa">
+      <div v-reveal class="card pwa-card" data-onboard="settings-pwa">
         <div class="card-header">
           <div class="card-icon icon-mint">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>

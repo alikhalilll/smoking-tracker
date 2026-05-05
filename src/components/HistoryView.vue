@@ -1,13 +1,13 @@
 <template>
   <div class="fade-in">
-    <div v-if="days.length === 0" class="empty-state card" data-onboard="history-empty">
+    <div v-if="days.length === 0" v-reveal class="empty-state card" data-onboard="history-empty">
       <div class="empty-hero">📒</div>
       <p>{{ t('history.empty') }}</p>
     </div>
 
     <template v-else>
       <!-- Overall gap report -->
-      <div class="report-header">
+      <div v-reveal class="report-header">
         <h2 class="h-section" style="margin-bottom: 0">
           {{ t('history.gap_report') }}
         </h2>
@@ -16,7 +16,7 @@
           {{ t('home.generate_report') }}
         </button>
       </div>
-      <div class="report-grid" data-onboard="history-gap">
+      <div v-reveal class="report-grid" data-onboard="history-gap">
         <div class="report-card">
           <div class="report-bullet icon-peach"></div>
           <div class="report-label">{{ t('history.avg_gap') }}</div>
@@ -40,7 +40,7 @@
       </div>
 
       <!-- Per-day breakdown -->
-      <h2 class="h-section" style="margin-top: 1.75rem">
+      <h2 v-reveal class="h-section" style="margin-top: 1.75rem">
         {{ t('history.daily_breakdown') }}
       </h2>
 
@@ -48,6 +48,7 @@
         <div
           v-for="(d, i) in days"
           :key="d"
+          v-reveal
           class="day-card card"
           :style="{ animationDelay: i * 0.03 + 's', borderLeftColor: getColor(byDay[d]) }"
         >

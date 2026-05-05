@@ -8,7 +8,7 @@
     </div>
 
     <!-- Gated: not signed in -->
-    <div v-if="!isAuthed || !leaderboard" class="card opt-in">
+    <div v-if="!isAuthed || !leaderboard" v-reveal class="card opt-in">
       <div class="opt-hero">🏆</div>
       <h2 class="opt-headline">{{ t('cloud.needs_signin_headline') }}</h2>
       <p class="opt-body">{{ t('cloud.needs_signin_body') }}</p>
@@ -20,6 +20,7 @@
     <!-- Signed in but not yet opted in — inline join form -->
     <div
       v-else-if="!leaderboard.prefs.value.optedIn"
+      v-reveal
       class="card opt-in"
     >
       <div class="opt-hero">🌱</div>
@@ -85,7 +86,7 @@
 
       <template v-else>
         <!-- Top 3 podium -->
-        <div v-if="podium.first" class="podium" :class="podiumLayoutClass">
+        <div v-if="podium.first" v-reveal class="podium" :class="podiumLayoutClass">
           <!-- 2nd place (start side) — ice particles -->
           <div v-if="podium.second" class="podium-spot rank-2">
             <div class="podium-avatar-wrap medium">
@@ -171,6 +172,7 @@
           <div
             v-for="(row, i) in restRows"
             :key="row.user_id"
+            v-reveal
             class="user-row"
             :class="{
               'user-row-self': isOwn(row),
