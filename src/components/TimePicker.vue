@@ -76,7 +76,7 @@ import {
   DrawerContent,
   DrawerTitle,
 } from 'vaul-vue'
-import { useI18n } from '../i18n'
+import { useI18n, intlLocale } from '../i18n'
 
 interface Props {
   /** "HH:MM" 24-hour clock string. */
@@ -109,9 +109,17 @@ const minutePadded = computed<string>(() =>
 )
 const period = computed<'AM' | 'PM'>(() => (parts.value.h >= 12 ? 'PM' : 'AM'))
 
-const formatted = computed<string>(
-  () => `${hour12.value}:${minutePadded.value} ${period.value}`
-)
+// Render the trigger label via Intl so Arabic mode shows
+// "٩:٠٠ ص" instead of the hand-built "9:00 AM" string.
+const formatted = computed<string>(() => {
+  const d = new Date()
+  d.setHours(parts.value.h, parts.value.m, 0, 0)
+  return d.toLocaleTimeString(intlLocale(), {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  })
+})
 
 function setHours24(h12: number, p: 'AM' | 'PM'): number {
   const c = Math.min(12, Math.max(1, h12))
