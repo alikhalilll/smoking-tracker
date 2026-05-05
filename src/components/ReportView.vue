@@ -126,7 +126,7 @@
                 background: b.count > 0 ? 'var(--bar-default)' : 'var(--bar-empty)',
               }"
             />
-            <div class="weekday-label">{{ b.label }}</div>
+            <div class="weekday-label">{{ weekdayShort(b.weekday) }}</div>
           </div>
         </div>
       </section>
@@ -135,8 +135,8 @@
       <section class="report-section">
         <div class="section-title">{{ t('report.gap_distribution') }}</div>
         <div class="gap-rows">
-          <div v-for="b in gapDistribution" :key="b.label" class="gap-row">
-            <div class="gap-row-label">{{ b.label }}</div>
+          <div v-for="b in gapDistribution" :key="b.key" class="gap-row">
+            <div class="gap-row-label">{{ t(b.key) }}</div>
             <div class="gap-row-track">
               <div
                 class="gap-row-fill"
@@ -273,6 +273,15 @@ function gapRowWidth(count: number): number {
 
 function isToday(dateStr: string): boolean {
   return dateStr === getToday()
+}
+
+// Render a 0..6 weekday index in the active locale ("Sun" / "أحد").
+// Anchored on a known Sunday so the math is independent of "today".
+function weekdayShort(wd: number): string {
+  const SUNDAY = new Date(2024, 0, 7) // Sun, Jan 7 2024
+  const d = new Date(SUNDAY)
+  d.setDate(SUNDAY.getDate() + wd)
+  return d.toLocaleDateString(intlLocale(), { weekday: 'short' })
 }
 
 function shortDate(dateStr: string): string {

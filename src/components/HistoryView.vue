@@ -94,7 +94,18 @@
                 <span v-if="e.gapMs == null" class="gap-muted">
                   {{ t('history.first_ever') }}
                 </span>
-                <span v-else>+{{ formatDuration(e.gapMs) }}</span>
+                <template v-else>
+                  <span>+{{ formatDuration(e.gapMs) }}</span>
+                  <span
+                    v-if="(e.sleepMs ?? 0) > 0"
+                    class="entry-sleep-tag"
+                    :title="t('history.gap_includes_sleep', { duration: formatDuration(e.sleepMs!) })"
+                    :aria-label="t('history.gap_includes_sleep', { duration: formatDuration(e.sleepMs!) })"
+                  >
+                    <span class="entry-sleep-icon" aria-hidden="true">🌙</span>
+                    <span>{{ t('history.gap_includes_sleep_short', { duration: formatDuration(e.sleepMs!) }) }}</span>
+                  </span>
+                </template>
               </div>
               <button
                 class="entry-edit-btn"
@@ -377,6 +388,31 @@ function barWidth(count: number): number {
 }
 .entry-gap {
   color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+/* Pill marker that surfaces the sleep portion of a gap so users can
+   tell whether a long gap was awake time or absorbed bedtime. */
+.entry-sleep-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent);
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.entry-sleep-icon {
+  font-size: 11px;
+  line-height: 1;
 }
 .gap-muted {
   color: var(--subtle);

@@ -73,6 +73,8 @@ const en = {
     last_at: 'Last {time}',
     avg_gap_inline: 'Avg gap {duration}',
     first_ever: 'first ever',
+    gap_includes_sleep_short: 'sleep {duration}',
+    gap_includes_sleep: 'Includes {duration} of sleep — your awake gap is shown without it.',
     today: 'Today',
     yesterday: 'Yesterday',
     delete_day_btn: 'Delete this day',
@@ -98,6 +100,14 @@ const en = {
     gap_distribution: 'Gap distribution',
     not_enough_data: 'Not enough data yet — log a couple more entries to see gap patterns.',
     logged_gaps: 'Logged gaps',
+    gap_buckets: {
+      lt_15m: '< 15m',
+      b15_30m: '15–30m',
+      b30m_1h: '30m–1h',
+      b1_3h: '1–3h',
+      b3_6h: '3–6h',
+      gte_6h: '6h+',
+    },
   },
   quit: {
     title: 'Quit plan',

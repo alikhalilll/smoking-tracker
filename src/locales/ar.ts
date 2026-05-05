@@ -73,6 +73,8 @@ const ar = {
     last_at: 'آخر {time}',
     avg_gap_inline: 'متوسط الفاصل {duration}',
     first_ever: 'الأولى',
+    gap_includes_sleep_short: 'نوم {duration}',
+    gap_includes_sleep: 'تشمل {duration} من النوم — الفاصل المعروض هو وقت الاستيقاظ فقط.',
     today: 'اليوم',
     yesterday: 'أمس',
     delete_day_btn: 'حذف هذا اليوم',
@@ -98,6 +100,14 @@ const ar = {
     gap_distribution: 'توزيع الفواصل',
     not_enough_data: 'بيانات غير كافية بعد — سجّل المزيد لرؤية أنماط الفواصل.',
     logged_gaps: 'الفواصل المسجلة',
+    gap_buckets: {
+      lt_15m: '< ١٥د',
+      b15_30m: '١٥–٣٠د',
+      b30m_1h: '٣٠د–١س',
+      b1_3h: '١–٣س',
+      b3_6h: '٣–٦س',
+      gte_6h: '٦س+',
+    },
   },
   quit: {
     title: 'خطة الإقلاع',

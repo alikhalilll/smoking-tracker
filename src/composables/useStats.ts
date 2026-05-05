@@ -64,29 +64,28 @@ function hasEntryStrictlyInside(
 }
 
 /**
- * Subtract sleep overlap from a raw gap so analytics only count time
- * the user was awake. A 10h overnight gap with 8h of sleep in it
- * becomes 2h.
+ * Split a raw gap into (awake, sleep) ms. Sleep is the portion of
+ * [prevMs, currMs] that fell inside a bedtime episode AND wasn't
+ * interrupted by a logged cigarette. Awake is `total - sleep`,
+ * clamped to ≥ 0.
  *
- * Exception: if the user logged a cigarette strictly inside a given
- * bedtime episode, that whole episode is treated as awake — they
- * obviously weren't sleeping through it — and its overlap is added
- * back to the gap. `entrySortedMs` is the full ascending list of
- * entry timestamps in ms; without it we fall back to the original
- * "always subtract" behavior.
+ * If the user logged a cigarette strictly inside a bedtime episode,
+ * that whole episode is treated as awake — they obviously weren't
+ * sleeping through it. `entrySortedMs` is the full ascending list of
+ * entry timestamps; without it we don't apply the awake exception.
  *
  * Times are inclusive at start, exclusive at end.
  */
-export function awakeGapMs(
+export function splitGapMs(
   prevMs: number,
   currMs: number,
   startHM: string,
   endHM: string,
   entrySortedMs: ReadonlyArray<number> = []
-): number {
+): { awakeMs: number; sleepMs: number } {
   const total = currMs - prevMs
-  if (total <= 0) return total
-  if (startHM === endHM) return total
+  if (total <= 0) return { awakeMs: total, sleepMs: 0 }
+  if (startHM === endHM) return { awakeMs: total, sleepMs: 0 }
 
   // Iterate every calendar day whose bedtime episode could overlap
   // [prev, curr] — that's from the day before `prev` (in case the
@@ -103,8 +102,6 @@ export function awakeGapMs(
     const overlapStart = Math.max(bs, prevMs)
     const overlapEnd = Math.min(be, currMs)
     if (overlapEnd > overlapStart) {
-      // If a cigarette was logged inside this bedtime episode the
-      // user was awake through it — keep the overlap in the gap.
       if (!hasEntryStrictlyInside(entrySortedMs, bs, be)) {
         sleep += overlapEnd - overlapStart
       }
@@ -112,18 +109,31 @@ export function awakeGapMs(
     cursor.setDate(cursor.getDate() + 1)
   }
 
-  return Math.max(0, total - sleep)
+  return { awakeMs: Math.max(0, total - sleep), sleepMs: sleep }
 }
 
-const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const
+/**
+ * Awake-only convenience over `splitGapMs` — preserved as the
+ * original public surface so analytics code (allGapsMs, distributions)
+ * stays one-liners.
+ */
+export function awakeGapMs(
+  prevMs: number,
+  currMs: number,
+  startHM: string,
+  endHM: string,
+  entrySortedMs: ReadonlyArray<number> = []
+): number {
+  return splitGapMs(prevMs, currMs, startHM, endHM, entrySortedMs).awakeMs
+}
 
-const GAP_BUCKET_DEFS: Array<Pick<GapDistributionBucket, 'label' | 'minMs' | 'maxMs'>> = [
-  { label: '< 15m', minMs: 0, maxMs: 15 * 60_000 },
-  { label: '15–30m', minMs: 15 * 60_000, maxMs: 30 * 60_000 },
-  { label: '30m–1h', minMs: 30 * 60_000, maxMs: 60 * 60_000 },
-  { label: '1–3h', minMs: 60 * 60_000, maxMs: 3 * 60 * 60_000 },
-  { label: '3–6h', minMs: 3 * 60 * 60_000, maxMs: 6 * 60 * 60_000 },
-  { label: '6h+', minMs: 6 * 60 * 60_000, maxMs: Number.POSITIVE_INFINITY },
+const GAP_BUCKET_DEFS: Array<Pick<GapDistributionBucket, 'key' | 'minMs' | 'maxMs'>> = [
+  { key: 'report.gap_buckets.lt_15m',  minMs: 0, maxMs: 15 * 60_000 },
+  { key: 'report.gap_buckets.b15_30m', minMs: 15 * 60_000, maxMs: 30 * 60_000 },
+  { key: 'report.gap_buckets.b30m_1h', minMs: 30 * 60_000, maxMs: 60 * 60_000 },
+  { key: 'report.gap_buckets.b1_3h',   minMs: 60 * 60_000, maxMs: 3 * 60 * 60_000 },
+  { key: 'report.gap_buckets.b3_6h',   minMs: 3 * 60 * 60_000, maxMs: 6 * 60 * 60_000 },
+  { key: 'report.gap_buckets.gte_6h',  minMs: 6 * 60 * 60_000, maxMs: Number.POSITIVE_INFINITY },
 ]
 
 export function useStats(data: Ref<AppData>) {
@@ -151,19 +161,17 @@ export function useStats(data: Ref<AppData>) {
     const arr = sortedEntries.value
     const ms = sortedEntriesMs.value
     const { bedtimeStart, bedtimeEnd } = reminders.settings.value
-    return arr.map((e, i) => ({
-      ...e,
-      gapMs:
-        i === 0
-          ? null
-          : awakeGapMs(
-              new Date(arr[i - 1].time).getTime(),
-              new Date(e.time).getTime(),
-              bedtimeStart,
-              bedtimeEnd,
-              ms
-            ),
-    }))
+    return arr.map((e, i) => {
+      if (i === 0) return { ...e, gapMs: null, sleepMs: null }
+      const { awakeMs, sleepMs } = splitGapMs(
+        new Date(arr[i - 1].time).getTime(),
+        new Date(e.time).getTime(),
+        bedtimeStart,
+        bedtimeEnd,
+        ms
+      )
+      return { ...e, gapMs: awakeMs, sleepMs }
+    })
   })
 
   const byDay = computed<Record<string, number>>(() => {
@@ -314,7 +322,6 @@ export function useStats(data: Ref<AppData>) {
 
     return totals.map((total, wd) => ({
       weekday: wd,
-      label: WEEKDAY_LABELS[wd],
       count: dayCounts[wd] === 0 ? 0 : Math.round((total / dayCounts[wd]) * 10) / 10,
     }))
   })
