@@ -357,9 +357,18 @@ const stopwatch = computed<string | null>(() => {
   const hours = Math.floor((totalSec % 86400) / 3600)
   const minutes = Math.floor((totalSec % 3600) / 60)
   const seconds = totalSec % 60
-  const pad = (n: number): string => n.toString().padStart(2, '0')
-  const hms = `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
-  return days > 0 ? `${days}d ${hms}` : hms
+  // Intl-format the digits so Arabic locale renders Arabic-Indic
+  // numerals (٠١٢…) instead of Latin ones in the stopwatch.
+  const loc = intlLocale()
+  const padded = new Intl.NumberFormat(loc, {
+    minimumIntegerDigits: 2,
+    useGrouping: false,
+  })
+  const plain = new Intl.NumberFormat(loc, { useGrouping: false })
+  const hms = `${padded.format(hours)}:${padded.format(minutes)}:${padded.format(seconds)}`
+  return days > 0
+    ? t('home.stopwatch_days', { d: plain.format(days), hms })
+    : hms
 })
 
 // Progress ring fills relative to either the quit-plan target (if any)

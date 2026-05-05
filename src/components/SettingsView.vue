@@ -239,6 +239,23 @@
           />
         </div>
       </div>
+
+      <!-- Hard refresh — clears the SW caches, unregisters the worker,
+           and reloads. Use this when the PWA is stuck on an old version. -->
+      <div class="card" data-onboard="settings-hard-refresh">
+        <div class="card-header">
+          <div class="card-icon icon-lavender">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </div>
+          <div>
+            <div class="card-title">{{ t('settings.hard_refresh_title') }}</div>
+            <div class="card-sub">{{ t('settings.hard_refresh_help') }}</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost block" :disabled="refreshing" @click="onHardRefresh">
+          {{ refreshing ? t('settings.hard_refresh_in_progress') : t('settings.hard_refresh_btn') }}
+        </button>
+      </div>
     </section>
 
     <!-- ===== Reminders ===== -->
@@ -512,23 +529,6 @@
             <div class="card-sub">{{ t('settings.offline_value') }}</div>
           </div>
         </div>
-      </div>
-
-      <!-- Hard refresh — clears the SW caches, unregisters the worker,
-           and reloads. Use this when the PWA is stuck on an old version. -->
-      <div class="card" data-onboard="settings-hard-refresh">
-        <div class="card-header">
-          <div class="card-icon icon-lavender">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-          </div>
-          <div>
-            <div class="card-title">{{ t('settings.hard_refresh_title') }}</div>
-            <div class="card-sub">{{ t('settings.hard_refresh_help') }}</div>
-          </div>
-        </div>
-        <button class="btn btn-ghost block" :disabled="refreshing" @click="onHardRefresh">
-          {{ refreshing ? t('settings.hard_refresh_in_progress') : t('settings.hard_refresh_btn') }}
-        </button>
       </div>
     </section>
   </div>

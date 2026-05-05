@@ -41,6 +41,7 @@ const en = {
   home: {
     cigarettes_today: 'cigarettes today',
     since_last: 'since last cigarette',
+    stopwatch_days: '{d}d {hms}',
     log_one: 'Log 1 cigarette',
     log_many: 'Log {n} cigarettes',
     undo_last: 'Undo last',
@@ -384,7 +385,7 @@ const en = {
       },
       settings: {
         title: '⚙️ Settings',
-        body: "Four sections: Account (sign-in, sync, leaderboard name) · App (language, theme, haptics) · Reminders (nudges + sleep schedule) · Data (pack price, CSV export, reset). You're all set — tap Done and start tracking 🎉",
+        body: "Four sections: Account (sign-in, sync, leaderboard name) · App (language, theme, haptics, refresh app data) · Reminders (nudges + sleep schedule) · Data (pack price, CSV export, reset). You're all set — tap Done and start tracking 🎉",
         children: {
           language: {
             title: 'Language',
@@ -397,6 +398,10 @@ const en = {
           haptics: {
             title: 'Haptic feedback',
             body: 'A gentle vibration when you tap. Works on Android — iOS Safari has no haptics for web apps.',
+          },
+          hard_refresh: {
+            title: 'Refresh app data',
+            body: 'Clears the offline cache and reloads from the server. Use this if the app feels stuck on an old version after an update.',
           },
           signin: {
             title: 'Account & sync',
@@ -447,7 +452,7 @@ const en = {
     lang_en: 'English',
     lang_ar: 'العربية',
     bedtime_label: 'Sleep schedule',
-    bedtime_help: 'Used to pause reminders and to keep sleep hours out of your gap stats — so a 10-hour overnight gap with 8 hours of sleep counts as a 2-hour awake gap.',
+    bedtime_help: 'Used to pause reminders and to keep sleep hours out of your gap stats — so a 10-hour overnight gap with 8 hours of sleep counts as a 2-hour awake gap. If you log a cigarette inside this window, those sleep hours are kept in the gap (you were awake).',
     bedtime_start: 'From',
     bedtime_end: 'To',
   },
