@@ -104,6 +104,16 @@ export function intlLocale(): string {
   return currentLocale.value === 'ar' ? 'ar-u-nu-arab' : 'en-US'
 }
 
+/** Format an integer-or-decimal in the current locale's numbering
+ * system. In Arabic that's Arabic-Indic (٠١٢…). Use this anywhere a
+ * raw number would otherwise leak Latin digits into the UI. */
+export function formatNumber(
+  n: number,
+  opts: Intl.NumberFormatOptions = {}
+): string {
+  return new Intl.NumberFormat(intlLocale(), opts).format(n)
+}
+
 export interface UseI18n {
   locale: Ref<Locale>
   setLocale: (l: Locale) => void
