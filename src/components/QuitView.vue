@@ -5,7 +5,7 @@
       <div class="section-title">{{ t('quit.title') }}</div>
       <div class="intro">{{ t('quit.intro') }}</div>
 
-      <div class="baseline-card" data-onboard="quit-baseline">
+      <div v-reveal class="baseline-card" data-onboard="quit-baseline">
         <div class="baseline-label">{{ t('quit.suggested_baseline') }}</div>
         <div class="baseline-row">
           <button class="round-btn" @click="decBaseline">−</button>
@@ -22,6 +22,7 @@
         <button
           v-for="intensity in intensities"
           :key="intensity"
+          v-reveal
           class="intensity-card"
           @click="emit('start', { intensity, baseline: baselineInput })"
         >
@@ -65,7 +66,7 @@
       </div>
 
       <!-- Today's target hero -->
-      <div v-if="!isComplete && todayTarget != null" class="today-card">
+      <div v-if="!isComplete && todayTarget != null" v-reveal class="today-card">
         <div class="today-target-row">
           <div class="today-actual" :style="{ color: actualColor }">
             {{ formatNumber(todayActual) }}
@@ -97,7 +98,7 @@
         </div>
       </div>
 
-      <div v-else-if="isComplete" class="today-card complete-card">
+      <div v-else-if="isComplete" v-reveal class="today-card complete-card">
         <div class="smoke-free-hero">
           <div class="smoke-free-number">{{ formatNumber(smokeFreeDays) }}</div>
           <div class="smoke-free-label">
@@ -131,7 +132,7 @@
       </div>
 
       <!-- Progress stats -->
-      <div v-if="progress" class="stats-grid">
+      <div v-if="progress" v-reveal class="stats-grid">
         <div class="stat-card">
           <div class="stat-label">{{ t('quit.day') }}</div>
           <div class="stat-value">
@@ -158,7 +159,7 @@
         {{ t('quit.plan_label') }}
       </div>
       <div class="week-list">
-        <div v-for="week in planWeeks" :key="week.index" class="week-group">
+        <div v-for="week in planWeeks" :key="week.index" v-reveal class="week-group">
           <button
             class="week-header"
             :class="{ open: openWeeks[week.index] }"

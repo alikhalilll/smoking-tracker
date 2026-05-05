@@ -76,6 +76,7 @@
         :total-smoked="totalSmoked"
         :total-days="totalDays"
         :best-day="bestDay"
+        :longest-gap-ms="gapStats.longest"
         :has-entries="data.entries.length > 0"
         :quit-today-target="quit.todayTarget.value"
         :quit-today-status="quit.todayStatus.value"

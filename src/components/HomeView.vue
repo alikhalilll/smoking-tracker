@@ -3,6 +3,7 @@
     <!-- Status chips: smoke-free streak (after a finished plan) or quit target -->
     <button
       v-if="quitIsComplete && (smokeFreeDays ?? 0) > 0"
+      v-reveal
       class="status-chip chip-success"
       data-onboard="home-status"
       @click="emit('open-quit')"
@@ -22,6 +23,7 @@
     </button>
     <button
       v-else-if="quitTodayTarget != null"
+      v-reveal
       class="status-chip"
       :class="
         quitTodayStatus === 'on-track'
@@ -43,7 +45,7 @@
     </button>
 
     <!-- Hero counter ring -->
-    <div class="hero" data-onboard="home-hero">
+    <div v-reveal class="hero" data-onboard="home-hero">
       <div class="ring-wrap" :class="{ pulsing: isPulsing }">
         <Confetti :trigger="confettiTrigger" />
         <svg class="ring" viewBox="0 0 120 120">
@@ -77,18 +79,84 @@
           />
         </svg>
         <div class="ring-content">
-          <div class="counter-number tabular">{{ formatNumber(animatedTodayCount) }}</div>
+          <div class="counter-number tabular">
+            <Transition name="num-flip" mode="out-in">
+              <span :key="todayCount">{{ formatNumber(todayCount) }}</span>
+            </Transition>
+          </div>
           <div class="counter-label">{{ t('home.cigarettes_today') }}</div>
         </div>
       </div>
-      <div v-if="stopwatch" class="gap-stopwatch">
-        <div class="stopwatch-time tabular">{{ stopwatch }}</div>
+      <div v-if="stopwatchParts" class="gap-stopwatch">
+        <div class="stopwatch-time tabular" dir="ltr">
+          <template v-if="stopwatchParts.days.length > 0">
+            <span
+              v-for="(digit, i) in stopwatchParts.days"
+              :key="'d' + i"
+              class="sw-cell"
+            >
+              <Transition name="tick-flip">
+                <span :key="digit" class="sw-seg">{{ digit }}</span>
+              </Transition>
+            </span>
+            <span class="sw-unit">{{ t('home.stopwatch_day_unit') }}</span>
+          </template>
+
+          <span class="sw-cell">
+            <Transition name="tick-flip">
+              <span :key="stopwatchParts.hh[0]" class="sw-seg">{{ stopwatchParts.hh[0] }}</span>
+            </Transition>
+          </span>
+          <span class="sw-cell">
+            <Transition name="tick-flip">
+              <span :key="stopwatchParts.hh[1]" class="sw-seg">{{ stopwatchParts.hh[1] }}</span>
+            </Transition>
+          </span>
+          <span class="sw-sep">:</span>
+          <span class="sw-cell">
+            <Transition name="tick-flip">
+              <span :key="stopwatchParts.mm[0]" class="sw-seg">{{ stopwatchParts.mm[0] }}</span>
+            </Transition>
+          </span>
+          <span class="sw-cell">
+            <Transition name="tick-flip">
+              <span :key="stopwatchParts.mm[1]" class="sw-seg">{{ stopwatchParts.mm[1] }}</span>
+            </Transition>
+          </span>
+          <span class="sw-sep">:</span>
+          <span class="sw-cell">
+            <Transition name="tick-flip">
+              <span :key="stopwatchParts.ss[0]" class="sw-seg">{{ stopwatchParts.ss[0] }}</span>
+            </Transition>
+          </span>
+          <span class="sw-cell">
+            <Transition name="tick-flip">
+              <span :key="stopwatchParts.ss[1]" class="sw-seg">{{ stopwatchParts.ss[1] }}</span>
+            </Transition>
+          </span>
+        </div>
         <div class="stopwatch-label">{{ t('home.since_last') }}</div>
+        <div
+          v-if="(longestGapMs ?? 0) > 0"
+          class="stopwatch-best"
+          :class="{ 'is-new-record': beatingBest }"
+        >
+          <span class="sw-best-icon" aria-hidden="true">{{ beatingBest ? '🏆' : '⏱' }}</span>
+          <span class="sw-best-text">
+            {{
+              beatingBest
+                ? t('home.new_record')
+                : t('home.longest_gap_label', {
+                    duration: formatDuration(longestGapMs),
+                  })
+            }}
+          </span>
+        </div>
       </div>
     </div>
 
     <!-- Log composer -->
-    <div class="log-card card" data-onboard="home-log">
+    <div v-reveal="{ delay: 80 }" class="log-card card" data-onboard="home-log">
       <div class="log-stepper">
         <button class="step-btn" @click="decrement" :aria-label="'minus'">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg>
@@ -129,7 +197,7 @@
     </div>
 
     <!-- Last 7 days chart -->
-    <div class="chart-section" data-onboard="home-chart">
+    <div v-reveal class="chart-section" data-onboard="home-chart">
       <h3 class="h-section">{{ t('home.last_7_days') }}</h3>
       <div class="bar-chart">
         <div v-for="(d, i) in last7" :key="i" class="bar-col">
@@ -158,7 +226,7 @@
     </div>
 
     <!-- Stats grid: white cards with tinted icon bubbles -->
-    <div class="stats-grid" data-onboard="home-stats">
+    <div v-reveal class="stats-grid" data-onboard="home-stats">
       <div class="stat-card">
         <div class="stat-icon icon-peach">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
@@ -201,7 +269,7 @@
     </div>
 
     <!-- Health milestones — only meaningful once at least one cig logged -->
-    <section v-if="hasEntries" class="health-section" data-onboard="home-health">
+    <section v-if="hasEntries" v-reveal class="health-section" data-onboard="home-health">
       <div class="health-header">
         <h3 class="h-section" style="margin: 0">{{ t('home.health_section') }}</h3>
         <span v-if="nextMilestone" class="health-next">
@@ -240,7 +308,7 @@
     </section>
 
     <!-- Generate report + Share -->
-    <div v-if="hasEntries" class="bottom-actions" data-onboard="home-actions">
+    <div v-if="hasEntries" v-reveal class="bottom-actions" data-onboard="home-actions">
       <button class="btn btn-ghost" @click="emit('open-report')">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-5"/></svg>
         {{ t('home.generate_report') }}
@@ -258,7 +326,6 @@ import { ref, computed, watch, toRef, onMounted, onUnmounted } from 'vue'
 import { useI18n, intlLocale, formatNumber } from '../i18n'
 import { share } from '../composables/useShare'
 import { getToday } from '../composables/useDate'
-import { useCountUp } from '../composables/useCountUp'
 import { useToast } from '../composables/useToast'
 import { useEconomy, formatMoney } from '../composables/useEconomy'
 import { useHealthMilestones } from '../composables/useHealthMilestones'
@@ -277,6 +344,8 @@ interface Props {
   totalSmoked: number
   totalDays: number
   bestDay: number
+  /** Longest awake gap recorded between two logs (ms). 0 if none. */
+  longestGapMs?: number
   hasEntries: boolean
   quitTodayTarget?: number | null
   quitTodayStatus?: 'on-track' | 'over' | null
@@ -331,8 +400,6 @@ function formatRemaining(ms: number): string {
   return formatDuration(ms)
 }
 
-const animatedTodayCount = useCountUp(toRef(props, 'todayCount'))
-
 // Live stopwatch since the last logged cigarette. Ticks every second
 // while the component is mounted; the computed gates display so we
 // render nothing before the first log.
@@ -345,30 +412,64 @@ onUnmounted(() => {
   if (nowTimer) clearInterval(nowTimer)
 })
 
-const stopwatch = computed<string | null>(() => {
+interface StopwatchParts {
+  /** One localized digit per place value. Empty when below 1 day. */
+  days: string[]
+  /** Two localized digits each — [tens, ones]. */
+  hh: [string, string]
+  mm: [string, string]
+  ss: [string, string]
+}
+
+// True when the live "since last cigarette" timer has surpassed the
+// historical longest gap — the user is mid-record. Compared in raw
+// ms (not the rounded display value) so the celebration kicks in
+// the instant they cross the threshold.
+const beatingBest = computed<boolean>(() => {
+  const best = props.longestGapMs ?? 0
+  if (best <= 0 || !props.lastSmokeTime) return false
+  const elapsed = now.value - new Date(props.lastSmokeTime).getTime()
+  return elapsed > best
+})
+
+const stopwatchParts = computed<StopwatchParts | null>(() => {
   if (!props.lastSmokeTime) return null
   // Clamp to 0 — right after logging, `now.value` (1s ticks) can briefly
   // trail the freshly-stamped entry time. Without the clamp, elapsed goes
-  // negative for a fraction of a second and the whole block disappears
-  // instead of resetting to 00:00:00.
+  // negative for a fraction of a second and the whole block disappears.
   const elapsed = Math.max(0, now.value - new Date(props.lastSmokeTime).getTime())
   const totalSec = Math.floor(elapsed / 1000)
   const days = Math.floor(totalSec / 86400)
   const hours = Math.floor((totalSec % 86400) / 3600)
   const minutes = Math.floor((totalSec % 3600) / 60)
   const seconds = totalSec % 60
-  // Intl-format the digits so Arabic locale renders Arabic-Indic
-  // numerals (٠١٢…) instead of Latin ones in the stopwatch.
+
+  // Format each individual digit in the active locale so the template
+  // can wrap every digit in its own <Transition>. On a typical tick
+  // only the ones-place of seconds changes — every other digit stays
+  // mounted and silent.
   const loc = intlLocale()
-  const padded = new Intl.NumberFormat(loc, {
-    minimumIntegerDigits: 2,
-    useGrouping: false,
-  })
-  const plain = new Intl.NumberFormat(loc, { useGrouping: false })
-  const hms = `${padded.format(hours)}:${padded.format(minutes)}:${padded.format(seconds)}`
-  return days > 0
-    ? t('home.stopwatch_days', { d: plain.format(days), hms })
-    : hms
+  const fmt = new Intl.NumberFormat(loc, { useGrouping: false })
+  const split2 = (n: number): [string, string] => [
+    fmt.format(Math.floor(n / 10)),
+    fmt.format(n % 10),
+  ]
+  const splitN = (n: number): string[] => {
+    if (n === 0) return [fmt.format(0)]
+    const out: string[] = []
+    let v = n
+    while (v > 0) {
+      out.unshift(fmt.format(v % 10))
+      v = Math.floor(v / 10)
+    }
+    return out
+  }
+  return {
+    days: days > 0 ? splitN(days) : [],
+    hh: split2(hours),
+    mm: split2(minutes),
+    ss: split2(seconds),
+  }
 })
 
 // Progress ring fills relative to either the quit-plan target (if any)
@@ -558,6 +659,30 @@ async function onShare(): Promise<void> {
   line-height: 1;
   letter-spacing: -0.03em;
   color: var(--text);
+  /* Establish a positioning context so the in/out spans of the
+     <Transition> can stack over each other without shifting layout
+     during the cross-fade. */
+  position: relative;
+  display: inline-block;
+  min-width: 1ch;
+}
+.counter-number > span {
+  display: inline-block;
+}
+/* Counter flip — slide + fade when the today count actually changes. */
+.num-flip-enter-active,
+.num-flip-leave-active {
+  transition: opacity 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: opacity, transform;
+}
+.num-flip-enter-from {
+  opacity: 0;
+  transform: translateY(14px) scale(0.85);
+}
+.num-flip-leave-to {
+  opacity: 0;
+  transform: translateY(-14px) scale(0.92);
 }
 .counter-label {
   font-size: 12px;
@@ -580,6 +705,103 @@ async function onShare(): Promise<void> {
   color: var(--text);
   font-variant-numeric: tabular-nums;
   line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  /* Numeric clocks read left-to-right in both English and Arabic.
+     Pinning ltr here keeps "00:01:23" in the right order even when
+     the surrounding RTL container would otherwise flip it. */
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+/* One cell per digit. Relative positioning lets the in/out spans of
+   each digit's <Transition> stack without budging neighbors; the
+   `1ch` width keeps the cell from reflowing while a digit fades. */
+.sw-cell {
+  position: relative;
+  display: inline-block;
+  width: 1ch;
+  height: 1em;
+  text-align: center;
+}
+.sw-seg {
+  position: absolute;
+  inset: 0;
+  display: inline-block;
+}
+.sw-sep {
+  padding: 0 1px;
+  opacity: 0.7;
+}
+.sw-unit {
+  margin-left: 2px;
+  margin-right: 6px;
+  font-weight: 600;
+}
+/* Stopwatch tick — concurrent crossfade (no mode="out-in" gap). */
+.tick-flip-enter-active,
+.tick-flip-leave-active {
+  transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: opacity, transform;
+}
+.tick-flip-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.tick-flip-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .num-flip-enter-active,
+  .num-flip-leave-active,
+  .tick-flip-enter-active,
+  .tick-flip-leave-active {
+    transition: none !important;
+  }
+  .num-flip-enter-from,
+  .num-flip-leave-to,
+  .tick-flip-enter-from,
+  .tick-flip-leave-to {
+    transform: none !important;
+  }
+}
+/* Personal-best line under the stopwatch. Subtle by default; flips
+   to a brand-tinted chip with a trophy when the live elapsed time
+   beats the historical best. */
+.stopwatch-best {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-tint);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease;
+}
+.stopwatch-best.is-new-record {
+  color: #fff;
+  background: linear-gradient(
+    135deg,
+    var(--brand-grad-from),
+    var(--brand-grad-to)
+  );
+  box-shadow: 0 4px 14px rgba(255, 122, 61, 0.32);
+  animation: best-pop 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.sw-best-icon {
+  font-size: 12px;
+  line-height: 1;
+}
+@keyframes best-pop {
+  0%   { transform: scale(0.92); }
+  60%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
 }
 .stopwatch-label {
   font-size: 11px;
