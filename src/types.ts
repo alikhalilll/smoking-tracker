@@ -78,8 +78,13 @@ export interface QuitProgress {
 }
 
 export interface AnnotatedEntry extends SmokeEntry {
-  /** Gap in ms from the chronologically previous entry. null only for the very first entry overall. */
+  /** Awake gap in ms from the chronologically previous entry (sleep
+   *  overlap subtracted). null only for the very first entry overall. */
   gapMs: number | null
+  /** Total sleep ms subtracted from the raw gap when computing
+   *  `gapMs`. 0 if the gap didn't intersect a bedtime window or the
+   *  user was awake through it. null when `gapMs` is null. */
+  sleepMs: number | null
 }
 
 export interface DayReport {
@@ -112,13 +117,17 @@ export interface HourBucket {
 }
 
 export interface WeekdayBucket {
+  /** Sun=0..Sat=6. The display label is rendered by the consumer
+   *  via `Intl.DateTimeFormat({ weekday: 'short' })` so it follows
+   *  the active locale instead of being baked in English. */
   weekday: number
-  label: string
   count: number
 }
 
 export interface GapDistributionBucket {
-  label: string
+  /** Translation key under `report.gap_buckets.*` — the view resolves
+   *  it at render time so the label localizes with the app locale. */
+  key: string
   minMs: number
   maxMs: number
   count: number
