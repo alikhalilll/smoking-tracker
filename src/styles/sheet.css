@@ -135,7 +135,7 @@
   border-radius: var(--radius-input);
   background: var(--card);
   color: var(--text);
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: inherit;
   font-variant-numeric: tabular-nums;
   font-size: 28px;
   font-weight: 700;

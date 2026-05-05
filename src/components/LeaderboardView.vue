@@ -103,7 +103,7 @@
                 :seed="podium.second.user_id"
                 size="lg"
               />
-              <span class="podium-medal silver">2</span>
+              <span class="podium-medal silver">{{ formatNumber(2) }}</span>
             </div>
             <div class="podium-name">{{ podium.second.display_name }}</div>
             <div class="podium-score">
@@ -132,7 +132,7 @@
                 :seed="podium.first.user_id"
                 size="lg"
               />
-              <span class="podium-medal gold">1</span>
+              <span class="podium-medal gold">{{ formatNumber(1) }}</span>
             </div>
             <div class="podium-name top">{{ podium.first.display_name }}</div>
             <div class="podium-score top">
@@ -156,7 +156,7 @@
                 :seed="podium.third.user_id"
                 size="lg"
               />
-              <span class="podium-medal bronze">3</span>
+              <span class="podium-medal bronze">{{ formatNumber(3) }}</span>
             </div>
             <div class="podium-name">{{ podium.third.display_name }}</div>
             <div class="podium-score">
@@ -189,7 +189,7 @@
                 {{ formattedSub(row) }}
               </div>
             </div>
-            <div class="user-rank" :class="`rc-${(i + 4) % 6}`">{{ i + 4 }}</div>
+            <div class="user-rank" :class="`rc-${(i + 4) % 6}`">{{ formatNumber(i + 4) }}</div>
           </div>
         </div>
 
@@ -201,7 +201,7 @@
 
 <script setup lang="ts">
 import { computed, h, ref } from 'vue'
-import { useI18n } from '../i18n'
+import { useI18n, formatNumber } from '../i18n'
 import { useAuth } from '../composables/useAuth'
 import Avatar from './Avatar.vue'
 import type { LeaderboardEntry, LeaderboardMetric } from '../types'
@@ -279,8 +279,8 @@ function isOwn(row: LeaderboardEntry): boolean {
 }
 
 function formatRawValue(row: LeaderboardEntry): string {
-  if (metric.value === 'smoke_free') return String(row.smoke_free_days)
-  return `${row.reduction_pct.toFixed(0)}%`
+  if (metric.value === 'smoke_free') return formatNumber(row.smoke_free_days)
+  return `${formatNumber(Math.round(row.reduction_pct))}%`
 }
 
 function formattedSub(row: LeaderboardEntry): string {
@@ -292,8 +292,10 @@ function formattedSub(row: LeaderboardEntry): string {
       { n: row.smoke_free_days }
     )
   }
+  // Pass the rounded percent as a number so interpolate() runs it
+  // through the locale's number formatter (Latin → Arabic-Indic).
   return t('leaderboard.reduction_value', {
-    pct: row.reduction_pct.toFixed(0),
+    pct: Math.round(row.reduction_pct),
   })
 }
 

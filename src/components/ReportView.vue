@@ -23,19 +23,19 @@
         <div class="summary-grid">
           <div class="summary-card">
             <div class="summary-label">{{ t('home.total_logged') }}</div>
-            <div class="summary-value">{{ totalSmoked }}</div>
+            <div class="summary-value">{{ formatNumber(totalSmoked) }}</div>
           </div>
           <div class="summary-card">
             <div class="summary-label">{{ t('home.days_tracked') }}</div>
-            <div class="summary-value">{{ totalDays }}</div>
+            <div class="summary-value">{{ formatNumber(totalDays) }}</div>
           </div>
           <div class="summary-card">
             <div class="summary-label">{{ t('home.daily_avg') }}</div>
-            <div class="summary-value">{{ dailyAvg }}</div>
+            <div class="summary-value">{{ formatNumber(dailyAvg) }}</div>
           </div>
           <div class="summary-card">
             <div class="summary-label">{{ t('report.logged_gaps') }}</div>
-            <div class="summary-value">{{ gapStats.count }}</div>
+            <div class="summary-value">{{ formatNumber(gapStats.count) }}</div>
           </div>
           <div class="summary-card">
             <div class="summary-label">{{ t('history.avg_gap') }}</div>
@@ -97,11 +97,11 @@
           </div>
         </div>
         <div class="hour-axis">
-          <span>0</span>
-          <span>6</span>
-          <span>12</span>
-          <span>18</span>
-          <span>23</span>
+          <span>{{ formatNumber(0) }}</span>
+          <span>{{ formatNumber(6) }}</span>
+          <span>{{ formatNumber(12) }}</span>
+          <span>{{ formatNumber(18) }}</span>
+          <span>{{ formatNumber(23) }}</span>
         </div>
         <div class="muted-line">
           {{ t('report.peak_hour') }}
@@ -118,7 +118,7 @@
             :key="b.weekday"
             class="weekday-col"
           >
-            <div class="weekday-value">{{ b.count || '·' }}</div>
+            <div class="weekday-value">{{ b.count > 0 ? formatNumber(b.count) : '·' }}</div>
             <div
               class="weekday-bar"
               :style="{
@@ -143,7 +143,7 @@
                 :style="{ width: gapRowWidth(b.count) + '%' }"
               />
             </div>
-            <div class="gap-row-count">{{ b.count }}</div>
+            <div class="gap-row-count">{{ formatNumber(b.count) }}</div>
           </div>
         </div>
         <div v-if="gapStats.count === 0" class="muted-line">
@@ -168,7 +168,7 @@ import {
   DrawerTitle,
 } from 'vaul-vue'
 import { formatDuration } from '../composables/useStats'
-import { useI18n, intlLocale } from '../i18n'
+import { useI18n, intlLocale, formatNumber } from '../i18n'
 import { getToday } from '../composables/useDate'
 import type {
   DayBucket,
@@ -238,13 +238,18 @@ const peakHourLabel = computed(() => {
     (a, b) => b.count - a.count
   )[0]
   if (!peak || peak.count === 0) return '—'
-  return `${formatHour(peak.hour)} (${peak.count})`
+  return `${formatHour(peak.hour)} (${formatNumber(peak.count)})`
 })
 
 function formatHour(h: number): string {
-  if (h === 0) return '12 AM'
-  if (h === 12) return '12 PM'
-  return h < 12 ? `${h} AM` : `${h - 12} PM`
+  // Use the locale's time formatter so Arabic mode renders Arabic-Indic
+  // digits and the locale-correct AM/PM marker (ص / م).
+  const d = new Date()
+  d.setHours(h, 0, 0, 0)
+  return d.toLocaleTimeString(intlLocale(), {
+    hour: 'numeric',
+    hour12: true,
+  })
 }
 
 function dailyBarHeight(count: number): number {

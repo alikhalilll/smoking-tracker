@@ -54,7 +54,7 @@
           <button class="day-header" @click="toggle(d)">
             <div>
               <div class="day-label">{{ getDayLabel(d) }}</div>
-              <div class="day-date tabular">{{ d }}</div>
+              <div class="day-date tabular">{{ formatIsoDate(d) }}</div>
             </div>
             <div class="day-right">
               <div
@@ -65,7 +65,7 @@
                 }"
               />
               <div class="day-count tabular" :style="{ color: getColor(byDay[d]) }">
-                {{ byDay[d] }}
+                {{ formatNumber(byDay[d]) }}
               </div>
               <div class="caret" :class="{ open: expanded[d] }">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
@@ -134,7 +134,7 @@ import {
   formatDuration,
   formatTime,
 } from '../composables/useStats'
-import { useI18n } from '../i18n'
+import { useI18n, intlLocale, formatNumber } from '../i18n'
 import { useConfirm } from '../composables/useConfirm'
 import type { DayReport, GapStats } from '../types'
 import DateTimePicker from './DateTimePicker.vue'
@@ -176,6 +176,17 @@ watch(
 
 function toggle(d: string): void {
   expanded.value[d] = !expanded.value[d]
+}
+
+// Render an internal YYYY-MM-DD bucket key in the active locale so
+// Arabic users see Arabic-Indic numerals and a localized format
+// instead of the raw ISO string.
+function formatIsoDate(d: string): string {
+  return new Date(d + 'T00:00:00').toLocaleDateString(intlLocale(), {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
 }
 
 const { confirm } = useConfirm()

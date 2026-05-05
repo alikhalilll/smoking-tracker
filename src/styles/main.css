@@ -284,9 +284,9 @@ html[lang='ar'] body {
   font-family: 'Cairo', system-ui, -apple-system, sans-serif;
 }
 
-/* Numerics in either language stay tabular mono */
+/* Tabular numerics — keep digit columns aligned but inherit the
+   app font so language switches (Inter ↔ Cairo) flow through. */
 .tabular {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
 }
 
