@@ -43,9 +43,26 @@ export interface LiquidGlassOptions {
   blur?: number
   /**
    * Multiplier for displacement. 1 = physically derived max; <1 softens.
-   * Default 1.
+   * Default 1. When `scaleStates` is provided this is ignored at runtime
+   * (it just seeds the initial `idle` value).
    */
   scaleRatio?: number
+  /**
+   * Per-pointer-state scale ratios. When set, the directive listens to
+   * pointer events and animates the SVG `feDisplacementMap.scale`
+   * between states with a short rAF tween. Use this to keep idle
+   * surfaces flat and only "ripple" the refraction on hover/press —
+   * matches Apple's Liquid Glass interactive behavior.
+   *
+   * Example: `{ idle: 0.15, hover: 0.55, active: 1 }`
+   */
+  scaleStates?: {
+    idle?: number
+    hover?: number
+    active?: number
+  }
+  /** Tween duration in ms when transitioning between scale states. Default 220. */
+  transitionMs?: number
   /**
    * Extra CSS backdrop-filter chained BEFORE the SVG filter — e.g. to
    * keep the existing .glass `blur() saturate()` as the underlying
@@ -61,6 +78,18 @@ interface State {
   observer: ResizeObserver | null
   rafId: number | null
   lastApplied: { w: number; h: number } | null
+  /** Cached <feDisplacementMap> node so we can hot-tween its `scale`. */
+  dispMapEl: SVGFEDisplacementMapElement | null
+  /** Physically-derived max displacement (px) for the current size. */
+  maxDisplacement: number
+  /** Currently rendered scale value (in pixels), driven by the rAF tween. */
+  currentScale: number
+  /** Target scale we're animating toward. */
+  targetScale: number
+  /** Active rAF id for the scale tween. */
+  tweenRaf: number | null
+  /** Pointer-state listeners we attached, so we can detach on unmount. */
+  detachListeners: (() => void) | null
 }
 
 const STATE_KEY = '__liquidGlass'
@@ -124,13 +153,13 @@ function setAttr(el: SVGElement, attrs: Record<string, string | number>) {
 
 function makeFilter(
   id: string,
-  opts: Required<LiquidGlassOptions>,
+  opts: Required<Omit<LiquidGlassOptions, 'scaleStates'>>,
   rectW: number,
   rectH: number,
   displacementUrl: string,
   specularUrl: string,
   scale: number
-): SVGFilterElement {
+): { filter: SVGFilterElement; dispMap: SVGFEDisplacementMapElement } {
   const ns = 'http://www.w3.org/2000/svg'
   const filter = document.createElementNS(ns, 'filter')
   filter.id = id
@@ -238,7 +267,7 @@ function makeFilter(
   })
   filter.appendChild(blend2)
 
-  return filter
+  return { filter, dispMap }
 }
 
 function compute(el: HTMLElement, state: State) {
@@ -256,7 +285,7 @@ function compute(el: HTMLElement, state: State) {
   }
 
   const o = state.options
-  const opts: Required<LiquidGlassOptions> = {
+  const opts: Required<Omit<LiquidGlassOptions, 'scaleStates'>> = {
     surface: o.surface ?? 'convex',
     bezel: o.bezel ?? 8,
     radius: o.radius ?? Math.min(w, h) / 2,
@@ -266,6 +295,7 @@ function compute(el: HTMLElement, state: State) {
     saturation: o.saturation ?? 1.4,
     blur: o.blur ?? 6,
     scaleRatio: o.scaleRatio ?? 1,
+    transitionMs: o.transitionMs ?? 220,
     chain: o.chain ?? 'var(--glass-blur)',
   }
 
@@ -302,16 +332,25 @@ function compute(el: HTMLElement, state: State) {
   if (existing && existing.parentNode === defs) {
     defs.removeChild(existing)
   }
-  const filter = makeFilter(
+  // Pick the initial scale: if scaleStates is set, default to its idle
+  // value; otherwise use the static scaleRatio. The actual SVG scale is
+  // in pixels (maxDisplacement × ratio).
+  const initialRatio = state.options.scaleStates?.idle ?? opts.scaleRatio
+  const initialScalePx = disp.maxDisplacement * initialRatio
+  const built = makeFilter(
     state.filterId,
     opts,
     w,
     h,
     displacementUrl,
     specularUrl,
-    disp.maxDisplacement * opts.scaleRatio
+    initialScalePx
   )
-  defs.appendChild(filter)
+  defs.appendChild(built.filter)
+  state.dispMapEl = built.dispMap
+  state.maxDisplacement = disp.maxDisplacement
+  state.currentScale = initialScalePx
+  state.targetScale = initialScalePx
 
   const chain = opts.chain
   const filterCss = chain
@@ -320,6 +359,92 @@ function compute(el: HTMLElement, state: State) {
   el.style.setProperty('-webkit-backdrop-filter', filterCss)
   el.style.setProperty('backdrop-filter', filterCss)
   state.lastApplied = { w, h }
+}
+
+function easeOutCubic(t: number): number {
+  return 1 - Math.pow(1 - t, 3)
+}
+
+function tweenScale(
+  state: State,
+  to: number,
+  durationMs: number
+): void {
+  state.targetScale = to
+  if (!state.dispMapEl) return
+  if (state.tweenRaf != null) cancelAnimationFrame(state.tweenRaf)
+  const from = state.currentScale
+  if (from === to) return
+  const start = performance.now()
+  const tick = (now: number) => {
+    const elapsed = now - start
+    const t = Math.min(1, elapsed / Math.max(1, durationMs))
+    const eased = easeOutCubic(t)
+    const value = from + (to - from) * eased
+    state.currentScale = value
+    if (state.dispMapEl) {
+      state.dispMapEl.setAttribute('scale', String(value))
+    }
+    if (t < 1) {
+      state.tweenRaf = requestAnimationFrame(tick)
+    } else {
+      state.tweenRaf = null
+    }
+  }
+  state.tweenRaf = requestAnimationFrame(tick)
+}
+
+function attachPointerStates(el: HTMLElement, state: State): () => void {
+  const o = state.options
+  const states = o.scaleStates
+  if (!states) return () => {}
+
+  const idle = states.idle ?? o.scaleRatio ?? 1
+  const hover = states.hover ?? states.active ?? idle
+  const active = states.active ?? hover
+
+  const transition = o.transitionMs ?? 220
+
+  // We use Pointer Events so touch and mouse share the same path.
+  let isHovering = false
+  let isPressed = false
+
+  const update = () => {
+    const ratio = isPressed ? active : isHovering ? hover : idle
+    tweenScale(state, state.maxDisplacement * ratio, transition)
+  }
+
+  const onEnter = () => {
+    isHovering = true
+    update()
+  }
+  const onLeave = () => {
+    isHovering = false
+    isPressed = false
+    update()
+  }
+  const onDown = () => {
+    isPressed = true
+    update()
+  }
+  const onUp = () => {
+    isPressed = false
+    update()
+  }
+
+  el.addEventListener('pointerenter', onEnter)
+  el.addEventListener('pointerleave', onLeave)
+  el.addEventListener('pointerdown', onDown)
+  el.addEventListener('pointerup', onUp)
+  el.addEventListener('pointercancel', onUp)
+
+  return () => {
+    el.removeEventListener('pointerenter', onEnter)
+    el.removeEventListener('pointerleave', onLeave)
+    el.removeEventListener('pointerdown', onDown)
+    el.removeEventListener('pointerup', onUp)
+    el.removeEventListener('pointercancel', onUp)
+  }
 }
 
 function schedule(el: HTMLElement, state: State) {
@@ -339,6 +464,12 @@ export const vLiquidGlass: Directive<HTMLElement, LiquidGlassOptions> = {
       observer: null,
       rafId: null,
       lastApplied: null,
+      dispMapEl: null,
+      maxDisplacement: 0,
+      currentScale: 0,
+      targetScale: 0,
+      tweenRaf: null,
+      detachListeners: null,
     }
     el[STATE_KEY] = state
     // Initial pass — wait one frame so layout has settled.
@@ -347,6 +478,7 @@ export const vLiquidGlass: Directive<HTMLElement, LiquidGlassOptions> = {
       state.observer = new ResizeObserver(() => schedule(el, state))
       state.observer.observe(el)
     }
+    state.detachListeners = attachPointerStates(el, state)
   },
   updated(el: ElementWithState, binding: DirectiveBinding<LiquidGlassOptions>) {
     const state = el[STATE_KEY]
@@ -356,6 +488,9 @@ export const vLiquidGlass: Directive<HTMLElement, LiquidGlassOptions> = {
     if (JSON.stringify(prev) === JSON.stringify(next)) return
     state.options = next
     state.lastApplied = null
+    // Re-attach pointer listeners so scaleStates changes take effect.
+    state.detachListeners?.()
+    state.detachListeners = attachPointerStates(el, state)
     schedule(el, state)
   },
   unmounted(el: ElementWithState) {
@@ -363,6 +498,8 @@ export const vLiquidGlass: Directive<HTMLElement, LiquidGlassOptions> = {
     if (!state) return
     state.observer?.disconnect()
     if (state.rafId != null) cancelAnimationFrame(state.rafId)
+    if (state.tweenRaf != null) cancelAnimationFrame(state.tweenRaf)
+    state.detachListeners?.()
     const defs = document.getElementById(DEFS_ID)
     const filter = document.getElementById(state.filterId)
     if (defs && filter && filter.parentNode === defs) {

@@ -186,14 +186,18 @@
          lights up brand-coral with a soft circular highlight around
          just the icon. No morphing indicator — labels are static so
          each tab keeps a fixed footprint. -->
-    <nav
-      v-if="view !== 'admin'"
-      v-liquid-glass="{ surface: 'convex', bezel: 12, glassThickness: 80, scaleRatio: 0.85, specularOpacity: 0.3 }"
-      class="nav-bar glass"
-    >
+    <nav v-if="view !== 'admin'" class="nav-bar glass">
       <button
         v-for="(tab, i) in tabs"
         :key="tab.id"
+        v-liquid-glass="{
+          surface: 'convex',
+          bezel: 8,
+          glassThickness: 60,
+          specularOpacity: 0.45,
+          scaleStates: { idle: 0, hover: 0.55, active: 1.05 },
+          chain: '',
+        }"
         class="nav-tab"
         :class="{ active: view === tab.id }"
         @click="onTabClick(tab.id, i)"
@@ -1079,6 +1083,26 @@ onUnmounted(() => {
   border-radius: var(--radius-pill);
   z-index: 100;
   max-width: calc(100vw - 24px);
+  /* Stronger lift than the default glass shadow — the Telegram floating
+     pill reads more like a hovering object than an inline bar. */
+  box-shadow: var(--glass-highlight),
+              0 22px 56px rgba(15, 23, 42, 0.20),
+              0 6px 16px rgba(15, 23, 42, 0.12),
+              0 1px 2px rgba(15, 23, 42, 0.08);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .nav-bar {
+    box-shadow: var(--glass-highlight),
+                0 22px 56px rgba(0, 0, 0, 0.65),
+                0 6px 16px rgba(0, 0, 0, 0.40),
+                0 1px 2px rgba(0, 0, 0, 0.30);
+  }
+}
+[data-theme='dark'] .nav-bar {
+  box-shadow: var(--glass-highlight),
+              0 22px 56px rgba(0, 0, 0, 0.65),
+              0 6px 16px rgba(0, 0, 0, 0.40),
+              0 1px 2px rgba(0, 0, 0, 0.30);
 }
 .nav-tab {
   appearance: none;
@@ -1119,9 +1143,9 @@ onUnmounted(() => {
               box-shadow 0.22s ease;
 }
 .nav-tab.active .nav-icon-wrap {
-  background: var(--glass-active-tint);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35),
-              0 4px 12px color-mix(in srgb, var(--brand) 22%, transparent);
+  background: color-mix(in srgb, var(--brand) 28%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55),
+              0 6px 14px color-mix(in srgb, var(--brand) 28%, transparent);
   transform: translateY(-1px);
 }
 .nav-icon {

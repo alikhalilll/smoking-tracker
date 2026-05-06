@@ -1,6 +1,14 @@
 <template>
   <button
-    v-liquid-glass="{ surface: 'lip', bezel: 5, glassThickness: 60, scaleRatio: 1, specularOpacity: 0.5, blur: 0.2, chain: '' }"
+    v-liquid-glass="{
+      surface: 'lip',
+      bezel: 5,
+      glassThickness: 60,
+      specularOpacity: 0.5,
+      blur: 0.2,
+      chain: '',
+      scaleStates: { idle: 0.15, hover: 0.55, active: 1.05 },
+    }"
     class="toggle"
     :class="{ on: modelValue, disabled }"
     role="switch"
