@@ -282,7 +282,17 @@
               </tr>
             </thead>
             <tbody>
-              <tr v-for="u in filteredUsers" :key="u.id">
+              <tr
+                v-for="u in filteredUsers"
+                :key="u.id"
+                class="user-row"
+                role="button"
+                tabindex="0"
+                :aria-label="`Open activity for ${u.email || u.id}`"
+                @click="openUser(u.id)"
+                @keydown.enter.prevent="openUser(u.id)"
+                @keydown.space.prevent="openUser(u.id)"
+              >
                 <td class="email-cell">{{ u.email || '—' }}</td>
                 <td>{{ formatDate(u.created_at) }}</td>
                 <td class="num">{{ u.total_entries.toLocaleString() }}</td>
@@ -301,6 +311,12 @@
       </section>
     </template>
     </main>
+
+    <AdminUserDrawer
+      :user-id="selectedUserId"
+      :open="userDrawerOpen"
+      @update:open="onUserDrawerOpenChange"
+    />
   </div>
 </template>
 
@@ -322,6 +338,13 @@ import {
 } from 'chart.js'
 import { useAdminApi } from '../composables/useAdminApi'
 import Select from './Select.vue'
+import AdminUserDrawer from './AdminUserDrawer.vue'
+import {
+  fmtCount as fmt,
+  formatNum,
+  formatDate,
+  formatRelative,
+} from '../utils/adminFormat'
 
 ChartJS.register(
   CategoryScale,
@@ -442,6 +465,18 @@ const users = ref<UserRow[]>([])
 const userFilter = ref('')
 const sortKey = ref<string>('created_at')
 
+const selectedUserId = ref<string | null>(null)
+const userDrawerOpen = ref(false)
+
+function openUser(id: string): void {
+  selectedUserId.value = id
+  userDrawerOpen.value = true
+}
+function onUserDrawerOpenChange(v: boolean): void {
+  userDrawerOpen.value = v
+  if (!v) selectedUserId.value = null
+}
+
 const tabs = computed<Array<{ id: TabId; label: string; badge?: number | null }>>(() => [
   { id: 'overview', label: 'Overview' },
   { id: 'activity', label: 'Activity' },
@@ -488,32 +523,6 @@ const tiles = computed(() => {
     { label: 'On leaderboard',        value: fmt(o?.leaderboard_size),             tone: 'tinted-mint' },
   ]
 })
-
-function fmt(n: number | undefined): string {
-  if (n == null) return '—'
-  return n.toLocaleString()
-}
-function formatNum(n: number | undefined): string {
-  if (n == null) return '—'
-  return n.toLocaleString(undefined, {
-    minimumFractionDigits: n % 1 === 0 ? 0 : 1,
-    maximumFractionDigits: 2,
-  })
-}
-function formatDate(iso: string | null): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString()
-}
-function formatRelative(iso: string): string {
-  const d = new Date(iso)
-  const diffMin = Math.round((Date.now() - d.getTime()) / 60000)
-  if (diffMin < 1) return 'just now'
-  if (diffMin < 60) return `${diffMin}m ago`
-  if (diffMin < 60 * 24) return `${Math.round(diffMin / 60)}h ago`
-  const days = Math.round(diffMin / (60 * 24))
-  if (days < 30) return `${days}d ago`
-  return d.toLocaleDateString()
-}
 
 const lastRefreshLabel = computed(() => {
   if (!lastRefresh.value) return '—'
@@ -1148,7 +1157,15 @@ onMounted(() => {
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
 }
-.user-table tbody tr:hover { background: var(--btn-ghost-bg); }
+.user-table tbody tr.user-row { cursor: pointer; }
+.user-table tbody tr.user-row:hover,
+.user-table tbody tr.user-row:focus-visible {
+  background: var(--btn-ghost-bg);
+  outline: none;
+}
+.user-table tbody tr.user-row:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--brand-soft);
+}
 .user-table th {
   font-weight: 600;
   color: var(--muted);

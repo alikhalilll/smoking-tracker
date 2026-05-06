@@ -411,6 +411,43 @@ $$;
 
 revoke all on function public.admin_user_list(integer) from public;
 grant execute on function public.admin_user_list(integer) to service_role;
+
+-- Per-user account fields the service role can't read directly
+-- (auth.users is hidden from non-superuser roles in some Supabase
+-- configurations). Used by the admin "user activity" drawer.
+create or replace function public.admin_user_activity_account(p_user_id uuid)
+returns table(
+  id uuid,
+  email text,
+  created_at timestamptz,
+  last_sign_in_at timestamptz,
+  email_confirmed_at timestamptz,
+  providers text[]
+)
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  return query
+    select u.id,
+           u.email,
+           u.created_at,
+           u.last_sign_in_at,
+           u.email_confirmed_at,
+           coalesce(
+             array(
+               select jsonb_array_elements_text(u.raw_app_meta_data -> 'providers')
+             ),
+             array[]::text[]
+           ) as providers
+    from auth.users u
+    where u.id = p_user_id;
+end;
+$$;
+
+revoke all on function public.admin_user_activity_account(uuid) from public;
+grant execute on function public.admin_user_activity_account(uuid) to service_role;
 ```
 
 ### 7b. Deploy the Edge Function
