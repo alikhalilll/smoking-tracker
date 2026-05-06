@@ -184,49 +184,103 @@ function bucketTimeseries(
 
 async function actionOverview() {
   const sb = adminClient()
+  const since30 = new Date()
+  since30.setDate(since30.getDate() - 30)
+  const since30Date = since30.toISOString().slice(0, 10)
+
   const [
-    { count: totalUsers },
     { count: totalEntries },
     { count: totalPlans },
+    { data: active1Rows },
     { data: active7Rows },
     { data: active30Rows },
     { data: planRows },
+    { count: entries30Count },
+    { data: leaderboardRows },
+    { data: authUsersData },
   ] = await Promise.all([
-    sb.from('leaderboard_entries').select('*', { count: 'exact', head: true }),
     sb.from('entries').select('*', { count: 'exact', head: true }),
     sb.from('quit_plans').select('*', { count: 'exact', head: true }),
+    sb.rpc('count_active_users', { window_days: 1 }).then(emptyOnError),
     sb.rpc('count_active_users', { window_days: 7 }).then(emptyOnError),
     sb.rpc('count_active_users', { window_days: 30 }).then(emptyOnError),
     sb.from('quit_plans').select('start_date, duration_days'),
+    sb
+      .from('entries')
+      .select('*', { count: 'exact', head: true })
+      .gte('date', since30Date),
+    sb
+      .from('leaderboard_entries')
+      .select('smoke_free_days, reduction_pct, daily_avg'),
+    sb.rpc('admin_user_count').then((r) => ({ data: r.data })),
   ])
+
   const today = new Date()
   let plansComplete = 0
+  let plansActive = 0
   for (const p of planRows ?? []) {
     const start = new Date(p.start_date)
     start.setDate(start.getDate() + (p.duration_days ?? 0))
     if (start < today) plansComplete++
+    else plansActive++
   }
-  // total_users sourced from auth.users via dedicated RPC because the
-  // service-role client cannot select directly from auth.* tables.
-  const { data: authUsersData } = await sb.rpc('admin_user_count')
-  const realTotalUsers =
-    typeof authUsersData === 'number' ? authUsersData : totalUsers ?? 0
 
-  const active7 = Array.isArray(active7Rows)
-    ? Number(active7Rows[0]?.count ?? 0)
-    : Number(active7Rows ?? 0)
-  const active30 = Array.isArray(active30Rows)
-    ? Number(active30Rows[0]?.count ?? 0)
-    : Number(active30Rows ?? 0)
+  const realTotalUsers =
+    typeof authUsersData === 'number' ? authUsersData : 0
+  const active1 = unwrapCount(active1Rows)
+  const active7 = unwrapCount(active7Rows)
+  const active30 = unwrapCount(active30Rows)
+
+  // Average cigarettes per active user per day (over last 30 days).
+  const avgCigsPerActive =
+    active30 > 0
+      ? Math.round(((entries30Count ?? 0) / active30 / 30) * 100) / 100
+      : 0
+
+  const lb = (leaderboardRows ?? []) as Array<{
+    smoke_free_days: number | null
+    reduction_pct: number | string | null
+    daily_avg: number | string | null
+  }>
+  const streaks = lb.map((r) => Number(r.smoke_free_days ?? 0))
+  const reductions = lb
+    .map((r) => Number(r.reduction_pct ?? 0))
+    .filter((n) => Number.isFinite(n))
+  const longestStreak = streaks.length ? Math.max(...streaks) : 0
+  const smokeFree7Plus = streaks.filter((s) => s >= 7).length
+  const avgReduction =
+    reductions.length > 0
+      ? Math.round(
+          (reductions.reduce((a, b) => a + b, 0) / reductions.length) * 10
+        ) / 10
+      : 0
+
+  // Stickiness: DAU/MAU over the last 30 days.
+  const stickiness =
+    active30 > 0 ? Math.round((active1 / active30) * 100) : 0
 
   return {
     total_users: realTotalUsers,
+    active_1d: active1,
     active_7d: active7,
     active_30d: active30,
+    stickiness_pct: stickiness,
     total_entries: totalEntries ?? 0,
+    entries_30d: entries30Count ?? 0,
+    avg_cigs_per_active_30d: avgCigsPerActive,
     total_plans: totalPlans ?? 0,
+    plans_active: plansActive,
     plans_complete: plansComplete,
+    longest_streak: longestStreak,
+    smoke_free_7d_plus: smokeFree7Plus,
+    avg_reduction_pct: avgReduction,
+    leaderboard_size: lb.length,
   }
+}
+
+function unwrapCount(value: unknown): number {
+  if (Array.isArray(value)) return Number((value[0] as { count?: number })?.count ?? 0)
+  return Number(value ?? 0)
 }
 
 function emptyOnError<T>(res: { data: T | null; error: unknown }): {
@@ -292,6 +346,76 @@ async function actionUserList(limit: number) {
   return data
 }
 
+async function actionDauTimeseries(days: number) {
+  const sb = adminClient()
+  const since = new Date()
+  since.setDate(since.getDate() - days + 1)
+  const { data, error } = await sb.rpc('admin_dau_per_day', {
+    since_date: since.toISOString().slice(0, 10),
+  })
+  if (error) return emptyTimeseries(days)
+  if (Array.isArray(data)) {
+    const known = new Map<string, number>()
+    for (const r of data as Array<{ day: string; count: number }>) {
+      known.set(r.day.slice(0, 10), Number(r.count))
+    }
+    return emptyTimeseries(days).map((p) => ({
+      day: p.day,
+      count: known.get(p.day) ?? 0,
+    }))
+  }
+  return emptyTimeseries(days)
+}
+
+async function actionHourlyDistribution() {
+  const sb = adminClient()
+  const { data, error } = await sb.rpc('admin_hourly_distribution')
+  const buckets: number[] = Array.from({ length: 24 }, () => 0)
+  if (!error && Array.isArray(data)) {
+    for (const r of data as Array<{ hour: number; count: number }>) {
+      const h = Number(r.hour)
+      if (h >= 0 && h < 24) buckets[h] = Number(r.count)
+    }
+  }
+  return buckets.map((count, hour) => ({ hour, count }))
+}
+
+async function actionWeekdayDistribution() {
+  const sb = adminClient()
+  const { data, error } = await sb.rpc('admin_weekday_distribution')
+  // ISO weekday: 1=Mon..7=Sun
+  const buckets: number[] = Array.from({ length: 7 }, () => 0)
+  if (!error && Array.isArray(data)) {
+    for (const r of data as Array<{ weekday: number; count: number }>) {
+      const d = Number(r.weekday) - 1
+      if (d >= 0 && d < 7) buckets[d] = Number(r.count)
+    }
+  }
+  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  return buckets.map((count, i) => ({ weekday: labels[i], count }))
+}
+
+async function actionPlanStatus() {
+  const sb = adminClient()
+  const { data, error } = await sb.rpc('admin_plan_status')
+  if (error || !Array.isArray(data)) return []
+  return (data as Array<{ status: string; count: number }>).map((r) => ({
+    status: r.status,
+    count: Number(r.count),
+  }))
+}
+
+async function actionEngagementFunnel() {
+  const sb = adminClient()
+  const { data, error } = await sb.rpc('admin_engagement_funnel')
+  if (error || !Array.isArray(data)) return []
+  // Preserve the order of the steps as the RPC returns them.
+  return (data as Array<{ step: string; count: number }>).map((r) => ({
+    step: r.step,
+    count: Number(r.count),
+  }))
+}
+
 // --- Entrypoint -----------------------------------------------------
 
 Deno.serve(async (req: Request) => {
@@ -340,6 +464,18 @@ Deno.serve(async (req: Request) => {
       }
       case 'intensity_breakdown':
         return jsonResponse(await actionIntensityBreakdown() as unknown as Json)
+      case 'dau_timeseries': {
+        const days = Math.min(180, Number(body.days ?? 30) || 30)
+        return jsonResponse(await actionDauTimeseries(days) as unknown as Json)
+      }
+      case 'hourly_distribution':
+        return jsonResponse(await actionHourlyDistribution() as unknown as Json)
+      case 'weekday_distribution':
+        return jsonResponse(await actionWeekdayDistribution() as unknown as Json)
+      case 'plan_status':
+        return jsonResponse(await actionPlanStatus() as unknown as Json)
+      case 'engagement_funnel':
+        return jsonResponse(await actionEngagementFunnel() as unknown as Json)
       case 'user_list': {
         const limit = Math.min(500, Number(body.limit ?? 200) || 200)
         return jsonResponse(await actionUserList(limit) as unknown as Json)
