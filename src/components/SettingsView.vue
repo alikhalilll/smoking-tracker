@@ -2,29 +2,15 @@
   <div class="fade-in settings">
     <h1 class="settings-title">{{ t('settings.title') }}</h1>
 
-    <!-- Section tabs — segmented control (cleaner than the loud
-         gradient pills; the indicator slides between tabs). -->
-    <div class="seg-tabs" role="tablist" data-onboard="settings-tabs">
-      <div
-        class="seg-tab-indicator"
-        :style="{
-          width: `calc((100% - 8px) / ${sections.length})`,
-          transform: `translateX(${
-            sections.findIndex((s) => s.id === section) *
-            (isRtl ? -100 : 100)
-          }%)`,
-        }"
+    <!-- Liquid-glass section tabs — the indicator is a draggable thumb
+         that warps under the user's finger and snaps to the nearest
+         section on release. -->
+    <div data-onboard="settings-tabs">
+      <LiquidSegmented
+        :model-value="section"
+        :options="sectionOptions"
+        @update:model-value="(v) => (section = v)"
       />
-      <button
-        v-for="s in sections"
-        :key="s.id"
-        class="seg-tab"
-        :class="{ active: section === s.id }"
-        role="tab"
-        @click="section = s.id"
-      >
-        {{ t(`settings.section_${s.id}`) }}
-      </button>
     </div>
 
     <!-- ===== Account ===== -->
@@ -229,17 +215,11 @@
             <div class="card-sub">{{ t('settings.language_help') }}</div>
           </div>
         </div>
-        <div class="segmented-row">
-          <button
-            v-for="opt in localeOptions"
-            :key="opt.value"
-            class="seg-btn"
-            :class="{ active: locale === opt.value }"
-            @click="setLocale(opt.value)"
-          >
-            {{ opt.label }}
-          </button>
-        </div>
+        <LiquidSegmented
+          :model-value="locale"
+          :options="localeOptions"
+          @update:model-value="setLocale"
+        />
       </div>
 
       <div v-reveal class="card" data-onboard="settings-theme">
@@ -252,17 +232,11 @@
             <div class="card-sub">{{ t('settings.appearance_help') }}</div>
           </div>
         </div>
-        <div class="segmented-row">
-          <button
-            v-for="opt in themeOptions"
-            :key="opt.value"
-            class="seg-btn"
-            :class="{ active: themeMode === opt.value }"
-            @click="setTheme(opt.value)"
-          >
-            {{ t(`settings.theme_${opt.value}`) }}
-          </button>
-        </div>
+        <LiquidSegmented
+          :model-value="themeMode"
+          :options="themeSegOptions"
+          @update:model-value="setTheme"
+        />
       </div>
 
       <!-- Replay onboarding tour -->
@@ -359,37 +333,20 @@
 
         <div v-if="reminders.settings.value.enabled" class="reminder-detail">
           <div class="info-label">{{ t('reminders.gap_label') }}</div>
-          <div class="segmented-row">
-            <button
-              v-for="opt in REMINDER_GAP_OPTIONS"
-              :key="opt.minutes"
-              class="seg-btn"
-              :class="{
-                active: reminders.settings.value.gapMinutes === opt.minutes,
-              }"
-              @click="onGapChange(opt.minutes)"
-            >
-              {{ opt.label }}
-            </button>
-          </div>
+          <LiquidSegmented
+            :model-value="reminders.settings.value.gapMinutes"
+            :options="reminderGapOptions"
+            @update:model-value="onGapChange"
+          />
 
           <div class="info-label" style="margin-top: 14px">
             {{ t('reminders.language_label') }}
           </div>
-          <div class="segmented-row">
-            <button
-              v-for="opt in NOTIFICATION_LOCALE_OPTIONS"
-              :key="opt.value"
-              class="seg-btn"
-              :class="{
-                active:
-                  reminders.settings.value.notificationLocale === opt.value,
-              }"
-              @click="onNotificationLocaleChange(opt.value)"
-            >
-              {{ t(`reminders.lang_${opt.value}`) }}
-            </button>
-          </div>
+          <LiquidSegmented
+            :model-value="reminders.settings.value.notificationLocale"
+            :options="notificationLocaleOptions"
+            @update:model-value="onNotificationLocaleChange"
+          />
 
           <div
             v-if="reminders.permission.value !== 'granted'"
@@ -644,6 +601,7 @@ import { isSupabaseConfigured } from '../supabase'
 import Toggle from './Toggle.vue'
 import Select from './Select.vue'
 import TimePicker from './TimePicker.vue'
+import LiquidSegmented from './LiquidSegmented.vue'
 import type { UseSync } from '../composables/useSync'
 import type { UseLeaderboard } from '../composables/useLeaderboard'
 
@@ -937,7 +895,7 @@ function onExportCsv(): void {
 // when this prop isn't passed.
 const isAuthed = computed(() => props.isAuthed ?? false)
 
-const { t, locale, setLocale, isRtl } = useI18n()
+const { t, locale, setLocale } = useI18n()
 const { mode: themeMode, setTheme } = useTheme()
 const reminders = useReminders()
 
@@ -958,6 +916,37 @@ const themeOptions: ReadonlyArray<{ value: ThemeMode; label: string }> = [
   { value: 'light', label: '' },
   { value: 'dark', label: '' },
 ]
+
+// === LiquidSegmented option lists ==================================
+// These shape the existing data into the { value, label } pairs the
+// reusable component expects.
+const sectionOptions = computed(() =>
+  sections.map((s) => ({
+    value: s.id,
+    label: t(`settings.section_${s.id}`),
+  }))
+)
+
+const themeSegOptions = computed(() =>
+  themeOptions.map((o) => ({
+    value: o.value,
+    label: t(`settings.theme_${o.value}`),
+  }))
+)
+
+const reminderGapOptions = computed(() =>
+  REMINDER_GAP_OPTIONS.map((o) => ({
+    value: o.minutes,
+    label: o.label,
+  }))
+)
+
+const notificationLocaleOptions = computed(() =>
+  NOTIFICATION_LOCALE_OPTIONS.map((o) => ({
+    value: o.value,
+    label: t(`reminders.lang_${o.value}`),
+  }))
+)
 
 async function onToggleReminders(): Promise<void> {
   const next = !reminders.settings.value.enabled
