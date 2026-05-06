@@ -1,4 +1,42 @@
 <template>
+  <!-- Liquid Glass refraction filter (Chromium-only). Mounted once at
+       app root so any .glass surface can opt into the displacement via
+       the @supports query in components.css. Keep the filter off-canvas
+       (zero size, absolute) so it never paints itself. -->
+  <svg
+    aria-hidden="true"
+    width="0"
+    height="0"
+    style="position: absolute; width: 0; height: 0; pointer-events: none;"
+  >
+    <defs>
+      <filter
+        id="liquid-glass"
+        x="0%"
+        y="0%"
+        width="100%"
+        height="100%"
+        color-interpolation-filters="sRGB"
+      >
+        <feTurbulence
+          type="fractalNoise"
+          baseFrequency="0.012 0.018"
+          numOctaves="2"
+          seed="3"
+          result="turbulence"
+        />
+        <feGaussianBlur in="turbulence" stdDeviation="2" result="softNoise" />
+        <feDisplacementMap
+          in="SourceGraphic"
+          in2="softNoise"
+          scale="6"
+          xChannelSelector="R"
+          yChannelSelector="G"
+        />
+      </filter>
+    </defs>
+  </svg>
+
   <!-- Ambient floating dots — fixed behind every screen, dim by default,
        brighter on the leaderboard tab. -->
   <div
@@ -1022,17 +1060,18 @@ onUnmounted(() => {
   /* Animated view transitions could go here later */
 }
 
-/* Liquid Glass floating nav: icon-with-label tabs, soft circle
-   highlight around just the active icon. Centered with physical
-   `left: 50%` so it stays put in both LTR and RTL. */
+/* Liquid Glass floating nav — Telegram-style pill.
+   Physically centered (left:50% + translateX) so it sits put in both
+   LTR and RTL. Heavy backdrop blur lets the page content tint the
+   bar; the active tab gets a tinted brand circle behind its icon. */
 .nav-bar {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
   bottom: max(14px, env(safe-area-inset-bottom));
   display: flex;
-  gap: 2px;
-  padding: 8px 10px;
+  gap: 4px;
+  padding: 6px 8px;
   border-radius: var(--radius-pill);
   z-index: 100;
   max-width: calc(100vw - 24px);
@@ -1047,15 +1086,16 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 2px;
-  padding: 4px 6px;
+  gap: 3px;
+  padding: 5px 8px;
   color: var(--muted);
   transition: color 0.2s ease, transform 0.12s ease;
-  min-width: 48px;
+  min-width: 52px;
   flex: 1 1 auto;
+  border-radius: 18px;
 }
 @media (max-width: 360px) {
-  .nav-tab { min-width: 44px; padding: 4px 4px; }
+  .nav-tab { min-width: 46px; padding: 5px 4px; }
   .nav-label { font-size: 10px; }
 }
 .nav-tab:active {
@@ -1068,13 +1108,17 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
-  transition: background 0.2s ease;
+  transition: background 0.22s ease, transform 0.22s ease,
+              box-shadow 0.22s ease;
 }
 .nav-tab.active .nav-icon-wrap {
-  background: color-mix(in srgb, var(--brand) 18%, transparent);
+  background: var(--glass-active-tint);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35),
+              0 4px 12px color-mix(in srgb, var(--brand) 22%, transparent);
+  transform: translateY(-1px);
 }
 .nav-icon {
   display: flex;
@@ -1091,5 +1135,8 @@ onUnmounted(() => {
   font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1;
+}
+.nav-tab.active .nav-label {
+  font-weight: 700;
 }
 </style>

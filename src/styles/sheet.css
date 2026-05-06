@@ -19,10 +19,19 @@
   right: 0;
   bottom: 0;
   z-index: 201;
-  background: var(--card);
+  /* Liquid Glass surface — translucent fill + blurred backdrop + soft
+     top-edge highlight so the dimmed page underneath shows through.
+     The :before pseudo paints a subtle top sheen to mimic the lensed
+     specular highlight on iOS sheets. */
+  background: var(--glass-bg-strong);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  backdrop-filter: var(--glass-blur-strong);
+  border-top: 1px solid var(--glass-border);
   border-top-left-radius: 22px;
   border-top-right-radius: 22px;
-  box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--glass-highlight),
+              0 -10px 36px rgba(0, 0, 0, 0.22),
+              0 -2px 8px rgba(0, 0, 0, 0.10);
   padding: 8px 16px calc(20px + env(safe-area-inset-bottom));
   /* No outer scroll — vaul's drag-to-dismiss conflicts with overflow:auto
      on the drawer surface. Scroll is delegated to inner sections that
@@ -32,6 +41,27 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
+  isolation: isolate;
+}
+.sheet-content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--glass-sheen);
+  pointer-events: none;
+  z-index: 0;
+}
+.sheet-content > * {
+  position: relative;
+  z-index: 1;
+}
+
+@supports (backdrop-filter: url(#liquid-glass)) {
+  .sheet-content {
+    -webkit-backdrop-filter: var(--glass-blur-strong) url(#liquid-glass);
+    backdrop-filter: var(--glass-blur-strong) url(#liquid-glass);
+  }
 }
 
 .sheet-handle-row {

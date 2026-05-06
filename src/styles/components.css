@@ -30,42 +30,38 @@
 .tinted-sun { background: var(--tint-sun-bg); color: var(--tint-sun-fg); }
 
 /* === Liquid Glass surfaces ===
-   The :before pseudo-element paints a top-light "sheen" that
-   approximates how iOS 26's lensed surfaces refract incoming light.
-   The blurred backdrop + saturate boost is what does the heavy
-   lifting; the sheen and inset highlight are the finishing touches. */
-.glass {
+   Cross-browser baseline (Safari/Chrome/Firefox): translucent fill +
+   blurred-and-saturated backdrop + top-edge specular highlight + soft
+   sheen pseudo-element + lifted drop shadow.
+   On Chromium an @supports block layers a real SVG `feDisplacementMap`
+   on top of the blur for the iOS-26 refraction warp. Other browsers
+   keep the baseline. */
+.glass,
+.glass-strong,
+.glass-control {
   position: relative;
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-highlight), var(--glass-shadow);
+  isolation: isolate;
+}
+.glass {
   background: var(--glass-bg);
   -webkit-backdrop-filter: var(--glass-blur);
   backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-highlight), var(--glass-shadow);
-  isolation: isolate;
-}
-.glass::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: var(--glass-sheen);
-  pointer-events: none;
-  z-index: 0;
-}
-.glass > * {
-  position: relative;
-  z-index: 1;
 }
 .glass-strong {
-  position: relative;
   background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-highlight), var(--glass-shadow);
-  isolation: isolate;
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  backdrop-filter: var(--glass-blur-strong);
 }
-.glass-strong::before {
+.glass-control {
+  background: var(--glass-bg-tint);
+  -webkit-backdrop-filter: var(--glass-blur-control);
+  backdrop-filter: var(--glass-blur-control);
+}
+.glass::before,
+.glass-strong::before,
+.glass-control::before {
   content: '';
   position: absolute;
   inset: 0;
@@ -74,9 +70,28 @@
   pointer-events: none;
   z-index: 0;
 }
-.glass-strong > * {
+.glass > *,
+.glass-strong > *,
+.glass-control > * {
   position: relative;
   z-index: 1;
+}
+
+/* Chromium only: layer the SVG displacement map on top of the existing
+   blur for true refraction. Safari/Firefox skip this entirely and keep
+   the baseline frosted glass — the @supports query gates it because
+   only Chromium currently honors `backdrop-filter: url(#filter)`. */
+@supports (backdrop-filter: url(#liquid-glass)) {
+  .glass {
+    -webkit-backdrop-filter: var(--glass-blur) url(#liquid-glass);
+    backdrop-filter: var(--glass-blur) url(#liquid-glass);
+  }
+  .glass-strong {
+    -webkit-backdrop-filter: var(--glass-blur-strong) url(#liquid-glass);
+    backdrop-filter: var(--glass-blur-strong) url(#liquid-glass);
+  }
+  /* Small controls keep the lighter blur but skip the displacement —
+     the warp reads as noise on tiny surfaces. */
 }
 
 /* === Buttons === */
