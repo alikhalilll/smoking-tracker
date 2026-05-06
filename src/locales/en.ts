@@ -12,6 +12,12 @@ const en = {
     greet_friend: 'friend',
     go_home: 'Go to home',
   },
+  update: {
+    available_title: 'Update available',
+    available_body: 'A new version of Smoking Tracker is ready.',
+    refresh_btn: 'Update',
+    dismiss_btn: 'Later',
+  },
   tabs: {
     home: 'Home',
     history: 'History',

@@ -12,6 +12,12 @@ const ar = {
     greet_friend: 'صديقي',
     go_home: 'الذهاب للرئيسية',
   },
+  update: {
+    available_title: 'تحديث متوفر',
+    available_body: 'إصدار جديد من متعقّب التدخين جاهز.',
+    refresh_btn: 'تحديث',
+    dismiss_btn: 'لاحقًا',
+  },
   tabs: {
     home: 'الرئيسية',
     history: 'السجل',

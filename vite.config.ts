@@ -12,7 +12,11 @@ export default defineConfig({
   plugins: [
     vue(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt' keeps the new service worker in `waiting` state when a
+      // build ships, instead of silently swapping it in. The app reads
+      // that state via `useRegisterSW` and surfaces an "Update available"
+      // banner so installed users can choose when to refresh.
+      registerType: 'prompt',
       includeAssets: ['favicon.svg', 'icon-192.png', 'icon-512.png'],
       manifest: {
         name: 'Smoking Tracker',
