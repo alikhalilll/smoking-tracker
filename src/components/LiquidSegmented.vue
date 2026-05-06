@@ -1,15 +1,16 @@
 <template>
   <!--
-    N-position segmented control. The indicator is a draggable
-    liquid-glass thumb that follows the user's finger between sections
-    and snaps to the nearest one on release.
+    N-position segmented control with the kube.io <Switch> drag flow:
 
-    Drag flow mirrors kube.io's <Switch> (graphics/Switch.tsx):
-      - pointerdown on the thumb starts the gesture
+      - pointerdown anywhere on the control starts a "potential drag"
+        (the article puts mousedown on the thumb, but our thumb is only
+        1/N of the bar so we widen the target to the whole control)
       - window-level mousemove/touchmove updates xDragRatio in [0..N-1]
+        with the same baseRatio + dx/tabWidth math
       - rubber-band overflow past the ends with damping / 22
-      - tap (movement < 4px) advances to the next item
-      - drag past the half-step boundary snaps to the closer side
+      - on pointerup: movement < 4px is a tap (the @click on the tab
+        you released over emits the selection); >= 4px is a drag and
+        we snap to round(xDragRatio), suppressing the trailing click
 
     The thumb is the glass surface — backdrop-filter is applied to it
     via the v-liquid-glass directive with the article's lip bezel
@@ -18,15 +19,15 @@
   <div
     ref="rootEl"
     class="lg-seg"
-    :class="{ 'is-flat': flat }"
+    :class="{ 'is-flat': flat, 'is-pressed': isPressed }"
     role="tablist"
+    @mousedown="onMouseDown"
+    @touchstart.passive="onTouchStart"
   >
     <span
       class="lg-seg-thumb"
       v-liquid-glass="thumbLg"
       :style="thumbStyle"
-      @mousedown="onMouseDown"
-      @touchstart.passive="onTouchStart"
     />
     <button
       v-for="(opt, i) in options"
@@ -36,7 +37,7 @@
       type="button"
       role="tab"
       :aria-selected="isActive(i)"
-      @click="onTabClick(i)"
+      @click="onTabClick(i, $event)"
     >
       <slot name="label" :option="opt" :active="isActive(i)">
         {{ opt.label }}
@@ -203,7 +204,10 @@ function endDrag(clientX: number) {
 }
 
 function onMouseDown(e: MouseEvent) {
-  e.stopPropagation()
+  // Only primary button. Don't preventDefault — the @click on the
+  // child tab is how taps select; we just attach window listeners to
+  // catch any subsequent drag.
+  if (e.button !== 0) return
   startDrag(e.clientX)
   window.addEventListener('mousemove', onWindowMouseMove)
   window.addEventListener('mouseup', onWindowMouseUp)
@@ -211,7 +215,6 @@ function onMouseDown(e: MouseEvent) {
 function onTouchStart(e: TouchEvent) {
   const t = e.touches[0]
   if (!t) return
-  e.stopPropagation()
   startDrag(t.clientX)
   window.addEventListener('touchmove', onWindowTouchMove, { passive: false })
   window.addEventListener('touchend', onWindowTouchEnd)
@@ -244,9 +247,13 @@ function cleanupListeners() {
   window.removeEventListener('touchcancel', onWindowTouchEnd)
 }
 
-function onTabClick(i: number) {
+function onTabClick(i: number, e: MouseEvent) {
+  // The post-drag synthetic click should not register as a selection —
+  // the snap on release already handled it.
   if (movedFlag.value) {
     movedFlag.value = false
+    e.preventDefault()
+    e.stopPropagation()
     return
   }
   const next = props.options[i]
@@ -292,14 +299,22 @@ watch(
   background: var(--card);
   box-shadow: 0 4px 22px rgba(0, 0, 0, 0.10),
               inset 0 1px 0 rgba(255, 255, 255, 0.55);
-  cursor: grab;
+  /* The thumb sits visually above the tab labels so the brand-tinted
+     pill paints on top, but it must NOT capture pointer events —
+     taps and drags need to reach the tab buttons / root listeners. */
   z-index: 0;
+  pointer-events: none;
 }
-.lg-seg-thumb:active {
-  cursor: grabbing;
+.lg-seg.is-pressed .lg-seg-thumb {
   box-shadow: 0 4px 22px rgba(0, 0, 0, 0.10),
               inset 2px 7px 24px rgba(0, 0, 0, 0.09),
               inset -2px -7px 24px rgba(255, 255, 255, 0.09);
+}
+.lg-seg {
+  cursor: grab;
+}
+.lg-seg.is-pressed {
+  cursor: grabbing;
 }
 
 .lg-seg-tab {
