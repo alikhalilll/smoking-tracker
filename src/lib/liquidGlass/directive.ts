@@ -89,10 +89,12 @@ interface State {
   dispMapEl: SVGFEDisplacementMapElement | null
   /** Physically-derived max displacement (px) for the current size. */
   maxDisplacement: number
-  /** Currently rendered scale value (in pixels), driven by the rAF tween. */
+  /** Currently rendered scale value (in pixels), driven by the spring. */
   currentScale: number
   /** Target scale we're animating toward. */
   targetScale: number
+  /** Spring velocity for the scale animation (px / s). */
+  scaleVelocity: number
   /** Active rAF id for the scale tween. */
   tweenRaf: number | null
   /** Pointer-state listeners we attached, so we can detach on unmount. */
@@ -372,35 +374,69 @@ function compute(el: HTMLElement, state: State) {
   state.lastApplied = { w, h }
 }
 
-function easeOutCubic(t: number): number {
-  return 1 - Math.pow(1 - t, 3)
-}
+// Spring-driven scale animation — matches kube.io's
+// `useSpring(scaleRatio)` from the article's Filter component. Replaces
+// the previous easeOutCubic rAF tween so the refraction blooms in /
+// out with the same physics as every other animated value in the spec
+// (see src/lib/liquidGlass/SPEC.md §3).
+const SCALE_SETTLE_EPSILON = 0.0005
 
-function tweenScale(
-  state: State,
-  to: number,
-  durationMs: number
-): void {
+function tweenScale(state: State, to: number, _durationMs: number): void {
   state.targetScale = to
   if (!state.dispMapEl) return
-  if (state.tweenRaf != null) cancelAnimationFrame(state.tweenRaf)
-  const from = state.currentScale
-  if (from === to) return
-  const start = performance.now()
+  // No-op if already at target with no velocity to bleed off.
+  if (
+    state.tweenRaf == null &&
+    Math.abs(state.currentScale - to) < SCALE_SETTLE_EPSILON
+  ) {
+    state.currentScale = to
+    state.dispMapEl.setAttribute('scale', String(to))
+    return
+  }
+  if (state.tweenRaf != null) {
+    // Don't reset the tween — let the existing rAF loop see the new
+    // target via state.targetScale. This preserves velocity so a
+    // mid-flight retarget (e.g. press → release before settling) feels
+    // continuous instead of restarting the easing curve.
+    return
+  }
+  // Spring params: stiffness 1000, damping 80 (the article's xRatio
+  // family). Bookkeeping mirrors useSpring() in src/composables.
+  const stiffness = 1000
+  const damping = 80
+  const mass = 1
+
+  let lastTime = performance.now()
   const tick = (now: number) => {
-    const elapsed = now - start
-    const t = Math.min(1, elapsed / Math.max(1, durationMs))
-    const eased = easeOutCubic(t)
-    const value = from + (to - from) * eased
-    state.currentScale = value
+    let dt = (now - lastTime) / 1000
+    if (!Number.isFinite(dt) || dt <= 0) dt = 1 / 60
+    if (dt > 0.05) dt = 0.05
+    lastTime = now
+
+    const target = state.targetScale
+    const force =
+      -stiffness * (state.currentScale - target) -
+      damping * state.scaleVelocity
+    state.scaleVelocity += (force / mass) * dt
+    state.currentScale += state.scaleVelocity * dt
+
     if (state.dispMapEl) {
-      state.dispMapEl.setAttribute('scale', String(value))
+      state.dispMapEl.setAttribute('scale', String(state.currentScale))
     }
-    if (t < 1) {
-      state.tweenRaf = requestAnimationFrame(tick)
-    } else {
+
+    const settled =
+      Math.abs(state.currentScale - target) < SCALE_SETTLE_EPSILON &&
+      Math.abs(state.scaleVelocity) < SCALE_SETTLE_EPSILON
+    if (settled) {
+      state.currentScale = target
+      state.scaleVelocity = 0
+      if (state.dispMapEl) {
+        state.dispMapEl.setAttribute('scale', String(target))
+      }
       state.tweenRaf = null
+      return
     }
+    state.tweenRaf = requestAnimationFrame(tick)
   }
   state.tweenRaf = requestAnimationFrame(tick)
 }
@@ -494,6 +530,7 @@ export const vLiquidGlass: Directive<HTMLElement, LiquidGlassOptions> = {
       maxDisplacement: 0,
       currentScale: 0,
       targetScale: 0,
+      scaleVelocity: 0,
       tweenRaf: null,
       detachListeners: null,
       refreshState: null,
