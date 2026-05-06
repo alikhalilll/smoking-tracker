@@ -550,7 +550,7 @@ function shareText(): string {
 }
 
 async function onShare(): Promise<void> {
-  const result = await share({ title: 'Smoke Tracker', text: shareText() })
+  const result = await share({ title: 'Smoking Tracker', text: shareText() })
   if (result.via === 'clipboard' && result.ok) {
     showToast(t('share.copied'), 'success')
   }

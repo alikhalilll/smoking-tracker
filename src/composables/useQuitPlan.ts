@@ -66,6 +66,27 @@ export function generateTargets(
   return targets
 }
 
+/** Map a baseline cigarettes/day to a recommended intensity. The bands
+ *  are tuned so the daily step-down is gentle enough to stick to but
+ *  not so slow it never converges. */
+export function suggestIntensity(baseline: number): QuitIntensity {
+  if (baseline <= 5) return 'quick'
+  if (baseline <= 12) return 'standard'
+  if (baseline <= 20) return 'gradual'
+  return 'extended'
+}
+
+export interface QuitSuggestion {
+  baseline: number
+  intensity: QuitIntensity
+  durationDays: number
+  /** Number of distinct days in `byDay` we used to compute the baseline. */
+  daysOfHistory: number
+  /** false when there are fewer than 3 days of history. The card should
+   *  show an empty-state instead of a "Start" CTA. */
+  ready: boolean
+}
+
 export interface UseQuitPlan {
   plan: ComputedRef<QuitPlan | null>
   isActive: ComputedRef<boolean>
@@ -76,6 +97,7 @@ export interface UseQuitPlan {
   planDays: ComputedRef<QuitDay[]>
   progress: ComputedRef<QuitProgress | null>
   suggestedBaseline: ComputedRef<number>
+  suggestion: ComputedRef<QuitSuggestion>
 }
 
 export function useQuitPlan(
@@ -174,6 +196,23 @@ export function useQuitPlan(
     return Math.max(1, Math.round(dailyAvg.value))
   })
 
+  const suggestion = computed<QuitSuggestion>(() => {
+    const today = getToday()
+    let counted = 0
+    for (let i = 0; i < 7; i++) {
+      if (byDay.value[addDays(today, -i)] != null) counted++
+    }
+    const baseline = suggestedBaseline.value
+    const intensity = suggestIntensity(baseline)
+    return {
+      baseline,
+      intensity,
+      durationDays: INTENSITY_DURATIONS[intensity],
+      daysOfHistory: counted,
+      ready: counted >= 3,
+    }
+  })
+
   return {
     plan,
     isActive,
@@ -184,5 +223,6 @@ export function useQuitPlan(
     planDays,
     progress,
     suggestedBaseline,
+    suggestion,
   }
 }

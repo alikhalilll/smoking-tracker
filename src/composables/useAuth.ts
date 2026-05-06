@@ -1,6 +1,23 @@
 import { ref, computed, type ComputedRef, type Ref } from 'vue'
-import type { User } from '@supabase/supabase-js'
+import type { User, UserIdentity, Provider } from '@supabase/supabase-js'
 import { supabase } from '../supabase'
+
+export type SocialProvider = 'google' | 'apple' | 'facebook' | 'github'
+
+export const ALL_SOCIAL_PROVIDERS: ReadonlyArray<SocialProvider> = [
+  'google',
+  'apple',
+  'facebook',
+  'github',
+]
+
+/** Display label for a provider (used in Settings → Linked accounts). */
+export const PROVIDER_LABELS: Record<SocialProvider, string> = {
+  google: 'Google',
+  apple: 'Apple',
+  facebook: 'Facebook',
+  github: 'GitHub',
+}
 
 const user: Ref<User | null> = ref(null)
 const loading: Ref<boolean> = ref(true)
@@ -40,6 +57,26 @@ export interface UseAuth {
     email: string,
     password: string
   ) => Promise<{ ok: boolean; error?: string; needsConfirm?: boolean }>
+  /** Returns true if an account with this email already exists. Backed by
+   *  the `email_exists` SECURITY DEFINER RPC (see SUPABASE_SETUP.md). */
+  checkEmailExists: (email: string) => Promise<{ ok: boolean; exists?: boolean; error?: string }>
+  /** Redirects to the OAuth provider. Supabase's PKCE flow is already
+   *  configured in supabase.ts; the callback is handled by
+   *  detectSessionInUrl on return. */
+  signInWithProvider: (
+    provider: SocialProvider
+  ) => Promise<{ ok: boolean; error?: string }>
+  /** Link an OAuth provider to the *currently signed-in* user. Requires
+   *  the "Manual Linking" toggle to be enabled in Supabase Auth settings.
+   *  Redirects out to the provider, then returns to the app. */
+  linkIdentity: (
+    provider: SocialProvider
+  ) => Promise<{ ok: boolean; error?: string }>
+  /** Remove a previously linked identity. The user keeps their account
+   *  as long as at least one identity remains. */
+  unlinkIdentity: (
+    identity: UserIdentity
+  ) => Promise<{ ok: boolean; error?: string }>
   signOut: () => Promise<void>
   /** Permanently delete the current user's account + all server data.
    *  Requires the `delete_account()` SQL function with SECURITY DEFINER
@@ -106,6 +143,59 @@ export function useAuth(): UseAuth {
       // is created but no session is returned until they confirm.
       const needsConfirm = !data.session
       return { ok: true, needsConfirm }
+    },
+
+    async checkEmailExists(
+      email: string
+    ): Promise<{ ok: boolean; exists?: boolean; error?: string }> {
+      if (!supabase) return { ok: false, error: 'Supabase not configured' }
+      const { data, error } = await supabase.rpc('email_exists', {
+        p_email: email.trim(),
+      })
+      if (error) return { ok: false, error: error.message }
+      return { ok: true, exists: Boolean(data) }
+    },
+
+    async signInWithProvider(
+      provider: SocialProvider
+    ): Promise<{ ok: boolean; error?: string }> {
+      if (!supabase) return { ok: false, error: 'Supabase not configured' }
+      // PKCE flow returns the user to the same origin + base path. The
+      // SDK's detectSessionInUrl picks up the auth code on return.
+      const redirectTo = window.location.origin + import.meta.env.BASE_URL
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider as Provider,
+        options: { redirectTo },
+      })
+      return error ? { ok: false, error: error.message } : { ok: true }
+    },
+
+    async linkIdentity(
+      provider: SocialProvider
+    ): Promise<{ ok: boolean; error?: string }> {
+      if (!supabase) return { ok: false, error: 'Supabase not configured' }
+      const redirectTo = window.location.origin + import.meta.env.BASE_URL
+      // linkIdentity requires "Manual Linking" to be enabled in the
+      // Supabase project's Auth settings. If it isn't, Supabase returns
+      // a 422 with a clear message — we surface that as-is.
+      const { error } = await supabase.auth.linkIdentity({
+        provider: provider as Provider,
+        options: { redirectTo },
+      })
+      return error ? { ok: false, error: error.message } : { ok: true }
+    },
+
+    async unlinkIdentity(
+      identity: UserIdentity
+    ): Promise<{ ok: boolean; error?: string }> {
+      if (!supabase) return { ok: false, error: 'Supabase not configured' }
+      const { error } = await supabase.auth.unlinkIdentity(identity)
+      if (error) return { ok: false, error: error.message }
+      // Refresh the session so user.identities reflects the removal
+      // immediately in the UI.
+      const { data } = await supabase.auth.getSession()
+      user.value = data.session?.user ?? null
+      return { ok: true }
     },
 
     async signOut(): Promise<void> {

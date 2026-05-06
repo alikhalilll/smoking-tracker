@@ -16,11 +16,13 @@
     "@internationalized/date": "^3.12.1",
     "@supabase/supabase-js": "^2.105.1",
     "@vitejs/plugin-vue": "^6.0.6",
+    "chart.js": "^4.5.1",
     "reka-ui": "^2.9.6",
     "vaul-vue": "^0.4.1",
     "vite": "^7.3.2",
     "vite-plugin-pwa": "^1.2.0",
-    "vue": "^3.5.33"
+    "vue": "^3.5.33",
+    "vue-chartjs": "^5.3.3"
   },
   "type": "module",
   "devDependencies": {

@@ -5,7 +5,41 @@
       <div class="section-title">{{ t('quit.title') }}</div>
       <div class="intro">{{ t('quit.intro') }}</div>
 
-      <div v-reveal class="baseline-card" data-onboard="quit-baseline">
+      <!-- Suggestion hero. When we have ≥3 days of history we offer a
+           one-tap plan; otherwise we show a soft empty state. The
+           "Customize" button reveals the manual baseline + intensity
+           controls below. -->
+      <div v-if="!customizing" v-reveal class="suggestion-card">
+        <div class="suggestion-glyph">✨</div>
+        <div class="suggestion-title">
+          {{ suggestion.ready ? t('quit.suggestion.title') : t('quit.suggestion.empty_title') }}
+        </div>
+        <div class="suggestion-body">
+          <template v-if="suggestion.ready">
+            {{ t('quit.suggestion.body', {
+              history: suggestion.daysOfHistory,
+              intensity: t(`quit.intensities.${suggestion.intensity}.label`),
+              baseline: formatNumber(suggestion.baseline),
+              days: suggestion.durationDays,
+            }) }}
+          </template>
+          <template v-else>{{ t('quit.suggestion.empty_body') }}</template>
+        </div>
+        <div class="suggestion-actions">
+          <button
+            v-if="suggestion.ready"
+            class="btn btn-primary"
+            @click="emit('start', { intensity: suggestion.intensity, baseline: suggestion.baseline })"
+          >
+            {{ t('quit.suggestion.cta') }}
+          </button>
+          <button class="btn btn-ghost" @click="customizing = true">
+            {{ t('quit.suggestion.customize') }}
+          </button>
+        </div>
+      </div>
+
+      <div v-if="customizing" v-reveal class="baseline-card" data-onboard="quit-baseline">
         <div class="baseline-label">{{ t('quit.suggested_baseline') }}</div>
         <div class="baseline-row">
           <button class="round-btn" @click="decBaseline">−</button>
@@ -15,10 +49,10 @@
         <div class="baseline-hint">{{ t('quit.baseline_hint') }}</div>
       </div>
 
-      <div class="section-title" style="margin-top: 1.75rem">
+      <div v-if="customizing" class="section-title" style="margin-top: 1.75rem">
         {{ t('quit.pick_pace') }}
       </div>
-      <div class="intensity-list" data-onboard="quit-intensity-list">
+      <div v-if="customizing" class="intensity-list" data-onboard="quit-intensity-list">
         <button
           v-for="intensity in intensities"
           :key="intensity"
@@ -43,7 +77,7 @@
         </button>
       </div>
 
-      <div v-if="suggestedBaseline < 3" class="muted-line">
+      <div v-if="customizing && suggestedBaseline < 3" class="muted-line">
         {{ t('quit.not_enough_logs') }}
       </div>
     </template>
@@ -221,6 +255,7 @@ import {
   INTENSITY_DURATIONS,
   generateTargets,
   ALL_INTENSITIES,
+  type QuitSuggestion,
 } from '../composables/useQuitPlan'
 import { useI18n, intlLocale, tArray, formatNumber } from '../i18n'
 import { useConfirm } from '../composables/useConfirm'
@@ -241,6 +276,7 @@ interface Props {
   planDays: QuitDay[]
   progress: QuitProgress | null
   suggestedBaseline: number
+  suggestion: QuitSuggestion
   smokeFreeDays: number
 }
 
@@ -254,6 +290,11 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const intensities = ALL_INTENSITIES
+
+// Hidden until the user taps "Customize" on the suggestion card. While
+// the plan is still inactive and the suggestion is shown, we hold back
+// the manual setup form so the screen has a single primary CTA.
+const customizing = ref(false)
 
 const baselineInput = ref(props.suggestedBaseline)
 
@@ -412,6 +453,35 @@ function shortDate(dateStr: string): string {
   color: var(--muted);
   line-height: 1.55;
   margin-bottom: 1.5rem;
+}
+.suggestion-card {
+  background: linear-gradient(135deg, var(--brand-soft), var(--accent-soft));
+  border-radius: var(--radius-card);
+  padding: 22px 18px;
+  margin-bottom: 1.25rem;
+  text-align: start;
+}
+.suggestion-glyph {
+  font-size: 24px;
+  line-height: 1;
+  margin-bottom: 10px;
+}
+.suggestion-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.suggestion-body {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+.suggestion-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .baseline-card {
   background: linear-gradient(135deg, var(--brand-soft), var(--accent-soft));
