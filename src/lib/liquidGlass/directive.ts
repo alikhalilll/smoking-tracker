@@ -64,6 +64,13 @@ export interface LiquidGlassOptions {
   /** Tween duration in ms when transitioning between scale states. Default 220. */
   transitionMs?: number
   /**
+   * Externally pin the refraction at the `active` scale, regardless of
+   * pointer position. Use this to drive the effect from app state — e.g.
+   * "user is currently dragging this thumb". Setting it back to false
+   * tweens out via `transitionMs`.
+   */
+  forceActive?: boolean
+  /**
    * Extra CSS backdrop-filter chained BEFORE the SVG filter — e.g. to
    * keep the existing .glass `blur() saturate()` as the underlying
    * frosted layer. Default `var(--glass-blur)`. Pass an empty string
@@ -90,6 +97,8 @@ interface State {
   tweenRaf: number | null
   /** Pointer-state listeners we attached, so we can detach on unmount. */
   detachListeners: (() => void) | null
+  /** Re-evaluates the current pointer/force state and retweens. */
+  refreshState: (() => void) | null
 }
 
 const STATE_KEY = '__liquidGlass'
@@ -153,7 +162,7 @@ function setAttr(el: SVGElement, attrs: Record<string, string | number>) {
 
 function makeFilter(
   id: string,
-  opts: Required<Omit<LiquidGlassOptions, 'scaleStates'>>,
+  opts: Required<Omit<LiquidGlassOptions, 'scaleStates' | 'forceActive'>>,
   rectW: number,
   rectH: number,
   displacementUrl: string,
@@ -272,9 +281,11 @@ function makeFilter(
 
 function compute(el: HTMLElement, state: State) {
   if (!supportsBackdropFilterUrl()) return
-  const rect = el.getBoundingClientRect()
-  const w = Math.round(rect.width)
-  const h = Math.round(rect.height)
+  // Use offsetWidth/Height so a CSS transform (scale, etc) on the host
+  // doesn't shrink the displacement map. backdrop-filter is applied in
+  // the un-transformed coordinate space anyway.
+  const w = el.offsetWidth || Math.round(el.getBoundingClientRect().width)
+  const h = el.offsetHeight || Math.round(el.getBoundingClientRect().height)
   if (w < 4 || h < 4) return
   if (
     state.lastApplied &&
@@ -285,7 +296,7 @@ function compute(el: HTMLElement, state: State) {
   }
 
   const o = state.options
-  const opts: Required<Omit<LiquidGlassOptions, 'scaleStates'>> = {
+  const opts: Required<Omit<LiquidGlassOptions, 'scaleStates' | 'forceActive'>> = {
     surface: o.surface ?? 'convex',
     bezel: o.bezel ?? 8,
     radius: o.radius ?? Math.min(w, h) / 2,
@@ -395,24 +406,35 @@ function tweenScale(
 }
 
 function attachPointerStates(el: HTMLElement, state: State): () => void {
-  const o = state.options
-  const states = o.scaleStates
-  if (!states) return () => {}
-
-  const idle = states.idle ?? o.scaleRatio ?? 1
-  const hover = states.hover ?? states.active ?? idle
-  const active = states.active ?? hover
-
-  const transition = o.transitionMs ?? 220
-
-  // We use Pointer Events so touch and mouse share the same path.
   let isHovering = false
   let isPressed = false
 
+  // Read options on every tick so reactive updates (forceActive, parameter
+  // changes from `updated()`) take effect without re-binding listeners.
   const update = () => {
-    const ratio = isPressed ? active : isHovering ? hover : idle
+    const o = state.options
+    const states = o.scaleStates
+    // Without scaleStates and forceActive, there's nothing interactive.
+    if (!states && !o.forceActive) return
+
+    const idle = states?.idle ?? o.scaleRatio ?? 1
+    const hover = states?.hover ?? states?.active ?? idle
+    const active = states?.active ?? hover
+    const transition = o.transitionMs ?? 220
+
+    // forceActive overrides pointer state — used by drag interactions
+    // that need the warp to stay on while the pointer roams.
+    const ratio = o.forceActive
+      ? active
+      : isPressed
+      ? active
+      : isHovering
+      ? hover
+      : idle
     tweenScale(state, state.maxDisplacement * ratio, transition)
   }
+
+  state.refreshState = update
 
   const onEnter = () => {
     isHovering = true
@@ -438,12 +460,16 @@ function attachPointerStates(el: HTMLElement, state: State): () => void {
   el.addEventListener('pointerup', onUp)
   el.addEventListener('pointercancel', onUp)
 
+  // Apply current state immediately (handles forceActive on mount).
+  update()
+
   return () => {
     el.removeEventListener('pointerenter', onEnter)
     el.removeEventListener('pointerleave', onLeave)
     el.removeEventListener('pointerdown', onDown)
     el.removeEventListener('pointerup', onUp)
     el.removeEventListener('pointercancel', onUp)
+    state.refreshState = null
   }
 }
 
@@ -470,6 +496,7 @@ export const vLiquidGlass: Directive<HTMLElement, LiquidGlassOptions> = {
       targetScale: 0,
       tweenRaf: null,
       detachListeners: null,
+      refreshState: null,
     }
     el[STATE_KEY] = state
     // Initial pass — wait one frame so layout has settled.
@@ -487,11 +514,27 @@ export const vLiquidGlass: Directive<HTMLElement, LiquidGlassOptions> = {
     const prev = state.options
     if (JSON.stringify(prev) === JSON.stringify(next)) return
     state.options = next
-    state.lastApplied = null
-    // Re-attach pointer listeners so scaleStates changes take effect.
-    state.detachListeners?.()
-    state.detachListeners = attachPointerStates(el, state)
-    schedule(el, state)
+    // If only the interactive bits changed (forceActive, scaleStates,
+    // transitionMs), don't rebuild the displacement maps — just retween.
+    const sizeAffectingKeys: Array<keyof LiquidGlassOptions> = [
+      'surface',
+      'bezel',
+      'radius',
+      'glassThickness',
+      'refractiveIndex',
+      'specularOpacity',
+      'saturation',
+      'blur',
+      'chain',
+    ]
+    const sizeChanged = sizeAffectingKeys.some(
+      (k) => (prev as Record<string, unknown>)[k] !== (next as Record<string, unknown>)[k]
+    )
+    if (sizeChanged) {
+      state.lastApplied = null
+      schedule(el, state)
+    }
+    state.refreshState?.()
   },
   unmounted(el: ElementWithState) {
     const state = el[STATE_KEY]
