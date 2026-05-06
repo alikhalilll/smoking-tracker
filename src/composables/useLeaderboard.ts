@@ -2,6 +2,7 @@ import { computed, ref, watch, type ComputedRef, type Ref } from 'vue'
 import { supabase } from '../supabase'
 import { useAuth } from './useAuth'
 import { formatLocalDate, getToday, daysBetween } from './useDate'
+import { validateDisplayName } from '../utils/nameValidator'
 import type { AppData, LeaderboardEntry } from '../types'
 
 const STORAGE_KEY = 'smoking-tracker-leaderboard-prefs'
@@ -263,7 +264,15 @@ export function useLeaderboard(data: Ref<AppData>): UseLeaderboard {
   }
 
   function setDisplayName(name: string): void {
-    prefs.value = { ...prefs.value, displayName: name }
+    // Defense in depth: block invalid names from being persisted, even
+    // if a caller bypassed the UI validation. The empty-string case is
+    // allowed so users can clear the field before re-entering.
+    const trimmed = name.trim()
+    if (trimmed.length > 0) {
+      const v = validateDisplayName(trimmed)
+      if (!v.ok) return
+    }
+    prefs.value = { ...prefs.value, displayName: trimmed }
     savePrefs(prefs.value)
     if (prefs.value.optedIn) void pushOwnRow().then(refresh)
   }

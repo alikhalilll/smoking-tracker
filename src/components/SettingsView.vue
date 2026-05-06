@@ -101,7 +101,7 @@
           </div>
         </div>
 
-        <div class="linked-list">
+        <div class="linked-list" :class="{ 'linked-list-disabled': !socialEnabled }">
           <div
             v-for="p in socialProviders"
             :key="p"
@@ -109,11 +109,14 @@
           >
             <span class="linked-icon" v-html="PROVIDER_ICONS[p]" />
             <span class="linked-label">{{ PROVIDER_LABELS[p] }}</span>
-            <span v-if="isLinked(p)" class="chip chip-mint linked-chip">
+            <span v-if="socialEnabled && isLinked(p)" class="chip chip-mint linked-chip">
               {{ t('cloud.linked_chip') }}
             </span>
+            <span v-if="!socialEnabled" class="chip chip-brand linked-chip">
+              {{ t('cloud.coming_soon') }}
+            </span>
             <button
-              v-if="!isLinked(p)"
+              v-if="socialEnabled && !isLinked(p)"
               class="btn btn-ghost small-btn"
               :disabled="linkingProvider !== null"
               @click="onLink(p)"
@@ -122,7 +125,7 @@
               {{ linkingProvider === p ? '…' : t('cloud.link_btn') }}
             </button>
             <button
-              v-else
+              v-else-if="socialEnabled"
               class="btn btn-ghost small-btn"
               :disabled="unlinkingProvider !== null || linkedCount <= 1"
               :title="linkedCount <= 1 ? t('cloud.unlink_last_blocked') : undefined"
@@ -134,7 +137,11 @@
           </div>
         </div>
 
-        <div v-if="linkError" class="error-chip" style="margin-top: 12px">
+        <p v-if="!socialEnabled" class="muted-line" style="margin-top: 12px">
+          {{ t('cloud.linked_coming_soon') }}
+        </p>
+
+        <div v-if="socialEnabled && linkError" class="error-chip" style="margin-top: 12px">
           {{ linkError }}
         </div>
       </div>
@@ -160,14 +167,19 @@
           v-model="leaderboardName"
           type="text"
           class="field-input"
+          :class="{ 'field-input-error': nameError }"
           :placeholder="t('leaderboard_settings.display_name_placeholder')"
+          :maxlength="DISPLAY_NAME_LIMITS.max"
           @blur="onDisplayNameBlur"
         />
+        <div v-if="nameError" class="error-chip" style="margin-top: 8px">
+          {{ nameError }}
+        </div>
         <div class="row-between" style="margin-top: 14px">
           <span class="info-label">{{ t('leaderboard_settings.enable') }}</span>
           <Toggle
             :model-value="leaderboard.prefs.value.optedIn"
-            :disabled="!leaderboardName.trim() && !leaderboard.prefs.value.optedIn"
+            :disabled="!nameValid && !leaderboard.prefs.value.optedIn"
             @update:model-value="onLeaderboardToggle"
           />
         </div>
@@ -618,6 +630,7 @@ import {
   useAuth,
   ALL_SOCIAL_PROVIDERS,
   PROVIDER_LABELS,
+  SOCIAL_LOGIN_ENABLED,
   type SocialProvider,
 } from '../composables/useAuth'
 import { useEconomy, formatMoney } from '../composables/useEconomy'
@@ -625,6 +638,7 @@ import { useHaptics } from '../composables/useHaptics'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
 import { shareAppLink } from '../composables/useShare'
+import { validateDisplayName, DISPLAY_NAME_LIMITS } from '../utils/nameValidator'
 import { useOnboarding } from '../composables/useOnboarding'
 import { isSupabaseConfigured } from '../supabase'
 import Toggle from './Toggle.vue'
@@ -818,6 +832,7 @@ async function onShareApp(): Promise<void> {
 // --- Linked accounts ------------------------------------------------
 
 const socialProviders = ALL_SOCIAL_PROVIDERS
+const socialEnabled = SOCIAL_LOGIN_ENABLED
 
 const PROVIDER_ICONS: Record<SocialProvider, string> = {
   google: `<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.23c0-.7-.06-1.36-.18-2H12v3.79h5.39a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.9-1.75 2.97-4.33 2.97-7.32z"/><path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.45l-3.24-2.5c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.06v2.59A10 10 0 0 0 12 22z"/><path fill="#FBBC05" d="M6.41 13.89A6 6 0 0 1 6.1 12c0-.66.11-1.3.31-1.89V7.52H3.06A10 10 0 0 0 2 12c0 1.61.39 3.13 1.06 4.48l3.35-2.59z"/><path fill="#EA4335" d="M12 5.99c1.47 0 2.79.5 3.83 1.5l2.87-2.87C16.95 2.99 14.7 2 12 2A10 10 0 0 0 3.06 7.52l3.35 2.59C7.2 7.75 9.4 5.99 12 5.99z"/></svg>`,
@@ -1151,8 +1166,32 @@ const leaderboardName = ref(
   props.leaderboard?.prefs.value.displayName ?? ''
 )
 
+const nameValidation = computed(() =>
+  validateDisplayName(leaderboardName.value)
+)
+const nameValid = computed(() => nameValidation.value.ok)
+const nameError = computed(() => {
+  // Hide the error while the field is empty so the placeholder reads
+  // cleanly; "must be at least 2 chars" only fires once the user types.
+  if (leaderboardName.value.length === 0) return null
+  if (nameValidation.value.ok) return null
+  switch (nameValidation.value.reason) {
+    case 'too_short':
+      return t('leaderboard_settings.name_too_short', { min: DISPLAY_NAME_LIMITS.min })
+    case 'too_long':
+      return t('leaderboard_settings.name_too_long', { max: DISPLAY_NAME_LIMITS.max })
+    case 'banned':
+      return t('leaderboard_settings.name_banned')
+    case 'invalid_chars':
+      return t('leaderboard_settings.name_invalid_chars')
+    default:
+      return null
+  }
+})
+
 function onDisplayNameBlur(): void {
   if (!props.leaderboard) return
+  if (!nameValid.value) return
   const trimmed = leaderboardName.value.trim()
   if (trimmed !== props.leaderboard.prefs.value.displayName) {
     props.leaderboard.setDisplayName(trimmed)
@@ -1162,8 +1201,8 @@ function onDisplayNameBlur(): void {
 async function onLeaderboardToggle(): Promise<void> {
   if (!props.leaderboard) return
   const next = !props.leaderboard.prefs.value.optedIn
-  if (next && !leaderboardName.value.trim()) return
-  // Make sure the latest typed name is saved before opting in.
+  // Going from off→on requires a valid name; off→off is always allowed.
+  if (next && !nameValid.value) return
   if (next) props.leaderboard.setDisplayName(leaderboardName.value.trim())
   await props.leaderboard.setOptIn(next)
 }
@@ -1465,6 +1504,11 @@ async function handleReset(): Promise<void> {
 .linked-chip {
   margin-inline-end: 6px;
 }
+.linked-list-disabled {
+  filter: grayscale(0.35);
+  opacity: 0.78;
+  pointer-events: none;
+}
 
 .error-chip {
   margin-top: 10px;
@@ -1474,6 +1518,14 @@ async function handleReset(): Promise<void> {
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
+}
+.field-input-error {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 4px var(--danger-soft);
+}
+.field-input-error:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 4px var(--danger-soft);
 }
 
 /* Reminder detail */
