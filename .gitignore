@@ -44,6 +44,9 @@ coverage
 # Claude Code local config (per-user permission allowlist, etc.)
 .claude/
 
+# Local-only docs (audit artifacts, scratch notes, etc.)
+docs/
+
 # Supabase CLI local state — keep `supabase/functions/` and
 # `supabase/config.toml` committed; the rest is per-machine scratch
 # and may contain secrets.
