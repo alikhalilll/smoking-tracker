@@ -46,6 +46,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useHaptics } from '../composables/useHaptics'
+import { useSpring } from '../composables/useSpring'
 
 interface Props {
   modelValue: boolean
@@ -87,39 +88,89 @@ const initialPointerX = ref(0)
 const movedFlag = ref(false)
 
 // `active` is the source for opacity / scale / filter intensity.
-const active = computed(() => (isPressed.value ? 1 : 0))
+const activeRaw = computed(() => (isPressed.value ? 1 : 0))
+
 // Background opacity on the thumb: 1 at rest → 0.1 while pressed.
-const thumbBgOpacity = computed(() => 1 - 0.9 * active.value)
-// Thumb scale tween input.
-const thumbScale = computed(
+// Spring stiffness/damping verbatim from Switch.tsx backgroundOpacity.
+const thumbBgOpacityRaw = computed(() => 1 - 0.9 * activeRaw.value)
+const thumbBgOpacity = useSpring(thumbBgOpacityRaw, {
+  stiffness: 2000,
+  damping: 80,
+})
+
+// Thumb scale: 0.65 → 0.9, spring stiffness/damping from Switch.tsx
+// thumbScale.
+const thumbScaleRaw = computed(
   () =>
     THUMB_REST_SCALE +
-    (THUMB_ACTIVE_SCALE - THUMB_REST_SCALE) * active.value
+    (THUMB_ACTIVE_SCALE - THUMB_REST_SCALE) * activeRaw.value
 )
-// SVG filter scale ratio = (0.4 + 0.5·active) × refractionBase.
-const filterScaleRatio = computed(
-  () => (0.4 + 0.5 * active.value) * REFRACTION_BASE
+const thumbScale = useSpring(thumbScaleRaw, {
+  stiffness: 2000,
+  damping: 80,
+})
+
+// SVG filter scale ratio = (0.4 + 0.5·active) × refractionBase, then
+// spring-smoothed.
+const filterScaleRatioRaw = computed(
+  () => (0.4 + 0.5 * activeRaw.value) * REFRACTION_BASE
 )
-// While pressed, considerChecked uses xDragRatio; otherwise checked.
-const considerChecked = computed(() =>
-  isPressed.value ? xDragRatio.value > 0.5 : isOn.value
+const filterScaleRatio = useSpring(filterScaleRatioRaw)
+
+// During drag, considerChecked uses xDragRatio; otherwise checked.
+const considerCheckedRaw = computed(() =>
+  isPressed.value ? (xDragRatio.value > 0.5 ? 1 : 0) : isOn.value ? 1 : 0
 )
-// Resolved x ratio for transform (during drag follows xDragRatio).
-const xRatio = computed(() =>
+// Spring-smoothed (damping/stiffness from Switch.tsx backgroundColor).
+const considerChecked = useSpring(considerCheckedRaw, {
+  stiffness: 1000,
+  damping: 80,
+})
+
+// xRatio: thumb position ratio in [0..1]. During drag it follows
+// xDragRatio (which itself includes rubber-band overflow), otherwise
+// it's the discrete on/off. Spring stiffness/damping from Switch.tsx.
+const xRatioTarget = computed(() =>
   isPressed.value ? xDragRatio.value : isOn.value ? 1 : 0
 )
+const xRatio = useSpring(xRatioTarget, {
+  stiffness: 1000,
+  damping: 80,
+})
+
+// Mix two hex colors with alpha. Used to crossfade the track.
+function mixHex(a: string, b: string, t: number): string {
+  // Both inputs are 8-char hex (#RRGGBBAA) from the article.
+  const ax = parseInt(a.slice(1, 3), 16)
+  const ay = parseInt(a.slice(3, 5), 16)
+  const az = parseInt(a.slice(5, 7), 16)
+  const aa = parseInt(a.slice(7, 9), 16)
+  const bx = parseInt(b.slice(1, 3), 16)
+  const by = parseInt(b.slice(3, 5), 16)
+  const bz = parseInt(b.slice(5, 7), 16)
+  const ba = parseInt(b.slice(7, 9), 16)
+  const ti = Math.max(0, Math.min(1, t))
+  const r = Math.round(ax + (bx - ax) * ti)
+  const g = Math.round(ay + (by - ay) * ti)
+  const bl = Math.round(az + (bz - az) * ti)
+  const al = Math.round(aa + (ba - aa) * ti)
+  return `rgba(${r}, ${g}, ${bl}, ${(al / 255).toFixed(3)})`
+}
 
 // === Styles =========================================================
 const trackStyle = computed(() => ({
   width: `${SLIDER_WIDTH}px`,
   height: `${SLIDER_HEIGHT}px`,
   borderRadius: `${SLIDER_HEIGHT / 2}px`,
-  backgroundColor: considerChecked.value ? '#3BBF4EEE' : '#94949F77',
+  // Track color crossfades between off-grey and on-green driven by the
+  // spring on considerChecked — same colors as the article.
+  backgroundColor: mixHex('#94949F77', '#3BBF4EEE', considerChecked.value),
 }))
 
 const thumbStyle = computed(() => {
   const x = xRatio.value * TRAVEL
   const baseShadow = '0 4px 22px rgba(0,0,0,0.1)'
+  // Inset shadow appears only while pressed (verbatim from the article).
   const pressedShadow = isPressed.value
     ? ', inset 2px 7px 24px rgba(0,0,0,0.09), inset -2px -7px 24px rgba(255,255,255,0.09)'
     : ''
@@ -135,11 +186,9 @@ const thumbStyle = computed(() => {
     transform: `translateY(-50%) translateX(${x}px) scale(${thumbScale.value})`,
     backgroundColor: `rgba(255, 255, 255, ${thumbBgOpacity.value})`,
     boxShadow: baseShadow + pressedShadow,
-    // Disable transitions during drag for instant follow; let the spring-y
-    // CSS easing handle the snap once released.
-    transition: isDragging.value
-      ? 'none'
-      : 'transform 200ms cubic-bezier(0.2, 0.9, 0.2, 1), background-color 120ms cubic-bezier(0.2, 0.9, 0.2, 1)',
+    // No CSS transitions — every animated value is spring-driven by the
+    // useSpring composables above, matching the article verbatim.
+    transition: 'none',
   }
 })
 
@@ -282,9 +331,8 @@ onBeforeUnmount(() => {
   /* Allow vertical page scroll, but block horizontal so the drag math
      isn't fighting the browser's gesture handling. */
   touch-action: pan-y;
-  /* Track background transition matches the article's spring
-     (damping 80, stiffness 1000). */
-  transition: background-color 200ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  /* Track background is set inline from a JS-driven spring, no CSS
+     transition needed — matches the article's spring on backgroundColor. */
   user-select: none;
   -webkit-user-select: none;
   outline: none;
