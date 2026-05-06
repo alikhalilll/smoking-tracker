@@ -55,6 +55,7 @@ import {
   watch,
 } from 'vue'
 import { useHaptics } from '../composables/useHaptics'
+import { useSpring } from '../composables/useSpring'
 
 interface Option<V> {
   value: V
@@ -83,11 +84,28 @@ const containerHeight = ref(0)
 const PADDING = computed(() => props.trackPadding ?? 4)
 
 const N = computed(() => props.options.length)
+// Width of one tab slot — the *visible* thumb at rest matches this.
 const tabWidth = computed(() => {
   if (!containerWidth.value || !N.value) return 0
   return (containerWidth.value - PADDING.value * 2) / N.value
 })
-const thumbHeight = computed(() => Math.max(0, containerHeight.value - PADDING.value * 2))
+const trackHeight = computed(() => Math.max(0, containerHeight.value - PADDING.value * 2))
+
+// Geometry constants pulled from the article: thumb is bigger than its
+// visible slot, scaled DOWN at rest so its bezel stays inside the
+// track, and grows toward 0.9 when active for the "splash" effect.
+const THUMB_REST_SCALE = 0.65
+const THUMB_ACTIVE_SCALE = 0.9
+// Actual (unscaled) thumb dims. Multiplying by 1/REST_SCALE keeps the
+// rest-state visual size equal to the tab slot (and the active scale
+// then overflows slightly into neighbors — same as Switch.tsx).
+const thumbActualWidth = computed(() => tabWidth.value / THUMB_REST_SCALE)
+const thumbActualHeight = computed(
+  () => trackHeight.value / THUMB_REST_SCALE
+)
+const THUMB_REST_OFFSET = computed(
+  () => ((1 - THUMB_REST_SCALE) * thumbActualWidth.value) / 2
+)
 
 // === State =========================================================
 const currentIndex = computed(() => {
@@ -104,11 +122,47 @@ const movedFlag = ref(false)
 /** Index from which the current drag started — used as the base ratio. */
 const dragStartIndex = ref(0)
 
-const xRatio = computed(() =>
+// === Spring state (mirrors Switch.tsx motion values) ================
+// `activeRaw` = 1 while pressed, 0 otherwise. Drives every derived
+// motion (scale, opacity, filter intensity); each is spring-smoothed
+// individually below to match the article's per-value spring configs.
+const activeRaw = computed(() => (isPressed.value ? 1 : 0))
+
+// Thumb scale: 0.65 → 0.9, spring-smoothed.
+const thumbScaleRaw = computed(
+  () =>
+    THUMB_REST_SCALE +
+    (THUMB_ACTIVE_SCALE - THUMB_REST_SCALE) * activeRaw.value
+)
+const thumbScale = useSpring(thumbScaleRaw, {
+  stiffness: 2000,
+  damping: 80,
+})
+
+// Background opacity on the thumb: 1 at rest → 0.1 while pressed.
+const thumbBgOpacityRaw = computed(() => 1 - 0.9 * activeRaw.value)
+const thumbBgOpacity = useSpring(thumbBgOpacityRaw, {
+  stiffness: 2000,
+  damping: 80,
+})
+
+// Filter scale ratio: (0.4 + 0.5·active) — same formula as the article.
+const filterScaleRatioRaw = computed(() => 0.4 + 0.5 * activeRaw.value)
+const filterScaleRatio = useSpring(filterScaleRatioRaw)
+
+// xRatio: thumb position in [0..N-1]. Spring-tracks xDragRatio during
+// drag and currentIndex when at rest — verbatim from Switch.tsx.
+const xRatioTarget = computed(() =>
   isPressed.value ? xDragRatio.value : currentIndex.value
 )
+const xRatio = useSpring(xRatioTarget, {
+  stiffness: 1000,
+  damping: 80,
+})
 
 function isActive(i: number): boolean {
+  // While pressed, the active label tracks the snap target preview
+  // (round of xDragRatio) — the article's `considerChecked`.
   if (isPressed.value) {
     return Math.round(xDragRatio.value) === i
   }
@@ -136,21 +190,39 @@ onBeforeUnmount(() => {
 })
 
 // === Styles ========================================================
+// Position the thumb's BOUNDING BOX so that — at rest scale 0.65 —
+// the visible thumb sits exactly inside the tab slot. The rest of the
+// math is verbatim from Switch.tsx: marginLeft = -REST_OFFSET +
+// (slot - actual·rest)/2, and we add x = ratio·tabWidth so the
+// position interpolates between segments.
 const thumbStyle = computed(() => {
   const x = PADDING.value + xRatio.value * tabWidth.value
+  const baseShadow = '0 4px 22px rgba(0,0,0,0.10)'
+  const pressedShadow = isPressed.value
+    ? ', inset 2px 7px 24px rgba(0,0,0,0.09), inset -2px -7px 24px rgba(255,255,255,0.09)'
+    : ''
+  const top = PADDING.value + trackHeight.value / 2
+  const ml =
+    -THUMB_REST_OFFSET.value +
+    (tabWidth.value - thumbActualWidth.value * THUMB_REST_SCALE) / 2
   return {
-    width: `${tabWidth.value}px`,
-    height: `${thumbHeight.value}px`,
-    transform: `translateX(${x}px)`,
-    transition: isDragging.value
-      ? 'none'
-      : 'transform 220ms cubic-bezier(0.2, 0.9, 0.2, 1)',
+    position: 'absolute' as const,
+    left: '0',
+    top: `${top}px`,
+    width: `${thumbActualWidth.value}px`,
+    height: `${thumbActualHeight.value}px`,
+    marginLeft: `${ml}px`,
+    borderRadius: '999px',
+    transform: `translateY(-50%) translateX(${x}px) scale(${thumbScale.value})`,
+    backgroundColor: `rgba(255, 255, 255, ${thumbBgOpacity.value})`,
+    boxShadow: baseShadow + pressedShadow,
+    transition: 'none',
   }
 })
 
 const thumbLg = computed(() => ({
   surface: 'lip' as const,
-  bezel: 12,
+  bezel: 19,
   glassThickness: 47,
   refractiveIndex: 1.5,
   specularOpacity: 0.5,
@@ -159,6 +231,7 @@ const thumbLg = computed(() => ({
   chain: 'var(--glass-blur)',
   scaleStates: { idle: 0.4, hover: 0.4, active: 0.9 },
   forceActive: isPressed.value,
+  scaleRatio: filterScaleRatio.value,
 }))
 
 // === Drag flow (mirrors Switch.tsx) ================================
@@ -292,26 +365,13 @@ watch(
 }
 
 .lg-seg-thumb {
-  position: absolute;
-  top: 4px;
-  left: 0;
-  border-radius: var(--radius-pill);
-  background: var(--card);
-  box-shadow: 0 4px 22px rgba(0, 0, 0, 0.10),
-              inset 0 1px 0 rgba(255, 255, 255, 0.55);
-  /* The thumb sits visually above the tab labels so the brand-tinted
-     pill paints on top, but it must NOT capture pointer events —
-     taps and drags need to reach the tab buttons / root listeners. */
-  z-index: 0;
+  /* All positioning, sizing, transform, background-color, and box-shadow
+     are written inline from the spring-driven thumbStyle in the script.
+     We keep this rule for non-positional traits only — pointer-events
+     stay disabled so taps fall through to the tab buttons / root drag
+     listeners. */
   pointer-events: none;
-}
-.lg-seg.is-pressed .lg-seg-thumb {
-  box-shadow: 0 4px 22px rgba(0, 0, 0, 0.10),
-              inset 2px 7px 24px rgba(0, 0, 0, 0.09),
-              inset -2px -7px 24px rgba(255, 255, 255, 0.09);
-}
-.lg-seg {
-  cursor: grab;
+  z-index: 0;
 }
 .lg-seg.is-pressed {
   cursor: grabbing;
