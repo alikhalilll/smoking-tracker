@@ -382,6 +382,14 @@ function compute(el: HTMLElement, state: State) {
 const SCALE_SETTLE_EPSILON = 0.0005
 
 function tweenScale(state: State, to: number, _durationMs: number): void {
+  // Guard against NaN / Infinity sneaking in from upstream. Without
+  // this the spring math would propagate NaN forever, and Chrome
+  // throws on `<feDisplacementMap scale="NaN">`.
+  if (!Number.isFinite(to)) return
+  if (!Number.isFinite(state.currentScale)) {
+    state.currentScale = 0
+    state.scaleVelocity = 0
+  }
   state.targetScale = to
   if (!state.dispMapEl) return
   // No-op if already at target with no velocity to bleed off.
@@ -419,6 +427,13 @@ function tweenScale(state: State, to: number, _durationMs: number): void {
       damping * state.scaleVelocity
     state.scaleVelocity += (force / mass) * dt
     state.currentScale += state.scaleVelocity * dt
+
+    // Defensive: if something upstream went sideways and produced NaN,
+    // reset rather than emit invalid SVG attributes (Chrome throws).
+    if (!Number.isFinite(state.currentScale)) {
+      state.currentScale = Number.isFinite(target) ? target : 0
+      state.scaleVelocity = 0
+    }
 
     if (state.dispMapEl) {
       state.dispMapEl.setAttribute('scale', String(state.currentScale))
@@ -467,7 +482,14 @@ function attachPointerStates(el: HTMLElement, state: State): () => void {
       : isHovering
       ? hover
       : idle
-    tweenScale(state, state.maxDisplacement * ratio, transition)
+    // Multiplication safety: if maxDisplacement is non-finite (shouldn't
+    // happen now that buildDisplacementImage clamps, but guard anyway)
+    // and ratio is 0, the product is NaN — Chrome rejects that.
+    const scalePx =
+      Number.isFinite(state.maxDisplacement) && Number.isFinite(ratio)
+        ? state.maxDisplacement * ratio
+        : 0
+    tweenScale(state, scalePx, transition)
   }
 
   state.refreshState = update

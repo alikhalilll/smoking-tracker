@@ -313,13 +313,25 @@ The base drop shadow is constant across all states.
 ## 7. Track color (binary switch only)
 
 ```ts
-trackBg = mixHex('#94949F77', '#3BBF4EEE', considerChecked.value)
+trackBg = `color-mix(in srgb,
+  var(--switch-track-off) ${(1 - c) * 100}%,
+  var(--switch-track-on) ${c * 100}%)`
+// where c = considerChecked.value
 ```
 
-8-char hex (`#RRGGBBAA`). The transparent grey crossfades into the
-fully-opaque green as `considerChecked` springs from 0 to 1. Because
-`considerChecked` updates **during** drag (when `xDragRatio > 0.5`),
-the track previews the "if you let go now" color — no commit needed.
+The two endpoints are **theme-aware CSS variables** declared in
+`src/styles/main.css` for both light and dark roots:
+
+| Variable               | Light                       | Dark                        |
+|------------------------|-----------------------------|-----------------------------|
+| `--switch-track-off`   | `rgba(120, 120, 130, 0.22)` | `rgba(148, 148, 159, 0.32)` |
+| `--switch-track-on`    | `#34c759` (iOS green)       | `#3bbf4e` (article green)   |
+
+`color-mix()` does the per-channel interpolation in CSS, so the same
+component reads correctly in either theme without any JS color math.
+Because `considerChecked` updates **during** drag (when
+`xDragRatio > 0.5`), the track previews the "if you let go now"
+color — no commit needed.
 
 ---
 

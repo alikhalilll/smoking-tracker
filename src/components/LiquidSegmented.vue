@@ -25,8 +25,8 @@
     @touchstart.passive="onTouchStart"
   >
     <span
-      class="lg-seg-thumb"
       v-liquid-glass="thumbLg"
+      class="lg-seg-thumb"
       :style="thumbStyle"
     />
     <button
@@ -220,6 +220,14 @@ const thumbStyle = computed(() => {
   const ml =
     -THUMB_REST_OFFSET.value +
     (tabWidth.value - thumbActualWidth.value * THUMB_REST_SCALE) / 2
+  // Fade the theme-aware --card color toward transparent on press (so
+  // the warped track behind shows through the glass). Doing the fade
+  // via color-mix keeps the rest-state colour theme-correct in both
+  // light and dark; an `rgba(255,255,255,X)` fill would always be
+  // white regardless of theme.
+  const opPct = (
+    Math.max(0, Math.min(1, thumbBgOpacity.value)) * 100
+  ).toFixed(1)
   return {
     position: 'absolute' as const,
     left: '0',
@@ -229,32 +237,33 @@ const thumbStyle = computed(() => {
     marginLeft: `${ml}px`,
     borderRadius: '999px',
     transform: `translateY(-50%) translateX(${x}px) scale(${thumbScale.value})`,
-    backgroundColor: `rgba(255, 255, 255, ${thumbBgOpacity.value})`,
+    backgroundColor: `color-mix(in srgb, var(--card) ${opPct}%, transparent)`,
     boxShadow: baseShadow + pressedShadow,
     transition: 'none',
   }
 })
 
-// v-liquid-glass options sourced from tokens (with prop overrides for
-// blur / specularOpacity / specularSaturation / refractionBase /
-// surface / bezelWidth / glassThickness / refractiveIndex). The
-// segmented thumb has a translucent track behind it so we keep the
-// `chain: ''` already in tokens (no extra blur layer).
-const thumbLg = computed(() => ({
-  ...liquidFilterOptions({
+// Refraction lives on the THUMB (matches the article's switch). The
+// thumb's backdrop is the colored track around it (--btn-ghost-bg);
+// that translucent fill plus the parent card behind gives the warp
+// enough contrast to read. Whole-track refraction was tried but the
+// uniform card backdrop in settings made the warp invisible — only
+// surfaces with rich page content behind them (the bottom nav) read
+// well with whole-surface refraction.
+const thumbLg = computed(() =>
+  liquidFilterOptions({
     blur: props.blur,
     specularOpacity: props.specularOpacity,
     specularSaturation: props.specularSaturation,
     refractionBase: props.refractionBase,
-    surface: props.surface,
+    surface: props.surface ?? 'convex',
     bezelWidth: props.bezelWidth,
     glassThickness: props.glassThickness,
     refractiveIndex: props.refractiveIndex,
     forceActive: isPressed.value,
     refractionRatio: filterScaleRatio.value,
-  }),
-  chain: 'var(--glass-blur)',
-}))
+  })
+)
 
 // === Drag flow (mirrors Switch.tsx) ================================
 
@@ -387,13 +396,20 @@ watch(
 }
 
 .lg-seg-thumb {
-  /* All positioning, sizing, transform, background-color, and box-shadow
-     are written inline from the spring-driven thumbStyle in the script.
-     We keep this rule for non-positional traits only — pointer-events
-     stay disabled so taps fall through to the tab buttons / root drag
-     listeners. */
+  /* Position / size / transform are written inline from the spring-
+     driven thumbStyle. Background lives here so it can theme via
+     CSS vars; pointer-events stay disabled so taps fall through to
+     the tab buttons / root drag listeners. */
   pointer-events: none;
   z-index: 0;
+  background: var(--card);
+  box-shadow: 0 4px 22px rgba(0, 0, 0, 0.10),
+              inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+.lg-seg.is-pressed .lg-seg-thumb {
+  box-shadow: 0 4px 22px rgba(0, 0, 0, 0.10),
+              inset 2px 7px 24px rgba(0, 0, 0, 0.09),
+              inset -2px -7px 24px rgba(255, 255, 255, 0.09);
 }
 .lg-seg.is-pressed {
   cursor: grabbing;

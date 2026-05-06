@@ -53,12 +53,18 @@ export interface LiquidSpringSet {
  * Article-faithful defaults. Toggle.vue / LiquidSegmented.vue /
  * LiquidPress.vue all use these unless an explicit prop overrides.
  */
+// bezel: 28,
+//     glassThickness: 80,
+//     refractiveIndex: 1.5,
+//     blur: 0.2,
+//     specularOpacity: 0.5,
+    // saturation: 6,
 export const LIQUID_INPUT_TOKENS = {
   filter: {
     blur: 0.2,
     specularOpacity: 0.5,
     specularSaturation: 6,
-    refractionBase: 1,
+    refractionBase: 1.5,
   } as LiquidFilterParams,
 
   geometry: {
@@ -93,10 +99,17 @@ export const LIQUID_INPUT_TOKENS = {
     overflowDamping: 22,
   },
 
-  /** Track colors for the binary switch (8-char hex, RGBA). */
+  /**
+   * Track colour CSS variable references for the binary switch. The
+   * actual hex values live in src/styles/main.css and differ per
+   * theme so the switch reads correctly in light + dark mode;
+   * Toggle.vue crossfades them with `color-mix()` driven by the
+   * considerChecked spring. Don't inline a hex value here — it would
+   * defeat theming.
+   */
   switchTrack: {
-    off: '#94949F77',
-    on: '#3BBF4EEE',
+    off: 'var(--switch-track-off)',
+    on: 'var(--switch-track-on)',
   },
 } as const
 

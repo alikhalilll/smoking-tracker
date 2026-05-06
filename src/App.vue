@@ -186,24 +186,68 @@
          lights up brand-coral with a soft circular highlight around
          just the icon. No morphing indicator — labels are static so
          each tab keeps a fixed footprint. -->
-    <nav v-if="view !== 'admin'" class="nav-bar glass">
-      <LiquidSegmented
-        :model-value="view"
-        :options="navOptions"
-        :flat="true"
-        :track-padding="6"
-        class="nav-seg"
-        @update:model-value="onTabClick"
+    <!--
+      Dribbble-style bottom nav: floating glass pill split into two
+      tab clusters with a raised center FAB for the primary action
+      (quick-log a cigarette). The FAB is brand-coloured, scales on
+      press, and warps the underlying surface via the same liquid-
+      glass refraction the Switch uses (LiquidPress wrapper).
+    -->
+    <nav
+      v-if="view !== 'admin'"
+      v-liquid-glass="navBarLg"
+      class="nav-bar"
+    >
+      <div class="nav-side">
+        <button
+          v-for="tab in navTabsLeft"
+          :key="tab.id"
+          class="nav-tab"
+          :class="{ 'is-active': view === tab.id }"
+          :aria-current="view === tab.id ? 'page' : undefined"
+          :aria-label="tab.label"
+          @click="onTabClick(tab.id)"
+        >
+          <span class="nav-tab-icon" v-html="tab.icon" />
+          <span class="nav-tab-label">{{ tab.label }}</span>
+        </button>
+      </div>
+
+      <LiquidPress
+        class="nav-fab"
+        :refraction-base="0"
+        :aria-label="t('home.log_one')"
+        @click="onQuickLog"
       >
-        <template #label="{ option, active }">
-          <span
-            class="nav-icon"
-            :class="{ active }"
-            v-html="(option as unknown as { icon: string }).icon"
-          />
-          <span class="nav-label">{{ option.label }}</span>
-        </template>
-      </LiquidSegmented>
+        <svg
+          class="nav-fab-icon"
+          width="28"
+          height="28"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </LiquidPress>
+
+      <div class="nav-side">
+        <button
+          v-for="tab in navTabsRight"
+          :key="tab.id"
+          class="nav-tab"
+          :class="{ 'is-active': view === tab.id }"
+          :aria-current="view === tab.id ? 'page' : undefined"
+          :aria-label="tab.label"
+          @click="onTabClick(tab.id)"
+        >
+          <span class="nav-tab-icon" v-html="tab.icon" />
+          <span class="nav-tab-label">{{ tab.label }}</span>
+        </button>
+      </div>
     </nav>
 
     <!-- Full report drawer -->
@@ -264,7 +308,7 @@ import ConfirmDrawer from './components/ConfirmDrawer.vue'
 import Toast from './components/Toast.vue'
 import UpdatePrompt from './components/UpdatePrompt.vue'
 import OnboardingOverlay from './components/OnboardingOverlay.vue'
-import LiquidSegmented from './components/LiquidSegmented.vue'
+import LiquidPress from './components/LiquidPress.vue'
 import { useOnboarding, type OnboardingStep } from './composables/useOnboarding'
 import type { QuitIntensity } from './types'
 
@@ -288,22 +332,63 @@ const ICONS: Record<TabId, string> = {
 const { t, isRtl } = useI18n()
 const supabaseConfigured = isSupabaseConfigured()
 
-const tabs = computed<ReadonlyArray<{ id: TabId; icon: string }>>(() => {
-  const ids: TabId[] = supabaseConfigured
-    ? ['home', 'history', 'quit', 'leaderboard', 'settings']
-    : ['home', 'history', 'quit', 'settings']
-  return ids.map((id) => ({ id, icon: ICONS[id] }))
+// Dribbble-style split nav: 4 destination tabs around a center FAB.
+// `quit` is dropped from the bottom nav (HomeView still surfaces an
+// "open quit" CTA) so we can keep the layout balanced — 2 tabs left,
+// FAB centre, 2 tabs right. When supabase isn't configured we swap the
+// leaderboard slot for `quit` so users without cloud sync still have a
+// route to the plan.
+interface NavTab {
+  id: TabId
+  icon: string
+  label: string
+}
+
+const navTabsLeft = computed<NavTab[]>(() => [
+  { id: 'home', icon: ICONS.home, label: t('tabs.home') },
+  { id: 'history', icon: ICONS.history, label: t('tabs.history') },
+])
+
+const navTabsRight = computed<NavTab[]>(() => {
+  const right: NavTab[] = supabaseConfigured
+    ? [
+        {
+          id: 'leaderboard',
+          icon: ICONS.leaderboard,
+          label: t('tabs.leaderboard'),
+        },
+      ]
+    : [{ id: 'quit', icon: ICONS.quit, label: t('tabs.quit') }]
+  right.push({
+    id: 'settings',
+    icon: ICONS.settings,
+    label: t('tabs.settings'),
+  })
+  return right
 })
 
-// Shape for <LiquidSegmented>: each option carries the icon SVG so the
-// scoped slot can render the column icon-over-label tab.
-const navOptions = computed(() =>
-  tabs.value.map((tab) => ({
-    value: tab.id,
-    label: t(`tabs.${tab.id}`),
-    icon: tab.icon,
-  }))
-)
+// Refraction filter applied to the whole nav-bar — not per-tab — so
+// the entire pill warps the page content underneath through the bezel
+// (matches the kube.io article's panel demo). `forceActive: true`
+// keeps the warp at full strength continuously; the bar is meant to
+// look like a lensed glass surface, not press-triggered.
+const navBarLg = computed(() => ({
+  surface: 'convex' as const,
+  bezel: 28,
+  glassThickness: 80,
+  refractiveIndex: 1.5,
+  blur: 0.2,
+  specularOpacity: 0.5,
+  saturation: 6,
+  chain: '',
+  scaleStates: { idle: 1, hover: 1, active: 1 },
+  forceActive: true,
+}))
+
+function onQuickLog(): void {
+  haptics.fire('tap')
+  handleLog(1)
+}
 
 // Active tab is mirrored to the URL hash so a refresh stays on the
 // same screen instead of snapping back to Home. We use the hash (not
@@ -1076,18 +1161,28 @@ onUnmounted(() => {
   /* Animated view transitions could go here later */
 }
 
-/* Floating bottom nav — wraps the reusable <LiquidSegmented>. The
-   nav-bar provides the glass backdrop + the lifted shadow; the
-   segmented control handles drag/snap and the moving thumb. */
+/* Dribbble-style floating bottom nav: glass pill (with the SVG
+   refraction filter applied to the bar itself, not the tabs) split
+   into two tab clusters around a raised center FAB. */
 .nav-bar {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
   bottom: max(14px, env(safe-area-inset-bottom));
-  padding: 0;
+  padding: 4px 14px;
   border-radius: var(--radius-pill);
   z-index: 100;
-  width: min(420px, calc(100vw - 24px));
+  width: min(440px, calc(100vw - 24px));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  /* Translucent fill so the directive's backdrop-filter has page
+     content to refract through. The refraction warps whatever is
+     behind this surface — without a baseline see-through fill the
+     bar would just be a frosted block. */
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   box-shadow: var(--glass-highlight),
               0 22px 56px rgba(15, 23, 42, 0.20),
               0 6px 16px rgba(15, 23, 42, 0.12),
@@ -1108,43 +1203,79 @@ onUnmounted(() => {
               0 1px 2px rgba(0, 0, 0, 0.30);
 }
 
-/* The segmented control itself fills the bar; tabs stack icon-over-
-   label vertically and the moving thumb is the brand-tinted active
-   pill. */
-.nav-seg :deep(.lg-seg-tab) {
+.nav-side {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+.nav-side:last-child {
+  justify-content: flex-end;
+}
+
+.nav-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 8px 4px;
-  font-size: 11px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: pointer;
+  border-radius: 14px;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 10px;
   font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1;
-  color: var(--muted);
+  transition: color 0.18s ease, transform 0.12s ease;
+  flex: 1 1 0;
+  min-width: 0;
 }
-.nav-seg :deep(.lg-seg-tab.is-active) {
-  color: var(--brand);
-  font-weight: 700;
-}
-.nav-seg :deep(.lg-seg-thumb) {
-  background: color-mix(in srgb, var(--brand) 22%, transparent);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55),
-              0 6px 14px color-mix(in srgb, var(--brand) 22%, transparent);
-}
+.nav-tab:active { transform: scale(0.94); }
+.nav-tab.is-active { color: var(--brand); font-weight: 700; }
 
-.nav-icon {
+.nav-tab-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
 }
-.nav-icon :deep(svg) {
+.nav-tab-icon :deep(svg) { display: block; }
+
+.nav-tab-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+/* Raised center FAB — primary "log" action. Brand gradient, sits on
+   top of the bar, scales/warps via LiquidPress on press. */
+.nav-fab {
+  width: 60px;
+  height: 60px;
+  flex: 0 0 60px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    var(--brand-grad-from),
+    var(--brand-grad-to)
+  );
+  color: #fff;
+  /* Lift above the bar by half its height so it pokes out the top —
+     classic Dribbble FAB pattern. */
+  transform: translateY(-22px);
+  box-shadow: var(--brand-shadow),
+              0 12px 24px color-mix(in srgb, var(--brand) 35%, transparent),
+              inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+.nav-fab :deep(.nav-fab-icon) {
   display: block;
-}
-.nav-label {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  line-height: 1;
 }
 </style>

@@ -1257,49 +1257,11 @@ async function handleReset(): Promise<void> {
   margin: 4px 0 0;
 }
 
-/* Section tabs — segmented control with a sliding indicator */
-.seg-tabs {
-  position: relative;
-  display: flex;
-  gap: 0;
-  background: var(--btn-ghost-bg);
-  border-radius: var(--radius-pill);
-  padding: 4px;
-  margin-top: 4px;
-}
-.seg-tab-indicator {
-  position: absolute;
-  top: 4px;
-  bottom: 4px;
-  inset-inline-start: 4px;
-  background: var(--card);
-  border-radius: var(--radius-pill);
-  box-shadow: var(--shadow-sm);
-  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-.seg-tab {
-  position: relative;
-  z-index: 1;
-  flex: 1;
-  appearance: none;
-  border: none;
-  background: transparent;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  padding: 9px 6px;
-  border-radius: var(--radius-pill);
-  color: var(--muted);
-  transition: color 0.2s ease;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.seg-tab.active {
-  color: var(--text);
-}
+/* Section tabs / segmented controls are now provided by
+   <LiquidSegmented> — the old `.seg-tabs`, `.seg-tab-indicator`, and
+   `.seg-tab` rules used to live here but are no longer applied to any
+   element. Removed to avoid orphan CSS rendering during HMR or class
+   typos. */
 
 .sec {
   display: flex;
@@ -1417,33 +1379,8 @@ async function handleReset(): Promise<void> {
   white-space: nowrap;
 }
 
-/* Segmented control inside a card */
-.segmented-row {
-  display: flex;
-  gap: 6px;
-  background: var(--btn-ghost-bg);
-  border-radius: 12px;
-  padding: 4px;
-}
-.seg-btn {
-  flex: 1;
-  appearance: none;
-  border: none;
-  background: transparent;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 10px 12px;
-  border-radius: 9px;
-  color: var(--muted);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-.seg-btn.active {
-  background: var(--card);
-  color: var(--text);
-  box-shadow: var(--shadow-sm);
-}
+/* (Old in-card `.segmented-row` / `.seg-btn` rules removed — those
+   pickers are <LiquidSegmented> now.) */
 
 /* Helpers */
 .row-between {
@@ -1682,31 +1619,8 @@ async function handleReset(): Promise<void> {
   color: var(--muted);
   margin-top: 3px;
 }
-.segmented {
-  display: flex;
-  gap: 4px;
-  background: var(--card);
-  border-radius: 10px;
-  padding: 4px;
-}
-.segmented-btn {
-  flex: 1;
-  padding: 9px 12px;
-  border: none;
-  border-radius: 7px;
-  background: transparent;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  color: var(--muted);
-  transition: background 0.15s, color 0.15s;
-}
-.segmented-btn.active {
-  background: var(--bg);
-  color: var(--text);
-  font-weight: 600;
-}
+/* (Old `.segmented` / `.segmented-btn` removed — superseded by
+   <LiquidSegmented>.) */
 .reminder-row {
   display: flex;
   justify-content: space-between;

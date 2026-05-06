@@ -65,11 +65,13 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
 const haptics = useHaptics()
 
-// === Geometry (verbatim from Switch.tsx) ===========================
-const SLIDER_HEIGHT = 67
-const SLIDER_WIDTH = 160
-const THUMB_WIDTH = 146
-const THUMB_HEIGHT = 92
+// === Geometry (proportions from Switch.tsx, scaled down for in-app
+// settings — original was 160×67 with a 146×92 thumb; we keep the
+// same ratios at ~60% size so the switch fits a settings row). ======
+const SLIDER_HEIGHT = 36
+const SLIDER_WIDTH = 64
+const THUMB_WIDTH = 56
+const THUMB_HEIGHT = 50
 const THUMB_RADIUS = THUMB_HEIGHT / 2
 const THUMB_REST_SCALE = computed(
   () => props.thumbRestScale ?? LIQUID_INPUT_TOKENS.geometry.thumbRestScale
@@ -159,38 +161,27 @@ const xRatioTarget = computed(() =>
 )
 const xRatio = useSpring(xRatioTarget, LIQUID_INPUT_TOKENS.springs.xRatio)
 
-// Mix two hex colors with alpha. Used to crossfade the track.
-function mixHex(a: string, b: string, t: number): string {
-  // Both inputs are 8-char hex (#RRGGBBAA) from the article.
-  const ax = parseInt(a.slice(1, 3), 16)
-  const ay = parseInt(a.slice(3, 5), 16)
-  const az = parseInt(a.slice(5, 7), 16)
-  const aa = parseInt(a.slice(7, 9), 16)
-  const bx = parseInt(b.slice(1, 3), 16)
-  const by = parseInt(b.slice(3, 5), 16)
-  const bz = parseInt(b.slice(5, 7), 16)
-  const ba = parseInt(b.slice(7, 9), 16)
-  const ti = Math.max(0, Math.min(1, t))
-  const r = Math.round(ax + (bx - ax) * ti)
-  const g = Math.round(ay + (by - ay) * ti)
-  const bl = Math.round(az + (bz - az) * ti)
-  const al = Math.round(aa + (ba - aa) * ti)
-  return `rgba(${r}, ${g}, ${bl}, ${(al / 255).toFixed(3)})`
-}
+// Track colour is interpolated by CSS color-mix() between the two
+// theme-aware switch vars (--switch-track-off / --switch-track-on),
+// driven by the considerChecked spring. CSS does the per-channel mix
+// for us, so the same component reads correctly in light and dark
+// without any JS color math.
 
 // === Styles =========================================================
-const trackStyle = computed(() => ({
-  width: `${SLIDER_WIDTH}px`,
-  height: `${SLIDER_HEIGHT}px`,
-  borderRadius: `${SLIDER_HEIGHT / 2}px`,
-  // Track color crossfades between off-grey and on-green driven by the
-  // spring on considerChecked — exact colors from the tokens.
-  backgroundColor: mixHex(
-    LIQUID_INPUT_TOKENS.switchTrack.off,
-    LIQUID_INPUT_TOKENS.switchTrack.on,
-    considerChecked.value
-  ),
-}))
+const trackStyle = computed(() => {
+  // `considerChecked` is in [0, 1] (during drag it preview-snaps; at
+  // rest it equals the bound value). Multiply to a percentage and let
+  // CSS color-mix() interpolate the two theme-aware track vars.
+  const pct = Math.max(0, Math.min(1, considerChecked.value)) * 100
+  const offPct = (100 - pct).toFixed(2)
+  const onPct = pct.toFixed(2)
+  return {
+    width: `${SLIDER_WIDTH}px`,
+    height: `${SLIDER_HEIGHT}px`,
+    borderRadius: `${SLIDER_HEIGHT / 2}px`,
+    backgroundColor: `color-mix(in srgb, var(--switch-track-off) ${offPct}%, var(--switch-track-on) ${onPct}%)`,
+  }
+})
 
 const thumbStyle = computed(() => {
   const x = xRatio.value * TRAVEL.value
@@ -217,9 +208,13 @@ const thumbStyle = computed(() => {
   }
 })
 
-// Build the v-liquid-glass options from the tokens helper. Per-instance
-// prop overrides flow through here, so a Toggle with refractionBase=0.5
-// gets idle:0.2 / active:0.45 endpoints automatically.
+// Refraction lives on the THUMB — the article's switch architecture.
+// The thumb's "backdrop" is the colored track behind it (#94949F77 ↔
+// #3BBF4EEE, set inline on the button). That high-contrast colored
+// surface is what makes the warp visible — uniform parent cards don't
+// give the displacement anything to bend. The thumb's white fill
+// fades on press (thumbBgOpacity → 0.1) so the warped track shows
+// through the glass.
 const thumbLg = computed(() =>
   liquidFilterOptions({
     blur: BLUR.value,
