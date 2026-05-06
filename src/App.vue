@@ -187,26 +187,23 @@
          just the icon. No morphing indicator — labels are static so
          each tab keeps a fixed footprint. -->
     <nav v-if="view !== 'admin'" class="nav-bar glass">
-      <button
-        v-for="(tab, i) in tabs"
-        :key="tab.id"
-        v-liquid-glass="{
-          surface: 'convex',
-          bezel: 8,
-          glassThickness: 60,
-          specularOpacity: 0.45,
-          scaleStates: { idle: 0, hover: 0.55, active: 1.05 },
-          chain: '',
-        }"
-        class="nav-tab"
-        :class="{ active: view === tab.id }"
-        @click="onTabClick(tab.id, i)"
+      <LiquidSegmented
+        :model-value="view"
+        :options="navOptions"
+        :flat="true"
+        :track-padding="6"
+        class="nav-seg"
+        @update:model-value="onTabClick"
       >
-        <span class="nav-icon-wrap">
-          <span class="nav-icon" v-html="tab.icon"></span>
-        </span>
-        <span class="nav-label">{{ t(`tabs.${tab.id}`) }}</span>
-      </button>
+        <template #label="{ option, active }">
+          <span
+            class="nav-icon"
+            :class="{ active }"
+            v-html="(option as unknown as { icon: string }).icon"
+          />
+          <span class="nav-label">{{ option.label }}</span>
+        </template>
+      </LiquidSegmented>
     </nav>
 
     <!-- Full report drawer -->
@@ -267,6 +264,7 @@ import ConfirmDrawer from './components/ConfirmDrawer.vue'
 import Toast from './components/Toast.vue'
 import UpdatePrompt from './components/UpdatePrompt.vue'
 import OnboardingOverlay from './components/OnboardingOverlay.vue'
+import LiquidSegmented from './components/LiquidSegmented.vue'
 import { useOnboarding, type OnboardingStep } from './composables/useOnboarding'
 import type { QuitIntensity } from './types'
 
@@ -296,6 +294,16 @@ const tabs = computed<ReadonlyArray<{ id: TabId; icon: string }>>(() => {
     : ['home', 'history', 'quit', 'settings']
   return ids.map((id) => ({ id, icon: ICONS[id] }))
 })
+
+// Shape for <LiquidSegmented>: each option carries the icon SVG so the
+// scoped slot can render the column icon-over-label tab.
+const navOptions = computed(() =>
+  tabs.value.map((tab) => ({
+    value: tab.id,
+    label: t(`tabs.${tab.id}`),
+    icon: tab.icon,
+  }))
+)
 
 // Active tab is mirrored to the URL hash so a refresh stays on the
 // same screen instead of snapping back to Home. We use the hash (not
@@ -344,7 +352,7 @@ function setView(id: TabId): void {
   }
 }
 
-function onTabClick(id: TabId, _i: number): void {
+function onTabClick(id: TabId): void {
   setView(id)
   haptics.fire('tap')
 }
@@ -1068,23 +1076,18 @@ onUnmounted(() => {
   /* Animated view transitions could go here later */
 }
 
-/* Liquid Glass floating nav — Telegram-style pill.
-   Physically centered (left:50% + translateX) so it sits put in both
-   LTR and RTL. Heavy backdrop blur lets the page content tint the
-   bar; the active tab gets a tinted brand circle behind its icon. */
+/* Floating bottom nav — wraps the reusable <LiquidSegmented>. The
+   nav-bar provides the glass backdrop + the lifted shadow; the
+   segmented control handles drag/snap and the moving thumb. */
 .nav-bar {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
   bottom: max(14px, env(safe-area-inset-bottom));
-  display: flex;
-  gap: 4px;
-  padding: 6px 8px;
+  padding: 0;
   border-radius: var(--radius-pill);
   z-index: 100;
-  max-width: calc(100vw - 24px);
-  /* Stronger lift than the default glass shadow — the Telegram floating
-     pill reads more like a hovering object than an inline bar. */
+  width: min(420px, calc(100vw - 24px));
   box-shadow: var(--glass-highlight),
               0 22px 56px rgba(15, 23, 42, 0.20),
               0 6px 16px rgba(15, 23, 42, 0.12),
@@ -1104,52 +1107,32 @@ onUnmounted(() => {
               0 6px 16px rgba(0, 0, 0, 0.40),
               0 1px 2px rgba(0, 0, 0, 0.30);
 }
-.nav-tab {
-  appearance: none;
-  border: none;
-  background: transparent;
-  font-family: inherit;
-  cursor: pointer;
-  display: flex;
+
+/* The segmented control itself fills the bar; tabs stack icon-over-
+   label vertically and the moving thumb is the brand-tinted active
+   pill. */
+.nav-seg :deep(.lg-seg-tab) {
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   gap: 3px;
-  padding: 5px 8px;
+  padding: 8px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  line-height: 1;
   color: var(--muted);
-  transition: color 0.2s ease, transform 0.12s ease;
-  min-width: 52px;
-  flex: 1 1 auto;
-  border-radius: 18px;
 }
-@media (max-width: 360px) {
-  .nav-tab { min-width: 46px; padding: 5px 4px; }
-  .nav-label { font-size: 10px; }
-}
-.nav-tab:active {
-  transform: scale(0.94);
-}
-.nav-tab.active {
+.nav-seg :deep(.lg-seg-tab.is-active) {
   color: var(--brand);
+  font-weight: 700;
 }
-.nav-icon-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  transition: background 0.22s ease, transform 0.22s ease,
-              box-shadow 0.22s ease;
-}
-.nav-tab.active .nav-icon-wrap {
-  background: color-mix(in srgb, var(--brand) 28%, transparent);
+.nav-seg :deep(.lg-seg-thumb) {
+  background: color-mix(in srgb, var(--brand) 22%, transparent);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.55),
-              0 6px 14px color-mix(in srgb, var(--brand) 28%, transparent);
-  transform: translateY(-1px);
+              0 6px 14px color-mix(in srgb, var(--brand) 22%, transparent);
 }
+
 .nav-icon {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 22px;
@@ -1163,8 +1146,5 @@ onUnmounted(() => {
   font-weight: 600;
   letter-spacing: 0.01em;
   line-height: 1;
-}
-.nav-tab.active .nav-label {
-  font-weight: 700;
 }
 </style>
