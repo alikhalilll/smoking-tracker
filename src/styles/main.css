@@ -70,6 +70,15 @@
   --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.06);
   --shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.10);
 
+  /* Liquid Glass switch track — theme-aware so the colors used by
+     <Toggle> map correctly in both modes. The off colour is a low-
+     alpha grey that lets the parent surface show through; the on
+     colour matches the system success token. Toggle.vue crossfades
+     these two with `color-mix()` driven by the considerChecked
+     spring, so the track follows the drag preview. */
+  --switch-track-off: rgba(120, 120, 130, 0.22);
+  --switch-track-on: #34c759;
+
   /* Liquid Glass — Bold iOS 26 vibe.
      - heavy blur + strong saturation for the lensed depth
      - thin top specular line + soft top sheen for the highlight
@@ -157,6 +166,12 @@
 
     --red-border: #5a2424;
 
+    /* Switch track: brighter on-state in dark mode for legibility,
+       slightly more transparent off-state so the dim surroundings
+       show through. */
+    --switch-track-off: rgba(148, 148, 159, 0.32);
+    --switch-track-on: #3bbf4e;
+
     --glass-bg: rgba(28, 25, 21, 0.48);
     --glass-bg-strong: rgba(28, 25, 21, 0.72);
     --glass-bg-tint: rgba(28, 25, 21, 0.32);
@@ -223,6 +238,9 @@
   --bar-empty: #2e2820;
 
   --red-border: #5a2424;
+
+  --switch-track-off: rgba(148, 148, 159, 0.32);
+  --switch-track-on: #3bbf4e;
 
   --glass-bg: rgba(28, 25, 21, 0.48);
   --glass-bg-strong: rgba(28, 25, 21, 0.72);

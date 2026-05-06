@@ -93,14 +93,21 @@ export function buildDisplacementImage(
     opts.dpr ??
     (typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1)
 
-  const lut = calculate1DDisplacement(
+  const lutRaw = calculate1DDisplacement(
     glassThickness,
     bezelWidth,
     surface,
     refractiveIndex,
     samples
   )
-  const maxDisplacement = Math.max(...lut.map((v) => Math.abs(v)))
+  // Clamp non-finite values (numerical edge cases at the bezel corners
+  // produce Infinity through 1/refracted[1]). Math.max([..., Infinity])
+  // is Infinity, and `Infinity * 0` (which happens when a caller passes
+  // refractionBase=0) is NaN — that NaN then poisons the SVG filter.
+  const lut = lutRaw.map((v) => (Number.isFinite(v) ? v : 0))
+  const maxDisplacement = lut.length
+    ? lut.reduce((acc, v) => Math.max(acc, Math.abs(v)), 0)
+    : 0
 
   const bufferWidth = Math.max(1, Math.round(width * dpr))
   const bufferHeight = Math.max(1, Math.round(height * dpr))
