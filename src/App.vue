@@ -186,6 +186,9 @@
     <!-- Toast host -->
     <Toast />
 
+    <!-- Service-worker "new version available" banner -->
+    <UpdatePrompt />
+
     <!-- In-page onboarding tour -->
     <OnboardingOverlay />
   </div>
@@ -216,6 +219,7 @@ import ReportView from './components/ReportView.vue'
 import AuthModal from './components/AuthModal.vue'
 import ConfirmDrawer from './components/ConfirmDrawer.vue'
 import Toast from './components/Toast.vue'
+import UpdatePrompt from './components/UpdatePrompt.vue'
 import OnboardingOverlay from './components/OnboardingOverlay.vue'
 import { useOnboarding, type OnboardingStep } from './composables/useOnboarding'
 import type { QuitIntensity } from './types'
