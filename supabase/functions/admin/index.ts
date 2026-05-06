@@ -419,6 +419,184 @@ async function actionEngagementFunnel() {
   }))
 }
 
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+interface AccountRow {
+  id: string
+  email: string | null
+  created_at: string
+  last_sign_in_at: string | null
+  email_confirmed_at: string | null
+  providers: string[] | null
+}
+
+interface EntryRow {
+  id: string
+  time: string
+  date: string
+}
+
+interface PlanRow {
+  start_date: string
+  baseline: number
+  duration_days: number
+  intensity: string
+  targets: unknown
+  updated_at: string | null
+}
+
+interface LeaderboardRow {
+  display_name: string
+  smoke_free_days: number
+  reduction_pct: number | string
+  total_logged: number
+  daily_avg: number | string
+  updated_at: string | null
+}
+
+async function actionUserActivity(userId: string, days: number) {
+  if (!UUID_RE.test(userId)) {
+    throw new Error('Invalid user_id')
+  }
+  const sb = adminClient()
+  const sinceDate = new Date()
+  sinceDate.setDate(sinceDate.getDate() - days + 1)
+  const since = sinceDate.toISOString().slice(0, 10)
+
+  const [accountRes, entriesRes, planRes, leaderboardRes] = await Promise.all([
+    sb.rpc('admin_user_activity_account', { p_user_id: userId }),
+    sb
+      .from('entries')
+      .select('id, time, date')
+      .eq('user_id', userId)
+      .gte('date', since)
+      .order('time', { ascending: false }),
+    sb
+      .from('quit_plans')
+      .select('start_date, baseline, duration_days, intensity, targets, updated_at')
+      .eq('user_id', userId)
+      .maybeSingle(),
+    sb
+      .from('leaderboard_entries')
+      .select(
+        'display_name, smoke_free_days, reduction_pct, total_logged, daily_avg, updated_at'
+      )
+      .eq('user_id', userId)
+      .maybeSingle(),
+  ])
+
+  if (accountRes.error) {
+    throw new Error(`admin_user_activity_account: ${accountRes.error.message}`)
+  }
+  if (entriesRes.error) {
+    throw new Error(`entries: ${entriesRes.error.message}`)
+  }
+
+  const accountRows = (accountRes.data ?? []) as AccountRow[]
+  const account = accountRows[0] ?? null
+  if (!account) {
+    throw new Error('User not found')
+  }
+
+  const entries = (entriesRes.data ?? []) as EntryRow[]
+  const total = entries.length
+  const lastLogAt = entries[0]?.time ?? null
+
+  const perDay = bucketTimeseries(
+    entries.map((e) => ({ day: e.date })),
+    days
+  )
+
+  const hourBuckets: number[] = Array.from({ length: 24 }, () => 0)
+  // ISO weekday: 1=Mon..7=Sun. Use Date.getDay() (0=Sun..6=Sat) and remap.
+  const weekdayBuckets: number[] = Array.from({ length: 7 }, () => 0)
+  for (const e of entries) {
+    const d = new Date(e.time)
+    const h = d.getHours()
+    if (h >= 0 && h < 24) hourBuckets[h]++
+    const js = d.getDay() // 0=Sun..6=Sat
+    const iso = js === 0 ? 6 : js - 1 // 0=Mon..6=Sun
+    weekdayBuckets[iso]++
+  }
+  const weekdayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+  const hourly = hourBuckets.map((count, hour) => ({ hour, count }))
+  const weekday = weekdayBuckets.map((count, i) => ({
+    weekday: weekdayLabels[i],
+    count,
+  }))
+
+  // "Footsteps" — full chronological timeline within the window. Capped
+  // to keep the response small; 200 covers ~7 cigarettes/day for 30 days.
+  const recent = entries.slice(0, 200)
+
+  let plan: Json | null = null
+  if (planRes.data) {
+    const p = planRes.data as PlanRow
+    const start = new Date(p.start_date)
+    start.setHours(0, 0, 0, 0)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const elapsed = Math.floor(
+      (today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
+    )
+    const dayOfPlan = elapsed + 1 // day 1 is the start_date itself
+    const isComplete = dayOfPlan > p.duration_days
+    let targetToday: number | null = null
+    if (Array.isArray(p.targets)) {
+      const idx = Math.max(0, Math.min(p.targets.length - 1, dayOfPlan - 1))
+      const v = (p.targets as unknown[])[idx]
+      targetToday = typeof v === 'number' ? v : Number(v)
+      if (!Number.isFinite(targetToday)) targetToday = null
+    }
+    plan = {
+      start_date: p.start_date,
+      baseline: p.baseline,
+      duration_days: p.duration_days,
+      intensity: p.intensity,
+      day_of_plan: dayOfPlan,
+      target_today: targetToday,
+      is_complete: isComplete,
+      updated_at: p.updated_at,
+    }
+  }
+
+  let leaderboard: Json | null = null
+  if (leaderboardRes.data) {
+    const l = leaderboardRes.data as LeaderboardRow
+    leaderboard = {
+      display_name: l.display_name,
+      smoke_free_days: Number(l.smoke_free_days ?? 0),
+      reduction_pct: Number(l.reduction_pct ?? 0),
+      total_logged: Number(l.total_logged ?? 0),
+      daily_avg: Number(l.daily_avg ?? 0),
+      updated_at: l.updated_at,
+    }
+  }
+
+  return {
+    account: {
+      id: account.id,
+      email: account.email,
+      created_at: account.created_at,
+      last_sign_in_at: account.last_sign_in_at,
+      email_confirmed_at: account.email_confirmed_at,
+      providers: account.providers ?? [],
+    },
+    window_days: days,
+    entries: {
+      total,
+      last_log_at: lastLogAt,
+      per_day: perDay,
+      hourly,
+      weekday,
+      recent,
+    },
+    plan,
+    leaderboard,
+  }
+}
+
 // --- Entrypoint -----------------------------------------------------
 
 Deno.serve(async (req: Request) => {
@@ -482,6 +660,13 @@ Deno.serve(async (req: Request) => {
       case 'user_list': {
         const limit = Math.min(500, Number(body.limit ?? 200) || 200)
         return jsonResponse(await actionUserList(limit) as unknown as Json)
+      }
+      case 'user_activity': {
+        const userId = String(body.user_id ?? '')
+        const days = Math.min(180, Math.max(7, Number(body.days ?? 30) || 30))
+        return jsonResponse(
+          await actionUserActivity(userId, days) as unknown as Json
+        )
       }
       default:
         return errorResponse(`Unknown action: ${action}`, 400)
