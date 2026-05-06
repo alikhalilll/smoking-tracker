@@ -110,6 +110,7 @@
         :plan-days="quit.planDays.value"
         :progress="quit.progress.value"
         :suggested-baseline="quit.suggestedBaseline.value"
+        :suggestion="quit.suggestion.value"
         :smoke-free-days="smokeFreeDays"
         @start="handleStartQuit"
         @abandon="abandonQuitPlan"
@@ -137,13 +138,17 @@
         @reminders-changed="handleRemindersChanged"
         @open-auth="openAuth"
       />
+
+      <!-- Hidden admin route — reachable only via #/admin. The bottom
+           nav is suppressed below so this fills the screen. -->
+      <AdminView v-else-if="view === 'admin'" @exit="setView('home')" />
     </main>
 
     <!-- Floating Liquid Glass nav: icon-with-label tabs; active tab
          lights up brand-coral with a soft circular highlight around
          just the icon. No morphing indicator — labels are static so
          each tab keeps a fixed footprint. -->
-    <nav class="nav-bar glass">
+    <nav v-if="view !== 'admin'" class="nav-bar glass">
       <button
         v-for="(tab, i) in tabs"
         :key="tab.id"
@@ -206,6 +211,7 @@ import HistoryView from './components/HistoryView.vue'
 import QuitView from './components/QuitView.vue'
 import LeaderboardView from './components/LeaderboardView.vue'
 import SettingsView from './components/SettingsView.vue'
+import AdminView from './components/AdminView.vue'
 import ReportView from './components/ReportView.vue'
 import AuthModal from './components/AuthModal.vue'
 import ConfirmDrawer from './components/ConfirmDrawer.vue'
@@ -214,7 +220,13 @@ import OnboardingOverlay from './components/OnboardingOverlay.vue'
 import { useOnboarding, type OnboardingStep } from './composables/useOnboarding'
 import type { QuitIntensity } from './types'
 
-type TabId = 'home' | 'history' | 'quit' | 'leaderboard' | 'settings'
+type TabId =
+  | 'home'
+  | 'history'
+  | 'quit'
+  | 'leaderboard'
+  | 'settings'
+  | 'admin'
 
 const ICONS: Record<TabId, string> = {
   home: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>`,
@@ -222,6 +234,7 @@ const ICONS: Record<TabId, string> = {
   quit: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>`,
   leaderboard: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M17 4H7v6a5 5 0 0 0 10 0V4z"/><path d="M17 6h2a2 2 0 0 1 0 4h-2M7 6H5a2 2 0 0 0 0 4h2"/></svg>`,
   settings: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  admin: '',
 }
 
 const { t, isRtl } = useI18n()
@@ -249,7 +262,8 @@ function readHashView(): TabId {
     main === 'history' ||
     main === 'quit' ||
     main === 'leaderboard' ||
-    main === 'settings'
+    main === 'settings' ||
+    main === 'admin'
   ) {
     return main as TabId
   }

@@ -43,3 +43,15 @@ export async function share(payload: {
   }
   return { ok: false, via: 'none', reason: 'no_share_path' }
 }
+
+/** Share just the app link (no personal progress). For invite-a-friend
+ *  flows in Settings or the auth modal. */
+export async function shareAppLink(payload: {
+  title: string
+  text: string
+}): Promise<ShareResult> {
+  return share(payload)
+}
+
+export const APP_SHARE_URL = APP_URL
+

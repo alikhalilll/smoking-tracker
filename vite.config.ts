@@ -15,9 +15,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'Smoke Tracker',
-        short_name: 'Smoke',
-        description: 'Track your daily smoking habits',
+        name: 'Smoking Tracker',
+        short_name: 'Smoking',
+        description: 'Track your daily smoking habits with Smoking Tracker',
         theme_color: '#1a1a18',
         background_color: '#fafaf6',
         display: 'standalone',

@@ -87,6 +87,58 @@
         </template>
       </div>
 
+      <!-- Linked accounts: let a signed-in user attach Google/Apple/
+           Facebook/GitHub to their existing account so they can sign
+           in with either method on their next visit. -->
+      <div v-if="isAuthed" v-reveal class="card">
+        <div class="card-header">
+          <div class="card-icon icon-lavender">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+          </div>
+          <div>
+            <div class="card-title">{{ t('cloud.linked_section') }}</div>
+            <div class="card-sub">{{ t('cloud.linked_help') }}</div>
+          </div>
+        </div>
+
+        <div class="linked-list">
+          <div
+            v-for="p in socialProviders"
+            :key="p"
+            class="linked-row"
+          >
+            <span class="linked-icon" v-html="PROVIDER_ICONS[p]" />
+            <span class="linked-label">{{ PROVIDER_LABELS[p] }}</span>
+            <span v-if="isLinked(p)" class="chip chip-mint linked-chip">
+              {{ t('cloud.linked_chip') }}
+            </span>
+            <button
+              v-if="!isLinked(p)"
+              class="btn btn-ghost small-btn"
+              :disabled="linkingProvider !== null"
+              @click="onLink(p)"
+            >
+              <span v-if="linkingProvider === p" class="spinner" />
+              {{ linkingProvider === p ? '…' : t('cloud.link_btn') }}
+            </button>
+            <button
+              v-else
+              class="btn btn-ghost small-btn"
+              :disabled="unlinkingProvider !== null || linkedCount <= 1"
+              :title="linkedCount <= 1 ? t('cloud.unlink_last_blocked') : undefined"
+              @click="onUnlink(p)"
+            >
+              <span v-if="unlinkingProvider === p" class="spinner" />
+              {{ unlinkingProvider === p ? t('cloud.unlinking') : t('cloud.unlink_btn') }}
+            </button>
+          </div>
+        </div>
+
+        <div v-if="linkError" class="error-chip" style="margin-top: 12px">
+          {{ linkError }}
+        </div>
+      </div>
+
       <!-- Leaderboard prefs (only when signed in + supabase configured) -->
       <div
         v-if="leaderboard && isAuthed"
@@ -255,6 +307,23 @@
         </div>
         <button class="btn btn-ghost block" :disabled="refreshing" @click="onHardRefresh">
           {{ refreshing ? t('settings.hard_refresh_in_progress') : t('settings.hard_refresh_btn') }}
+        </button>
+      </div>
+
+      <!-- Share the app — separate from the share-progress button on Home;
+           this one shares only the public app URL (invite a friend). -->
+      <div v-reveal class="card">
+        <div class="card-header">
+          <div class="card-icon icon-mint">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+          </div>
+          <div>
+            <div class="card-title">{{ t('share.app_btn') }}</div>
+            <div class="card-sub">{{ t('share.app_help') }}</div>
+          </div>
+        </div>
+        <button class="btn btn-ghost block" @click="onShareApp">
+          {{ t('share.app_btn') }}
         </button>
       </div>
     </section>
@@ -545,11 +614,17 @@ import {
   resolvedNotificationLocale,
   type NotificationLocale,
 } from '../composables/useReminders'
-import { useAuth } from '../composables/useAuth'
+import {
+  useAuth,
+  ALL_SOCIAL_PROVIDERS,
+  PROVIDER_LABELS,
+  type SocialProvider,
+} from '../composables/useAuth'
 import { useEconomy, formatMoney } from '../composables/useEconomy'
 import { useHaptics } from '../composables/useHaptics'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
+import { shareAppLink } from '../composables/useShare'
 import { useOnboarding } from '../composables/useOnboarding'
 import { isSupabaseConfigured } from '../supabase'
 import Toggle from './Toggle.vue'
@@ -728,6 +803,77 @@ function onHapticsToggle(): void {
   // Fire a quick tap on enable so the user feels confirmation that
   // it's working (and a no-op on iOS, which is the honest behavior).
   if (next) haptics.fire('tap')
+}
+
+async function onShareApp(): Promise<void> {
+  const result = await shareAppLink({
+    title: t('share.app_title'),
+    text: t('share.app_invite'),
+  })
+  if (result.via === 'clipboard' && result.ok) {
+    showToast(t('share.copied'), 'success')
+  }
+}
+
+// --- Linked accounts ------------------------------------------------
+
+const socialProviders = ALL_SOCIAL_PROVIDERS
+
+const PROVIDER_ICONS: Record<SocialProvider, string> = {
+  google: `<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#4285F4" d="M21.6 12.23c0-.7-.06-1.36-.18-2H12v3.79h5.39a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.9-1.75 2.97-4.33 2.97-7.32z"/><path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.45l-3.24-2.5c-.9.6-2.04.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.06v2.59A10 10 0 0 0 12 22z"/><path fill="#FBBC05" d="M6.41 13.89A6 6 0 0 1 6.1 12c0-.66.11-1.3.31-1.89V7.52H3.06A10 10 0 0 0 2 12c0 1.61.39 3.13 1.06 4.48l3.35-2.59z"/><path fill="#EA4335" d="M12 5.99c1.47 0 2.79.5 3.83 1.5l2.87-2.87C16.95 2.99 14.7 2 12 2A10 10 0 0 0 3.06 7.52l3.35 2.59C7.2 7.75 9.4 5.99 12 5.99z"/></svg>`,
+  apple: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.6c-.02-2.31 1.89-3.42 1.97-3.47-1.07-1.57-2.74-1.78-3.34-1.81-1.42-.14-2.78.84-3.5.84-.74 0-1.84-.82-3.03-.8-1.55.02-2.99.9-3.79 2.3-1.62 2.81-.41 6.96 1.16 9.24.77 1.12 1.68 2.36 2.87 2.32 1.16-.05 1.6-.74 3-.74 1.4 0 1.79.74 3.01.72 1.25-.02 2.04-1.13 2.8-2.25.88-1.3 1.24-2.55 1.26-2.61-.03-.02-2.41-.93-2.41-3.74zM14.04 5.85c.64-.78 1.07-1.86.95-2.94-.92.04-2.05.61-2.71 1.39-.59.69-1.11 1.79-.97 2.85 1.03.08 2.08-.52 2.73-1.3z"/></svg>`,
+  facebook: `<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true"><path fill="#1877F2" d="M22 12a10 10 0 1 0-11.56 9.88v-6.99H7.9V12h2.54V9.8c0-2.51 1.49-3.9 3.78-3.9 1.1 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.77-1.63 1.56V12h2.78l-.44 2.89h-2.34v6.99A10 10 0 0 0 22 12z"/></svg>`,
+  github: `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 .5A11.5 11.5 0 0 0 .5 12c0 5.08 3.29 9.39 7.86 10.92.58.1.79-.25.79-.56v-2.16c-3.2.7-3.87-1.37-3.87-1.37-.52-1.34-1.27-1.69-1.27-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.02 1.76 2.69 1.25 3.34.96.1-.74.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.69 0-1.26.45-2.28 1.18-3.08-.12-.29-.51-1.46.11-3.04 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.18-1.49 3.14-1.18 3.14-1.18.63 1.58.23 2.75.11 3.04.74.8 1.18 1.82 1.18 3.08 0 4.42-2.69 5.4-5.25 5.68.41.36.78 1.06.78 2.14v3.18c0 .31.21.67.8.55A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z"/></svg>`,
+}
+
+const linkingProvider = ref<SocialProvider | null>(null)
+const unlinkingProvider = ref<SocialProvider | null>(null)
+const linkError = ref<string | null>(null)
+
+const userIdentities = computed(() => auth.user.value?.identities ?? [])
+const linkedCount = computed(() => userIdentities.value.length)
+
+function isLinked(provider: SocialProvider): boolean {
+  return userIdentities.value.some((i) => i.provider === provider)
+}
+
+async function onLink(provider: SocialProvider): Promise<void> {
+  if (linkingProvider.value) return
+  linkingProvider.value = provider
+  linkError.value = null
+  const result = await auth.linkIdentity(provider)
+  // The browser is about to redirect; only clear state if the call
+  // returned an error before the redirect happened.
+  if (!result.ok) {
+    linkingProvider.value = null
+    linkError.value = result.error ?? t('cloud.link_failed')
+  }
+}
+
+async function onUnlink(provider: SocialProvider): Promise<void> {
+  if (unlinkingProvider.value) return
+  if (linkedCount.value <= 1) {
+    linkError.value = t('cloud.unlink_last_blocked')
+    return
+  }
+  const identity = userIdentities.value.find((i) => i.provider === provider)
+  if (!identity) return
+  const ok = await confirmDrawer({
+    title: t('cloud.unlink_btn'),
+    body: t('cloud.unlink_confirm', { provider: PROVIDER_LABELS[provider] }),
+    confirmText: t('cloud.unlink_btn'),
+    variant: 'danger',
+  })
+  if (!ok) return
+  unlinkingProvider.value = provider
+  linkError.value = null
+  const res = await auth.unlinkIdentity(identity)
+  unlinkingProvider.value = null
+  if (!res.ok) {
+    linkError.value = res.error ?? 'Unlink failed'
+  } else {
+    showToast(t('cloud.unlink_btn') + ' ✓', 'success')
+  }
 }
 const CURRENCIES: ReadonlyArray<string> = [
   'USD', 'EUR', 'GBP', 'EGP', 'SAR', 'AED', 'JOD', 'TRY', 'CAD', 'AUD', 'INR', 'PKR',
@@ -1283,6 +1429,43 @@ async function handleReset(): Promise<void> {
   font-size: 12px;
   padding: 8px 14px;
 }
+
+/* Linked-accounts list */
+.linked-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+}
+.linked-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.linked-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: var(--btn-ghost-bg);
+  flex-shrink: 0;
+}
+.linked-label {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.linked-chip {
+  margin-inline-end: 6px;
+}
+
 .error-chip {
   margin-top: 10px;
   padding: 10px 12px;

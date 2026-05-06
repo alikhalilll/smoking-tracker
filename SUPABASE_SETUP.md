@@ -161,6 +161,25 @@ $$;
 
 revoke all on function public.delete_account() from public;
 grant execute on function public.delete_account() to authenticated;
+
+-- email_exists(): used by the sign-in card's email-first flow to decide
+-- whether to show the "Welcome back" or "Create your account" step.
+-- Returns a boolean so the only thing leaked is whether the email is
+-- already registered — which a try-signin-then-signup flow leaks
+-- implicitly anyway.
+create or replace function public.email_exists(p_email text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  return exists(select 1 from auth.users where lower(email) = lower(p_email));
+end;
+$$;
+
+revoke all on function public.email_exists(text) from public;
+grant execute on function public.email_exists(text) to anon, authenticated;
 ```
 
 Click **Run**.
@@ -221,3 +240,194 @@ Open the app → Settings → **Cloud sync** → enter your email →
 **Send sign-in link** → click the link in your inbox. From that point
 every log syncs to the server, and signing in on another device pulls
 your history down.
+
+## 6. Social login (optional)
+
+The app supports Google, Apple, Facebook, and GitHub via Supabase's
+OAuth flow. Each provider you want to enable is configured separately:
+
+### Common steps (all providers)
+
+1. Authentication → **URL Configuration** in Supabase. Make sure your
+   **Site URL** and **Redirect URLs** include both production and dev:
+   - `https://alikhalilll.github.io/smoking-tracker/`
+   - `http://localhost:5173/smoking-tracker/`
+2. Authentication → **Providers** in Supabase. Enable the provider and
+   paste the Client ID + Client Secret (per provider, see below).
+3. The Supabase OAuth callback URL — copy it from the provider settings
+   panel — needs to be registered as the redirect URI on the provider's
+   side. It looks like `https://<project-ref>.supabase.co/auth/v1/callback`.
+4. Authentication → **Settings** → enable **"Manual linking"**. This is
+   required for the Settings → Linked accounts feature in the app, which
+   lets a signed-in user attach extra providers (Google/Apple/etc) to
+   their existing account without creating a duplicate.
+
+### Google
+
+1. https://console.cloud.google.com → Create project (or pick existing).
+2. APIs & Services → **OAuth consent screen** → External → fill required
+   fields → add your email as a test user.
+3. APIs & Services → **Credentials** → **Create credentials** → OAuth
+   client ID → **Web application**.
+4. Authorized redirect URIs: paste the Supabase callback URL.
+5. Copy Client ID + Client secret into Supabase.
+
+### Apple
+
+Requires an Apple Developer account ($99/yr).
+
+1. developer.apple.com → Certificates, Identifiers & Profiles.
+2. Identifiers → **App IDs** → New (if you don't have one) → enable
+   "Sign In with Apple".
+3. Identifiers → **Services IDs** → New. Set the identifier (e.g.
+   `com.example.smokingtracker.signin`). Enable "Sign In with Apple",
+   click **Configure**, set Web Domain to `<project-ref>.supabase.co`,
+   Return URLs to the Supabase callback URL.
+4. Keys → New → enable "Sign In with Apple", attach the App ID, save
+   the .p8 key file once (it can only be downloaded once).
+5. In Supabase Apple provider settings, paste:
+   - **Services ID** as the Client ID
+   - The .p8 key contents (Supabase generates a JWT client secret from it)
+   - Team ID and Key ID
+
+### Facebook
+
+1. https://developers.facebook.com → Create app → Consumer.
+2. Add the **Facebook Login** product.
+3. Settings → Basic → copy App ID + App Secret.
+4. Facebook Login → Settings → Valid OAuth Redirect URIs: paste the
+   Supabase callback URL.
+5. Paste App ID + App Secret into Supabase.
+
+### GitHub
+
+1. https://github.com/settings/developers → **New OAuth App**.
+2. Authorization callback URL: paste the Supabase callback URL.
+3. Generate a client secret. Paste Client ID + Client secret into Supabase.
+
+## 7. Admin dashboard (optional)
+
+The `/admin` route in the app talks to a Supabase Edge Function that
+verifies env-var credentials before reading aggregate data with the
+service-role key.
+
+### 7a. Add the supporting RPCs
+
+Run this in **SQL Editor → New query** (one-off):
+
+```sql
+-- Returns the total number of registered users (auth.users is hidden
+-- from anon/service-role direct selects in some Supabase configs, so
+-- we wrap it in a SECURITY DEFINER function called by the Edge Function).
+create or replace function public.admin_user_count()
+returns integer
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  return (select count(*)::int from auth.users);
+end;
+$$;
+
+revoke all on function public.admin_user_count() from public;
+grant execute on function public.admin_user_count() to service_role;
+
+-- Sign-ups grouped by day, since a given date.
+create or replace function public.admin_signups_per_day(since_date date)
+returns table(day text, count integer)
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  return query
+    select to_char(date_trunc('day', u.created_at), 'YYYY-MM-DD') as day,
+           count(*)::int as count
+    from auth.users u
+    where u.created_at >= since_date
+    group by 1
+    order by 1;
+end;
+$$;
+
+revoke all on function public.admin_signups_per_day(date) from public;
+grant execute on function public.admin_signups_per_day(date) to service_role;
+
+-- Users active in the last `window_days` days (logged a cigarette).
+create or replace function public.count_active_users(window_days integer)
+returns integer
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  return (
+    select count(distinct e.user_id)::int
+    from public.entries e
+    where e.date >= (current_date - window_days)
+  );
+end;
+$$;
+
+revoke all on function public.count_active_users(integer) from public;
+grant execute on function public.count_active_users(integer) to service_role;
+
+-- Per-user summary for the admin dashboard's user list. Returns email,
+-- join date, total entries, whether they have a quit plan, and the most
+-- recent log timestamp.
+create or replace function public.admin_user_list(row_limit integer default 200)
+returns table(
+  id uuid,
+  email text,
+  created_at timestamptz,
+  total_entries integer,
+  has_plan boolean,
+  last_log_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+begin
+  return query
+    select u.id,
+           u.email,
+           u.created_at,
+           coalesce(e_counts.cnt, 0)::int as total_entries,
+           (qp.user_id is not null) as has_plan,
+           e_counts.last_log
+    from auth.users u
+    left join (
+      select user_id, count(*)::int as cnt, max(time) as last_log
+      from public.entries
+      group by user_id
+    ) e_counts on e_counts.user_id = u.id
+    left join public.quit_plans qp on qp.user_id = u.id
+    order by u.created_at desc
+    limit row_limit;
+end;
+$$;
+
+revoke all on function public.admin_user_list(integer) from public;
+grant execute on function public.admin_user_list(integer) to service_role;
+```
+
+### 7b. Deploy the Edge Function
+
+```bash
+# 1. Generate a bcrypt hash of the admin password locally
+node -e "console.log(require('bcryptjs').hashSync(process.argv[1], 10))" 'YOUR_PASSWORD'
+
+# 2. Set Supabase secrets
+supabase secrets set \
+  ADMIN_USERNAME=admin \
+  ADMIN_PASSWORD_HASH='$2a$10$…' \
+  ADMIN_SESSION_SECRET="$(openssl rand -hex 32)"
+
+# 3. Deploy the function
+supabase functions deploy admin --no-verify-jwt
+```
+
+Then visit `https://alikhalilll.github.io/smoking-tracker/#/admin` and
+sign in with the username/password you set.
