@@ -56,13 +56,19 @@ import {
 } from 'vue'
 import { useHaptics } from '../composables/useHaptics'
 import { useSpring } from '../composables/useSpring'
+import {
+  LIQUID_INPUT_TOKENS,
+  liquidFilterOptions,
+  type LiquidFilterParams,
+  type LiquidGeometryParams,
+} from '../lib/liquidGlass/tokens'
 
 interface Option<V> {
   value: V
   label?: string
 }
 
-const props = defineProps<{
+type ComponentProps = {
   modelValue: T
   options: ReadonlyArray<Option<T>>
   /** Drop the track background — useful when embedded inside another
@@ -70,7 +76,9 @@ const props = defineProps<{
   flat?: boolean
   /** Extra padding between the thumb and the track edges, in px. */
   trackPadding?: number
-}>()
+} & Partial<LiquidFilterParams & LiquidGeometryParams>
+
+const props = defineProps<ComponentProps>()
 const emit = defineEmits<{ 'update:modelValue': [value: T] }>()
 const haptics = useHaptics()
 
@@ -91,11 +99,14 @@ const tabWidth = computed(() => {
 })
 const trackHeight = computed(() => Math.max(0, containerHeight.value - PADDING.value * 2))
 
-// Geometry constants pulled from the article: thumb is bigger than its
-// visible slot, scaled DOWN at rest so its bezel stays inside the
-// track, and grows toward 0.9 when active for the "splash" effect.
-const THUMB_REST_SCALE = 0.65
-const THUMB_ACTIVE_SCALE = 0.9
+// Geometry constants pulled from tokens (article-faithful defaults).
+// Thumb is bigger than its visible slot, scaled DOWN at rest so its
+// bezel stays inside the track, and grows toward 0.9 when active for
+// the "splash" effect.
+const THUMB_REST_SCALE =
+  props.thumbRestScale ?? LIQUID_INPUT_TOKENS.geometry.thumbRestScale
+const THUMB_ACTIVE_SCALE =
+  props.thumbActiveScale ?? LIQUID_INPUT_TOKENS.geometry.thumbActiveScale
 // Actual (unscaled) thumb dims. Multiplying by 1/REST_SCALE keeps the
 // rest-state visual size equal to the tab slot (and the active scale
 // then overflows slightly into neighbors — same as Switch.tsx).
@@ -134,31 +145,35 @@ const thumbScaleRaw = computed(
     THUMB_REST_SCALE +
     (THUMB_ACTIVE_SCALE - THUMB_REST_SCALE) * activeRaw.value
 )
-const thumbScale = useSpring(thumbScaleRaw, {
-  stiffness: 2000,
-  damping: 80,
-})
+const thumbScale = useSpring(
+  thumbScaleRaw,
+  LIQUID_INPUT_TOKENS.springs.thumbScale
+)
 
 // Background opacity on the thumb: 1 at rest → 0.1 while pressed.
 const thumbBgOpacityRaw = computed(() => 1 - 0.9 * activeRaw.value)
-const thumbBgOpacity = useSpring(thumbBgOpacityRaw, {
-  stiffness: 2000,
-  damping: 80,
-})
+const thumbBgOpacity = useSpring(
+  thumbBgOpacityRaw,
+  LIQUID_INPUT_TOKENS.springs.thumbBgOpacity
+)
 
-// Filter scale ratio: (0.4 + 0.5·active) — same formula as the article.
-const filterScaleRatioRaw = computed(() => 0.4 + 0.5 * activeRaw.value)
-const filterScaleRatio = useSpring(filterScaleRatioRaw)
+// Filter scale ratio: (0.4 + 0.5·active)·refractionBase.
+const refractionBase =
+  props.refractionBase ?? LIQUID_INPUT_TOKENS.filter.refractionBase
+const filterScaleRatioRaw = computed(
+  () => (0.4 + 0.5 * activeRaw.value) * refractionBase
+)
+const filterScaleRatio = useSpring(
+  filterScaleRatioRaw,
+  LIQUID_INPUT_TOKENS.springs.filterScale
+)
 
 // xRatio: thumb position in [0..N-1]. Spring-tracks xDragRatio during
-// drag and currentIndex when at rest — verbatim from Switch.tsx.
+// drag and currentIndex when at rest.
 const xRatioTarget = computed(() =>
   isPressed.value ? xDragRatio.value : currentIndex.value
 )
-const xRatio = useSpring(xRatioTarget, {
-  stiffness: 1000,
-  damping: 80,
-})
+const xRatio = useSpring(xRatioTarget, LIQUID_INPUT_TOKENS.springs.xRatio)
 
 function isActive(i: number): boolean {
   // While pressed, the active label tracks the snap target preview
@@ -220,18 +235,25 @@ const thumbStyle = computed(() => {
   }
 })
 
+// v-liquid-glass options sourced from tokens (with prop overrides for
+// blur / specularOpacity / specularSaturation / refractionBase /
+// surface / bezelWidth / glassThickness / refractiveIndex). The
+// segmented thumb has a translucent track behind it so we keep the
+// `chain: ''` already in tokens (no extra blur layer).
 const thumbLg = computed(() => ({
-  surface: 'lip' as const,
-  bezel: 19,
-  glassThickness: 47,
-  refractiveIndex: 1.5,
-  specularOpacity: 0.5,
-  saturation: 6,
-  blur: 0.2,
+  ...liquidFilterOptions({
+    blur: props.blur,
+    specularOpacity: props.specularOpacity,
+    specularSaturation: props.specularSaturation,
+    refractionBase: props.refractionBase,
+    surface: props.surface,
+    bezelWidth: props.bezelWidth,
+    glassThickness: props.glassThickness,
+    refractiveIndex: props.refractiveIndex,
+    forceActive: isPressed.value,
+    refractionRatio: filterScaleRatio.value,
+  }),
   chain: 'var(--glass-blur)',
-  scaleStates: { idle: 0.4, hover: 0.4, active: 0.9 },
-  forceActive: isPressed.value,
-  scaleRatio: filterScaleRatio.value,
 }))
 
 // === Drag flow (mirrors Switch.tsx) ================================

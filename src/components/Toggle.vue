@@ -47,13 +47,21 @@
 import { computed, onBeforeUnmount, ref } from 'vue'
 import { useHaptics } from '../composables/useHaptics'
 import { useSpring } from '../composables/useSpring'
+import {
+  LIQUID_INPUT_TOKENS,
+  liquidFilterOptions,
+  type LiquidFilterParams,
+  type LiquidGeometryParams,
+} from '../lib/liquidGlass/tokens'
 
-interface Props {
+interface Props extends Partial<LiquidFilterParams & LiquidGeometryParams> {
   modelValue: boolean
   disabled?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  disabled: false,
+})
 const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>()
 const haptics = useHaptics()
 
@@ -63,20 +71,34 @@ const SLIDER_WIDTH = 160
 const THUMB_WIDTH = 146
 const THUMB_HEIGHT = 92
 const THUMB_RADIUS = THUMB_HEIGHT / 2
-const THUMB_REST_SCALE = 0.65
-const THUMB_ACTIVE_SCALE = 0.9
-const THUMB_REST_OFFSET = ((1 - THUMB_REST_SCALE) * THUMB_WIDTH) / 2
-const TRAVEL =
-  SLIDER_WIDTH - SLIDER_HEIGHT - (THUMB_WIDTH - THUMB_HEIGHT) * THUMB_REST_SCALE
+const THUMB_REST_SCALE = computed(
+  () => props.thumbRestScale ?? LIQUID_INPUT_TOKENS.geometry.thumbRestScale
+)
+const THUMB_ACTIVE_SCALE = computed(
+  () => props.thumbActiveScale ?? LIQUID_INPUT_TOKENS.geometry.thumbActiveScale
+)
+const THUMB_REST_OFFSET = computed(
+  () => ((1 - THUMB_REST_SCALE.value) * THUMB_WIDTH) / 2
+)
+const TRAVEL = computed(
+  () =>
+    SLIDER_WIDTH -
+    SLIDER_HEIGHT -
+    (THUMB_WIDTH - THUMB_HEIGHT) * THUMB_REST_SCALE.value
+)
 
-// === Filter parameters (verbatim) ==================================
-const BLUR = 0.2
-const SPECULAR_OPACITY = 0.5
-const SPECULAR_SATURATION = 6
-const REFRACTION_BASE = 1
-const GLASS_THICKNESS = 47
-const BEZEL_WIDTH = 19
-const REFRACTIVE_INDEX = 1.5
+// === Filter parameters (token-defaulted, prop-overridable) =========
+const BLUR = computed(() => props.blur ?? LIQUID_INPUT_TOKENS.filter.blur)
+const SPECULAR_OPACITY = computed(
+  () => props.specularOpacity ?? LIQUID_INPUT_TOKENS.filter.specularOpacity
+)
+const SPECULAR_SATURATION = computed(
+  () =>
+    props.specularSaturation ?? LIQUID_INPUT_TOKENS.filter.specularSaturation
+)
+const REFRACTION_BASE = computed(
+  () => props.refractionBase ?? LIQUID_INPUT_TOKENS.filter.refractionBase
+)
 
 // === Reactive state ================================================
 const isOn = computed(() => props.modelValue)
@@ -91,52 +113,51 @@ const movedFlag = ref(false)
 const activeRaw = computed(() => (isPressed.value ? 1 : 0))
 
 // Background opacity on the thumb: 1 at rest → 0.1 while pressed.
-// Spring stiffness/damping verbatim from Switch.tsx backgroundOpacity.
+// Spring config from tokens (springs.thumbBgOpacity).
 const thumbBgOpacityRaw = computed(() => 1 - 0.9 * activeRaw.value)
-const thumbBgOpacity = useSpring(thumbBgOpacityRaw, {
-  stiffness: 2000,
-  damping: 80,
-})
+const thumbBgOpacity = useSpring(
+  thumbBgOpacityRaw,
+  LIQUID_INPUT_TOKENS.springs.thumbBgOpacity
+)
 
-// Thumb scale: 0.65 → 0.9, spring stiffness/damping from Switch.tsx
-// thumbScale.
+// Thumb scale: 0.65 → 0.9, spring config from tokens (springs.thumbScale).
 const thumbScaleRaw = computed(
   () =>
-    THUMB_REST_SCALE +
-    (THUMB_ACTIVE_SCALE - THUMB_REST_SCALE) * activeRaw.value
+    THUMB_REST_SCALE.value +
+    (THUMB_ACTIVE_SCALE.value - THUMB_REST_SCALE.value) * activeRaw.value
 )
-const thumbScale = useSpring(thumbScaleRaw, {
-  stiffness: 2000,
-  damping: 80,
-})
+const thumbScale = useSpring(
+  thumbScaleRaw,
+  LIQUID_INPUT_TOKENS.springs.thumbScale
+)
 
 // SVG filter scale ratio = (0.4 + 0.5·active) × refractionBase, then
-// spring-smoothed.
+// spring-smoothed (spec §3, springs.filterScale).
 const filterScaleRatioRaw = computed(
-  () => (0.4 + 0.5 * activeRaw.value) * REFRACTION_BASE
+  () => (0.4 + 0.5 * activeRaw.value) * REFRACTION_BASE.value
 )
-const filterScaleRatio = useSpring(filterScaleRatioRaw)
+const filterScaleRatio = useSpring(
+  filterScaleRatioRaw,
+  LIQUID_INPUT_TOKENS.springs.filterScale
+)
 
 // During drag, considerChecked uses xDragRatio; otherwise checked.
+// Spring config from tokens (springs.considerChecked).
 const considerCheckedRaw = computed(() =>
   isPressed.value ? (xDragRatio.value > 0.5 ? 1 : 0) : isOn.value ? 1 : 0
 )
-// Spring-smoothed (damping/stiffness from Switch.tsx backgroundColor).
-const considerChecked = useSpring(considerCheckedRaw, {
-  stiffness: 1000,
-  damping: 80,
-})
+const considerChecked = useSpring(
+  considerCheckedRaw,
+  LIQUID_INPUT_TOKENS.springs.considerChecked
+)
 
 // xRatio: thumb position ratio in [0..1]. During drag it follows
 // xDragRatio (which itself includes rubber-band overflow), otherwise
-// it's the discrete on/off. Spring stiffness/damping from Switch.tsx.
+// it's the discrete on/off. Spring config from tokens (springs.xRatio).
 const xRatioTarget = computed(() =>
   isPressed.value ? xDragRatio.value : isOn.value ? 1 : 0
 )
-const xRatio = useSpring(xRatioTarget, {
-  stiffness: 1000,
-  damping: 80,
-})
+const xRatio = useSpring(xRatioTarget, LIQUID_INPUT_TOKENS.springs.xRatio)
 
 // Mix two hex colors with alpha. Used to crossfade the track.
 function mixHex(a: string, b: string, t: number): string {
@@ -163,12 +184,16 @@ const trackStyle = computed(() => ({
   height: `${SLIDER_HEIGHT}px`,
   borderRadius: `${SLIDER_HEIGHT / 2}px`,
   // Track color crossfades between off-grey and on-green driven by the
-  // spring on considerChecked — same colors as the article.
-  backgroundColor: mixHex('#94949F77', '#3BBF4EEE', considerChecked.value),
+  // spring on considerChecked — exact colors from the tokens.
+  backgroundColor: mixHex(
+    LIQUID_INPUT_TOKENS.switchTrack.off,
+    LIQUID_INPUT_TOKENS.switchTrack.on,
+    considerChecked.value
+  ),
 }))
 
 const thumbStyle = computed(() => {
-  const x = xRatio.value * TRAVEL
+  const x = xRatio.value * TRAVEL.value
   const baseShadow = '0 4px 22px rgba(0,0,0,0.1)'
   // Inset shadow appears only while pressed (verbatim from the article).
   const pressedShadow = isPressed.value
@@ -179,8 +204,8 @@ const thumbStyle = computed(() => {
     height: `${THUMB_HEIGHT}px`,
     borderRadius: `${THUMB_RADIUS}px`,
     marginLeft: `${
-      -THUMB_REST_OFFSET +
-      (SLIDER_HEIGHT - THUMB_HEIGHT * THUMB_REST_SCALE) / 2
+      -THUMB_REST_OFFSET.value +
+      (SLIDER_HEIGHT - THUMB_HEIGHT * THUMB_REST_SCALE.value) / 2
     }px`,
     top: `${SLIDER_HEIGHT / 2}px`,
     transform: `translateY(-50%) translateX(${x}px) scale(${thumbScale.value})`,
@@ -192,22 +217,23 @@ const thumbStyle = computed(() => {
   }
 })
 
-const thumbLg = computed(() => ({
-  surface: 'lip' as const,
-  bezel: BEZEL_WIDTH,
-  glassThickness: GLASS_THICKNESS,
-  refractiveIndex: REFRACTIVE_INDEX,
-  specularOpacity: SPECULAR_OPACITY,
-  saturation: SPECULAR_SATURATION,
-  blur: BLUR,
-  chain: '',
-  // The article's filter scale follows a continuous formula. We mirror
-  // it with idle/active scaleStates and let the directive interpolate;
-  // forceActive pins it during drag (when pointer can leave the thumb).
-  scaleStates: { idle: 0.4, hover: 0.4, active: 0.9 },
-  forceActive: isPressed.value,
-  scaleRatio: filterScaleRatio.value,
-}))
+// Build the v-liquid-glass options from the tokens helper. Per-instance
+// prop overrides flow through here, so a Toggle with refractionBase=0.5
+// gets idle:0.2 / active:0.45 endpoints automatically.
+const thumbLg = computed(() =>
+  liquidFilterOptions({
+    blur: BLUR.value,
+    specularOpacity: SPECULAR_OPACITY.value,
+    specularSaturation: SPECULAR_SATURATION.value,
+    refractionBase: REFRACTION_BASE.value,
+    surface: props.surface,
+    bezelWidth: props.bezelWidth,
+    glassThickness: props.glassThickness,
+    refractiveIndex: props.refractiveIndex,
+    forceActive: isPressed.value,
+    refractionRatio: filterScaleRatio.value,
+  })
+)
 
 // === Pointer handling (matches Switch.tsx flow) =====================
 
@@ -223,21 +249,22 @@ function processMove(clientX: number) {
   if (!isPressed.value) return
   const baseRatio = isOn.value ? 1 : 0
   const dx = clientX - initialPointerX.value
-  if (Math.abs(dx) > 4) {
+  if (Math.abs(dx) > LIQUID_INPUT_TOKENS.drag.tapThreshold) {
     isDragging.value = true
     movedFlag.value = true
   }
-  const ratio = baseRatio + dx / TRAVEL
+  const ratio = baseRatio + dx / TRAVEL.value
   const overflow = ratio < 0 ? -ratio : ratio > 1 ? ratio - 1 : 0
   const overflowSign = ratio < 0 ? -1 : 1
-  const dampedOverflow = (overflowSign * overflow) / 22
+  const dampedOverflow =
+    (overflowSign * overflow) / LIQUID_INPUT_TOKENS.drag.overflowDamping
   xDragRatio.value = Math.min(1, Math.max(0, ratio)) + dampedOverflow
 }
 
 function endDrag(clientX: number) {
   if (!isPressed.value) return
   const dx = clientX - initialPointerX.value
-  const moved = Math.abs(dx) > 4
+  const moved = Math.abs(dx) > LIQUID_INPUT_TOKENS.drag.tapThreshold
   if (moved) {
     const next = xDragRatio.value > 0.5
     if (next !== isOn.value) {
