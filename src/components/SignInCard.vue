@@ -6,15 +6,20 @@
          never mutates — which fixes the autofill-clears-value bug. -->
     <template v-if="step === 'email'">
       <!-- Social providers — 2-column grid with a tinted icon chip and
-           a centered label below it. -->
-      <div class="provider-grid">
+           a centered label below it. Disabled until OAuth providers
+           are wired up in Supabase; we still render the grid so users
+           see what's on the way. -->
+      <div
+        class="provider-grid"
+        :class="{ 'provider-grid-disabled': !socialEnabled }"
+      >
         <button
           v-for="p in providers"
           :key="p.id"
           type="button"
           class="provider-btn"
           :class="`provider-${p.id}`"
-          :disabled="busy !== null"
+          :disabled="!socialEnabled || busy !== null"
           :aria-label="t(`cloud.${p.labelKey}`)"
           @click="onProvider(p.id)"
         >
@@ -25,6 +30,10 @@
           </template>
         </button>
       </div>
+      <p v-if="!socialEnabled" class="provider-hint">
+        <span class="chip chip-brand chip-soon">{{ t('cloud.coming_soon') }}</span>
+        <span>{{ t('cloud.social_coming_soon') }}</span>
+      </p>
 
       <div class="divider">
         <span>{{ t('cloud.or_with_email') }}</span>
@@ -207,7 +216,7 @@
 <script setup lang="ts">
 import { nextTick, ref } from 'vue'
 import { useI18n } from '../i18n'
-import { useAuth, type SocialProvider } from '../composables/useAuth'
+import { useAuth, SOCIAL_LOGIN_ENABLED, type SocialProvider } from '../composables/useAuth'
 
 const emit = defineEmits<{
   'signed-in': []
@@ -215,6 +224,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const auth = useAuth()
+const socialEnabled = SOCIAL_LOGIN_ENABLED
 
 type Step = 'email' | 'password-existing' | 'password-new'
 type Busy = null | 'email' | 'submit' | SocialProvider
@@ -435,6 +445,22 @@ async function onProvider(provider: SocialProvider): Promise<void> {
   gap: 12px;
   margin-bottom: 16px;
 }
+/* Visual cue when social providers aren't wired up yet — buttons stay
+   visible but flat-disabled so users know what's on the way. */
+.provider-grid-disabled {
+  filter: grayscale(0.35);
+  opacity: 0.78;
+}
+.provider-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 14px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.chip-soon { font-size: 10px; padding: 3px 8px; }
 .provider-btn {
   position: relative;
   display: flex;

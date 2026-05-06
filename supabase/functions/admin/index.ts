@@ -342,8 +342,8 @@ async function actionIntensityBreakdown() {
 async function actionUserList(limit: number) {
   const sb = adminClient()
   const { data, error } = await sb.rpc('admin_user_list', { row_limit: limit })
-  if (error || !data) return []
-  return data
+  if (error) throw new Error(`admin_user_list: ${error.message}`)
+  return data ?? []
 }
 
 async function actionDauTimeseries(days: number) {
@@ -353,7 +353,7 @@ async function actionDauTimeseries(days: number) {
   const { data, error } = await sb.rpc('admin_dau_per_day', {
     since_date: since.toISOString().slice(0, 10),
   })
-  if (error) return emptyTimeseries(days)
+  if (error) throw new Error(`admin_dau_per_day: ${error.message}`)
   if (Array.isArray(data)) {
     const known = new Map<string, number>()
     for (const r of data as Array<{ day: string; count: number }>) {
@@ -370,8 +370,9 @@ async function actionDauTimeseries(days: number) {
 async function actionHourlyDistribution() {
   const sb = adminClient()
   const { data, error } = await sb.rpc('admin_hourly_distribution')
+  if (error) throw new Error(`admin_hourly_distribution: ${error.message}`)
   const buckets: number[] = Array.from({ length: 24 }, () => 0)
-  if (!error && Array.isArray(data)) {
+  if (Array.isArray(data)) {
     for (const r of data as Array<{ hour: number; count: number }>) {
       const h = Number(r.hour)
       if (h >= 0 && h < 24) buckets[h] = Number(r.count)
@@ -383,9 +384,10 @@ async function actionHourlyDistribution() {
 async function actionWeekdayDistribution() {
   const sb = adminClient()
   const { data, error } = await sb.rpc('admin_weekday_distribution')
+  if (error) throw new Error(`admin_weekday_distribution: ${error.message}`)
   // ISO weekday: 1=Mon..7=Sun
   const buckets: number[] = Array.from({ length: 7 }, () => 0)
-  if (!error && Array.isArray(data)) {
+  if (Array.isArray(data)) {
     for (const r of data as Array<{ weekday: number; count: number }>) {
       const d = Number(r.weekday) - 1
       if (d >= 0 && d < 7) buckets[d] = Number(r.count)
@@ -398,7 +400,8 @@ async function actionWeekdayDistribution() {
 async function actionPlanStatus() {
   const sb = adminClient()
   const { data, error } = await sb.rpc('admin_plan_status')
-  if (error || !Array.isArray(data)) return []
+  if (error) throw new Error(`admin_plan_status: ${error.message}`)
+  if (!Array.isArray(data)) return []
   return (data as Array<{ status: string; count: number }>).map((r) => ({
     status: r.status,
     count: Number(r.count),
@@ -408,8 +411,8 @@ async function actionPlanStatus() {
 async function actionEngagementFunnel() {
   const sb = adminClient()
   const { data, error } = await sb.rpc('admin_engagement_funnel')
-  if (error || !Array.isArray(data)) return []
-  // Preserve the order of the steps as the RPC returns them.
+  if (error) throw new Error(`admin_engagement_funnel: ${error.message}`)
+  if (!Array.isArray(data)) return []
   return (data as Array<{ step: string; count: number }>).map((r) => ({
     step: r.step,
     count: Number(r.count),

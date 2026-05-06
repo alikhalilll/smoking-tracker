@@ -11,6 +11,12 @@ export const ALL_SOCIAL_PROVIDERS: ReadonlyArray<SocialProvider> = [
   'github',
 ]
 
+/** Flip to `true` once OAuth providers are configured in Supabase
+ *  (Authentication → Providers). Until then the social login + linking
+ *  UI is rendered as "Coming soon" — visible but non-interactive — so
+ *  users know the feature is on the way without seeing broken redirects. */
+export const SOCIAL_LOGIN_ENABLED = false
+
 /** Display label for a provider (used in Settings → Linked accounts). */
 export const PROVIDER_LABELS: Record<SocialProvider, string> = {
   google: 'Google',
