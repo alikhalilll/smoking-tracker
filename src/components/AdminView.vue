@@ -1,5 +1,5 @@
 <template>
-  <div class="admin-host">
+  <div class="admin-fill">
     <AdminLogin
       v-if="!isAuthed"
       @authed="onAuthed"
@@ -27,17 +27,23 @@ const api = useAdminApi()
 const isAuthed = computed(() => api.isAuthed.value)
 
 function onAuthed(): void {
-  // Reactive — `isAuthed` will already be true; nothing to do.
+  /* reactive — `isAuthed` flips to true */
 }
-
 function onSignedOut(): void {
-  // Reactive — flips back to AdminLogin automatically.
+  /* reactive — `isAuthed` flips back to false */
 }
 </script>
 
 <style scoped>
-.admin-host {
-  min-height: 100dvh;
+/* Lifts the admin out of the app's normal layout so it can claim the
+   entire viewport (sidebar + main) without inheriting any padding
+   from the App shell. */
+.admin-fill {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
   background: var(--bg);
+  overflow: hidden;
+  display: flex;
 }
 </style>

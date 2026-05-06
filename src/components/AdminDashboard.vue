@@ -1,48 +1,88 @@
 <template>
-  <div class="admin-dashboard">
-    <!-- Top header -->
-    <header class="admin-header">
-      <div class="admin-titles">
-        <h1 class="h-section admin-title">Smoking Tracker · Admin</h1>
-        <p class="h-section-sub">
-          Last refreshed {{ lastRefreshLabel }}
-          <span v-if="loading" class="muted">· loading…</span>
-        </p>
-      </div>
-      <div class="admin-actions">
-        <div class="admin-select">
-          <Select
-            v-model="windowKey"
-            :options="windowOptions"
-            title="Date range"
-          />
-        </div>
-        <button class="btn btn-ghost btn-pill" :disabled="loading" @click="loadAll">
-          <span v-if="loading" class="spinner" />
-          {{ loading ? 'Refreshing…' : 'Refresh' }}
+  <div class="admin-shell" :class="{ 'sidebar-open': mobileNavOpen }">
+    <!-- Sidebar (desktop persistent, mobile drawer) -->
+    <aside class="admin-sidebar" :class="{ open: mobileNavOpen }">
+      <header class="sidebar-brand">
+        <span class="brand-glyph" aria-hidden="true">📊</span>
+        <span class="brand-text">
+          <span class="brand-name">Smoking Tracker</span>
+          <span class="brand-sub">Admin</span>
+        </span>
+      </header>
+
+      <nav class="sidebar-nav" aria-label="Dashboard sections">
+        <button
+          v-for="t in tabs"
+          :key="t.id"
+          class="nav-item"
+          :class="{ active: activeTab === t.id }"
+          :aria-current="activeTab === t.id ? 'page' : undefined"
+          @click="onPickTab(t.id)"
+        >
+          <span class="nav-icon" v-html="navIcons[t.id]" />
+          <span class="nav-label">{{ t.label }}</span>
+          <span v-if="t.badge != null" class="chip chip-brand nav-badge">
+            {{ t.badge }}
+          </span>
         </button>
-        <button class="btn btn-ghost btn-pill" @click="onSignOut">Sign out</button>
-        <button class="btn btn-ghost btn-pill" @click="emit('exit')">← App</button>
-      </div>
-    </header>
+      </nav>
 
-    <div v-if="error" class="chip chip-danger admin-error">{{ error }}</div>
+      <footer class="sidebar-footer">
+        <button class="nav-item nav-item-ghost" @click="onSignOut">
+          <span class="nav-icon" v-html="iconSignOut" />
+          <span class="nav-label">Sign out</span>
+        </button>
+        <button class="nav-item nav-item-ghost" @click="emit('exit')">
+          <span class="nav-icon" v-html="iconBack" />
+          <span class="nav-label">Back to app</span>
+        </button>
+      </footer>
+    </aside>
 
-    <!-- Tab bar — reuses the segmented-row pattern from Settings -->
-    <div class="segmented-row admin-tabs" role="tablist">
-      <button
-        v-for="t in tabs"
-        :key="t.id"
-        class="seg-btn"
-        :class="{ active: activeTab === t.id }"
-        role="tab"
-        :aria-selected="activeTab === t.id"
-        @click="activeTab = t.id"
-      >
-        <span>{{ t.label }}</span>
-        <span v-if="t.badge != null" class="chip chip-brand seg-badge">{{ t.badge }}</span>
-      </button>
-    </div>
+    <!-- Mobile sidebar scrim -->
+    <div
+      v-if="mobileNavOpen"
+      class="sidebar-scrim"
+      role="presentation"
+      @click="mobileNavOpen = false"
+    />
+
+    <!-- Main content area -->
+    <main class="admin-main">
+      <header class="admin-toolbar glass">
+        <button
+          class="btn btn-icon admin-burger"
+          :aria-label="'Toggle navigation'"
+          @click="mobileNavOpen = !mobileNavOpen"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+
+        <div class="toolbar-titles">
+          <h1 class="h-section toolbar-title">{{ activeTabLabel }}</h1>
+          <p class="h-section-sub toolbar-sub">
+            <span>Last refreshed {{ lastRefreshLabel }}</span>
+            <span v-if="loading" class="muted">· loading…</span>
+          </p>
+        </div>
+
+        <div class="toolbar-actions">
+          <div class="admin-select">
+            <Select
+              v-model="windowKey"
+              :options="windowOptions"
+              title="Date range"
+            />
+          </div>
+          <button class="btn btn-ghost btn-pill toolbar-refresh" :disabled="loading" @click="loadAll">
+            <span v-if="loading" class="spinner" />
+            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+            <span class="refresh-label">{{ loading ? 'Refreshing…' : 'Refresh' }}</span>
+          </button>
+        </div>
+      </header>
+
+      <div v-if="error" class="chip chip-danger admin-error">{{ error }}</div>
 
     <!-- ============================== OVERVIEW ============================== -->
     <template v-if="activeTab === 'overview'">
@@ -260,6 +300,7 @@
         </div>
       </section>
     </template>
+    </main>
   </div>
 </template>
 
@@ -407,6 +448,26 @@ const tabs = computed<Array<{ id: TabId; label: string; badge?: number | null }>
   { id: 'behavior', label: 'Behavior' },
   { id: 'users', label: 'Users', badge: users.value.length || null },
 ])
+
+const activeTabLabel = computed(
+  () => tabs.value.find((t) => t.id === activeTab.value)?.label ?? 'Overview'
+)
+
+const mobileNavOpen = ref(false)
+function onPickTab(id: TabId): void {
+  activeTab.value = id
+  mobileNavOpen.value = false
+}
+
+const navIcons: Record<TabId, string> = {
+  overview: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>`,
+  activity: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+  behavior: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>`,
+  users: `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+}
+
+const iconSignOut = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>`
+const iconBack = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>`
 
 const tiles = computed(() => {
   const o = overview.value
@@ -727,48 +788,198 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* Layout-only — visual primitives (.card, .chip, .btn, .tinted-card,
-   .field-input, .segmented-row, .h-section) come from the shared
-   components.css so the admin matches the rest of the app. */
+/* SaaS-style layout — sidebar + main. Visual primitives come from
+   the shared components.css (.card, .chip, .btn, .tinted-card,
+   .field-input, .h-section) so the admin matches the rest of the
+   app. */
 
-.admin-dashboard {
+.admin-shell {
+  display: grid;
+  grid-template-columns: 256px 1fr;
   width: 100%;
-  padding: 24px clamp(16px, 3vw, 40px) calc(40px + env(safe-area-inset-bottom));
+  height: 100%;
   color: var(--text);
+}
+
+/* --- Sidebar ---------------------------------------------------- */
+.admin-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 12px;
+  padding: 22px 14px;
+  background: var(--card);
+  border-inline-end: 1px solid var(--border);
+  overflow-y: auto;
+  height: 100%;
+}
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.brand-glyph {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--brand-grad-from), var(--brand-grad-to));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  box-shadow: var(--brand-shadow);
+}
+.brand-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+.brand-name {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.brand-sub {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+.sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
 
-/* Header --------------------------------------------------------- */
-.admin-header {
+.nav-item {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.nav-item:hover {
+  background: var(--btn-ghost-bg);
+  color: var(--text);
+}
+.nav-item.active {
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+.nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.nav-label {
+  flex: 1;
+  text-align: start;
+}
+.nav-badge {
+  padding: 2px 8px;
+  font-size: 10px;
+}
+.nav-item-ghost {
+  color: var(--muted);
+}
+
+.sidebar-scrim {
+  display: none;
+}
+
+/* --- Main ------------------------------------------------------- */
+.admin-main {
+  overflow-y: auto;
+  height: 100%;
+  padding-bottom: calc(40px + env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+}
+.admin-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px clamp(16px, 3vw, 32px);
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+}
+.admin-burger {
+  display: none;
+}
+.toolbar-titles {
+  flex: 1;
+  min-width: 0;
+}
+.toolbar-title {
+  margin: 0;
+  font-size: 18px;
+}
+.toolbar-sub {
+  margin: 0;
+  display: flex;
+  gap: 4px;
+  align-items: baseline;
   flex-wrap: wrap;
 }
-.admin-titles { min-width: 0; }
-.admin-title { margin: 0 0 2px; }
-.admin-actions {
+.toolbar-actions {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
-.admin-error { align-self: flex-start; padding: 8px 14px; }
+.toolbar-refresh .refresh-label {
+  display: inline;
+}
 .muted { color: var(--muted); }
+.admin-error {
+  align-self: flex-start;
+  margin: 14px clamp(16px, 3vw, 32px) 0;
+  padding: 8px 14px;
+}
 
-/* Compact field — used for the time window and filter inputs in
-   header/table rows. Smaller padding than .field-input default. */
+/* Inline content padding — every section inside .admin-main */
+.tile-grid,
+.admin-section,
+.chart-grid {
+  margin-inline: clamp(16px, 3vw, 32px);
+}
+.tile-grid { margin-top: 18px; }
+.admin-section { margin-top: 14px; }
+.chart-grid { margin-top: 14px; }
+
+/* Compact field — used for filter inputs in table tools. */
 .field-input-compact {
   padding: 8px 12px;
   font-size: 13px;
   border-radius: 10px;
   width: auto;
-  min-width: 160px;
+  min-width: 180px;
 }
-/* Wrap around the shared Select component so its inner field-input
-   shrinks to fit the toolbar. */
 .admin-select {
   min-width: 170px;
 }
@@ -776,20 +987,6 @@ onMounted(() => {
   padding: 8px 12px;
   font-size: 13px;
   border-radius: 10px;
-}
-
-/* Tab bar — segmented-row width-auto so it doesn't stretch full
-   width on desktop. */
-.admin-tabs {
-  align-self: flex-start;
-  position: sticky;
-  top: 8px;
-  z-index: 5;
-}
-.seg-badge {
-  margin-inline-start: 6px;
-  padding: 2px 8px;
-  font-size: 10px;
 }
 
 /* KPI tiles — built from .tinted-card primitives */
@@ -977,13 +1174,51 @@ onMounted(() => {
   padding: 18px;
 }
 
-@media (max-width: 720px) {
+/* Tablet — narrower sidebar */
+@media (max-width: 1100px) {
+  .admin-shell { grid-template-columns: 220px 1fr; }
+}
+
+/* Mobile — sidebar becomes an off-canvas drawer */
+@media (max-width: 860px) {
+  .admin-shell { grid-template-columns: 1fr; }
+  .admin-sidebar {
+    position: fixed;
+    inset-inline-start: 0;
+    top: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 86vw;
+    z-index: 30;
+    transform: translateX(-100%);
+    transition: transform 0.28s cubic-bezier(0.22, 0.61, 0.36, 1);
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+  }
+  [dir='rtl'] .admin-sidebar {
+    inset-inline-start: auto;
+    inset-inline-end: 0;
+    transform: translateX(100%);
+  }
+  .admin-sidebar.open { transform: translateX(0); }
+  .sidebar-scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+    z-index: 25;
+  }
+  .admin-burger { display: inline-flex; }
+  .toolbar-refresh .refresh-label { display: none; }
+}
+
+@media (max-width: 540px) {
+  .admin-toolbar { gap: 10px; padding: 12px 16px; }
+  .toolbar-title { font-size: 16px; }
   .funnel-row {
     grid-template-columns: 1fr;
     gap: 6px;
   }
   .funnel-pct { text-align: start; }
-  .admin-actions { width: 100%; }
-  .field-input-compact { flex: 1; min-width: 0; }
 }
 </style>
