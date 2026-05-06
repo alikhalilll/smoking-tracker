@@ -186,7 +186,11 @@
          lights up brand-coral with a soft circular highlight around
          just the icon. No morphing indicator — labels are static so
          each tab keeps a fixed footprint. -->
-    <nav v-if="view !== 'admin'" class="nav-bar glass">
+    <nav
+      v-if="view !== 'admin'"
+      v-liquid-glass="{ surface: 'convex', bezel: 12, glassThickness: 80, scaleRatio: 0.85, specularOpacity: 0.3 }"
+      class="nav-bar glass"
+    >
       <button
         v-for="(tab, i) in tabs"
         :key="tab.id"
