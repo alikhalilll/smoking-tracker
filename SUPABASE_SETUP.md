@@ -431,7 +431,7 @@ as $$
 begin
   return query
     select u.id,
-           u.email,
+           u.email::text,
            u.created_at,
            u.last_sign_in_at,
            u.email_confirmed_at,
