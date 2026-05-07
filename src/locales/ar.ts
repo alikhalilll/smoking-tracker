@@ -23,7 +23,7 @@ const ar = {
     history: 'السجل',
     quit: 'الإقلاع',
     leaderboard: 'الترتيب',
-    settings: '···',
+    settings: 'الاعدادات',
   },
   leaderboard: {
     title: 'لوحة الإقلاع',
