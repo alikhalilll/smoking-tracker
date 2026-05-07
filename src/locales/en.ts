@@ -23,7 +23,7 @@ const en = {
     history: 'History',
     quit: 'Quit',
     leaderboard: 'Top',
-    settings: '···',
+    settings: 'Settings',
   },
   leaderboard: {
     title: 'Quitting leaderboard',

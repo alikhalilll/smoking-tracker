@@ -187,67 +187,29 @@
          just the icon. No morphing indicator — labels are static so
          each tab keeps a fixed footprint. -->
     <!--
-      Dribbble-style bottom nav: floating glass pill split into two
-      tab clusters with a raised center FAB for the primary action
-      (quick-log a cigarette). The FAB is brand-coloured, scales on
-      press, and warps the underlying surface via the same liquid-
-      glass refraction the Switch uses (LiquidPress wrapper).
+      "Stock" bottom navigation pattern (Dribbble shot 25832948):
+      a floating dark pill containing N tabs. Inactive tabs are
+      circular icon-only buttons; the active tab expands horizontally
+      into a green pill that shows icon + label. The bar still uses
+      liquid-glass refraction so the page content underneath warps.
     -->
     <nav
       v-if="view !== 'admin'"
       v-liquid-glass="navBarLg"
       class="nav-bar"
     >
-      <div class="nav-side">
-        <button
-          v-for="tab in navTabsLeft"
-          :key="tab.id"
-          class="nav-tab"
-          :class="{ 'is-active': view === tab.id }"
-          :aria-current="view === tab.id ? 'page' : undefined"
-          :aria-label="tab.label"
-          @click="onTabClick(tab.id)"
-        >
-          <span class="nav-tab-icon" v-html="tab.icon" />
-          <span class="nav-tab-label">{{ tab.label }}</span>
-        </button>
-      </div>
-
-      <LiquidPress
-        class="nav-fab"
-        :refraction-base="0"
-        :aria-label="t('home.log_one')"
-        @click="onQuickLog"
+      <button
+        v-for="tab in navTabs"
+        :key="tab.id"
+        class="nav-tab"
+        :class="{ 'is-active': view === tab.id }"
+        :aria-current="view === tab.id ? 'page' : undefined"
+        :aria-label="tab.label"
+        @click="onTabClick(tab.id)"
       >
-        <svg
-          class="nav-fab-icon"
-          width="28"
-          height="28"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.4"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        >
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-      </LiquidPress>
-
-      <div class="nav-side">
-        <button
-          v-for="tab in navTabsRight"
-          :key="tab.id"
-          class="nav-tab"
-          :class="{ 'is-active': view === tab.id }"
-          :aria-current="view === tab.id ? 'page' : undefined"
-          :aria-label="tab.label"
-          @click="onTabClick(tab.id)"
-        >
-          <span class="nav-tab-icon" v-html="tab.icon" />
-          <span class="nav-tab-label">{{ tab.label }}</span>
-        </button>
-      </div>
+        <span class="nav-tab-icon" v-html="tab.icon" />
+        <span class="nav-tab-label">{{ tab.label }}</span>
+      </button>
     </nav>
 
     <!-- Full report drawer -->
@@ -308,7 +270,6 @@ import ConfirmDrawer from './components/ConfirmDrawer.vue'
 import Toast from './components/Toast.vue'
 import UpdatePrompt from './components/UpdatePrompt.vue'
 import OnboardingOverlay from './components/OnboardingOverlay.vue'
-import LiquidPress from './components/LiquidPress.vue'
 import { useOnboarding, type OnboardingStep } from './composables/useOnboarding'
 import type { QuitIntensity } from './types'
 
@@ -325,46 +286,48 @@ const ICONS: Record<TabId, string> = {
   history: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
   quit: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>`,
   leaderboard: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4M17 4H7v6a5 5 0 0 0 10 0V4z"/><path d="M17 6h2a2 2 0 0 1 0 4h-2M7 6H5a2 2 0 0 0 0 4h2"/></svg>`,
-  settings: `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
+  // Heroicons-style filled gear. Bolder than Lucide's stroke-only
+  // version so the teeth are unambiguous at 22px — no rounding into
+  // dots like the previous icons.
+  settings: `<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M11.078 2.25c-.917 0-1.699.663-1.85 1.567L9.05 4.889c-.02.12-.115.26-.297.348a7.493 7.493 0 0 0-.986.57c-.166.115-.334.126-.45.083L6.3 5.508a1.875 1.875 0 0 0-2.282.819l-.922 1.597a1.875 1.875 0 0 0 .432 2.385l.84.692c.095.078.17.229.154.43a7.598 7.598 0 0 0 0 1.139c.015.2-.059.352-.153.43l-.841.692a1.875 1.875 0 0 0-.432 2.385l.922 1.597a1.875 1.875 0 0 0 2.282.818l1.019-.382c.115-.043.283-.031.45.082.312.214.641.405.985.57.182.088.277.228.297.35l.178 1.071c.151.904.933 1.567 1.85 1.567h1.844c.916 0 1.699-.663 1.85-1.567l.178-1.072c.02-.12.114-.26.297-.349.344-.165.673-.356.985-.57.167-.114.335-.125.45-.082l1.02.382a1.875 1.875 0 0 0 2.28-.819l.923-1.597a1.875 1.875 0 0 0-.432-2.385l-.84-.692c-.095-.078-.17-.229-.154-.43a7.614 7.614 0 0 0 0-1.139c-.016-.2.059-.352.153-.43l.84-.692c.708-.582.891-1.59.433-2.385l-.922-1.597a1.875 1.875 0 0 0-2.282-.818l-1.02.382c-.114.043-.282.031-.449-.083a7.49 7.49 0 0 0-.985-.57c-.183-.087-.277-.227-.297-.348l-.179-1.072a1.875 1.875 0 0 0-1.85-1.567h-1.843ZM12 15.75a3.75 3.75 0 1 0 0-7.5 3.75 3.75 0 0 0 0 7.5Z"/></svg>`,
   admin: '',
 }
 
 const { t, isRtl } = useI18n()
 const supabaseConfigured = isSupabaseConfigured()
 
-// Dribbble-style split nav: 4 destination tabs around a center FAB.
-// `quit` is dropped from the bottom nav (HomeView still surfaces an
-// "open quit" CTA) so we can keep the layout balanced — 2 tabs left,
-// FAB centre, 2 tabs right. When supabase isn't configured we swap the
-// leaderboard slot for `quit` so users without cloud sync still have a
-// route to the plan.
+// Stock-pattern nav: a single flat row of 4 tabs. The active one
+// expands to a labelled pill; the others stay as icon-only circles.
+// `quit` is intentionally dropped from the bar — Home surfaces a CTA
+// to it. When supabase isn't configured we swap the leaderboard slot
+// for `quit` so users without cloud sync still have a route to the
+// plan.
 interface NavTab {
   id: TabId
   icon: string
   label: string
 }
 
-const navTabsLeft = computed<NavTab[]>(() => [
-  { id: 'home', icon: ICONS.home, label: t('tabs.home') },
-  { id: 'history', icon: ICONS.history, label: t('tabs.history') },
-])
-
-const navTabsRight = computed<NavTab[]>(() => {
-  const right: NavTab[] = supabaseConfigured
-    ? [
-        {
-          id: 'leaderboard',
-          icon: ICONS.leaderboard,
-          label: t('tabs.leaderboard'),
-        },
-      ]
-    : [{ id: 'quit', icon: ICONS.quit, label: t('tabs.quit') }]
-  right.push({
+const navTabs = computed<NavTab[]>(() => {
+  const list: NavTab[] = [
+    { id: 'home', icon: ICONS.home, label: t('tabs.home') },
+    { id: 'history', icon: ICONS.history, label: t('tabs.history') },
+  ]
+  if (supabaseConfigured) {
+    list.push({
+      id: 'leaderboard',
+      icon: ICONS.leaderboard,
+      label: t('tabs.leaderboard'),
+    })
+  } else {
+    list.push({ id: 'quit', icon: ICONS.quit, label: t('tabs.quit') })
+  }
+  list.push({
     id: 'settings',
     icon: ICONS.settings,
     label: t('tabs.settings'),
   })
-  return right
+  return list
 })
 
 // Refraction filter applied to the whole nav-bar — not per-tab — so
@@ -372,23 +335,26 @@ const navTabsRight = computed<NavTab[]>(() => {
 // (matches the kube.io article's panel demo). `forceActive: true`
 // keeps the warp at full strength continuously; the bar is meant to
 // look like a lensed glass surface, not press-triggered.
+//
+// blur is higher than the article default (0.2) so the bar reads as a
+// genuine frosted-glass surface — the SVG's own feGaussianBlur stage
+// produces the frost while the subsequent feDisplacementMap still
+// shows the lensed bezel warp on top. We deliberately keep `chain: ''`
+// so the CSS doesn't pre-blur the source into mush before the SVG
+// runs, which would kill the warp.
 const navBarLg = computed(() => ({
   surface: 'convex' as const,
   bezel: 28,
   glassThickness: 80,
   refractiveIndex: 1.5,
-  blur: 0.2,
-  specularOpacity: 0.5,
-  saturation: 6,
+  blur: 14,
+  specularOpacity: 0.6,
+  saturation: 8,
   chain: '',
   scaleStates: { idle: 1, hover: 1, active: 1 },
   forceActive: true,
 }))
 
-function onQuickLog(): void {
-  haptics.fire('tap')
-  handleLog(1)
-}
 
 // Active tab is mirrored to the URL hash so a refresh stays on the
 // same screen instead of snapping back to Home. We use the hash (not
@@ -1161,26 +1127,27 @@ onUnmounted(() => {
   /* Animated view transitions could go here later */
 }
 
-/* Dribbble-style floating bottom nav: glass pill (with the SVG
-   refraction filter applied to the bar itself, not the tabs) split
-   into two tab clusters around a raised center FAB. */
+/* "Stock" bottom nav (Dribbble shot 25832948): a floating dark pill
+   with circular icon-only tabs at rest. The active tab expands into
+   a green pill that shows icon + label; other tabs stay compact and
+   the row redistributes via flex. The whole bar still has liquid-
+   glass refraction underneath (v-liquid-glass on the nav element)
+   so the page content warps through.
+*/
 .nav-bar {
   position: fixed;
   left: 50%;
   transform: translateX(-50%);
   bottom: max(14px, env(safe-area-inset-bottom));
-  padding: 4px 14px;
-  border-radius: var(--radius-pill);
   z-index: 100;
-  width: min(440px, calc(100vw - 24px));
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  /* Translucent fill so the directive's backdrop-filter has page
-     content to refract through. The refraction warps whatever is
-     behind this surface — without a baseline see-through fill the
-     bar would just be a frosted block. */
+  gap: 6px;
+  padding: 6px;
+  border-radius: var(--radius-pill);
+  width: min(420px, calc(100vw - 24px));
+  /* Translucent fill so the SVG backdrop-filter has something to
+     refract through; the page underneath shows in the warp. */
   background: var(--glass-bg);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-highlight),
@@ -1203,79 +1170,82 @@ onUnmounted(() => {
               0 1px 2px rgba(0, 0, 0, 0.30);
 }
 
-.nav-side {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  flex: 1 1 0;
-  min-width: 0;
-}
-.nav-side:last-child {
-  justify-content: flex-end;
-}
-
+/* Tab — circular at rest, pill when active. Width is animated via
+   `flex` so all four tabs balance the row: inactive ones are
+   `flex: 0 0 44px` (fixed circle) and the active one is
+   `flex: 1 1 auto` (stretches to fill). The flex `gap` is 0 at rest
+   (so the icon centers exactly in the circle) and grows to 8px on
+   the active tab where the label is visible. */
 .nav-tab {
   appearance: none;
   border: none;
-  background: transparent;
-  padding: 4px 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  cursor: pointer;
-  border-radius: 14px;
-  color: var(--muted);
   font-family: inherit;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  line-height: 1;
-  transition: color 0.18s ease, transform 0.12s ease;
-  flex: 1 1 0;
-  min-width: 0;
-}
-.nav-tab:active { transform: scale(0.94); }
-.nav-tab.is-active { color: var(--brand); font-weight: 700; }
-
-.nav-tab-icon {
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-}
-.nav-tab-icon :deep(svg) { display: block; }
-
-.nav-tab-label {
+  gap: 0;
+  height: 44px;
+  flex: 0 0 44px;
+  padding: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
+  transition: flex-basis 0.32s cubic-bezier(0.2, 0.85, 0.2, 1),
+              flex-grow 0.32s cubic-bezier(0.2, 0.85, 0.2, 1),
+              padding 0.32s cubic-bezier(0.2, 0.85, 0.2, 1),
+              gap 0.32s cubic-bezier(0.2, 0.85, 0.2, 1),
+              background 0.22s ease,
+              color 0.22s ease,
+              box-shadow 0.22s ease;
 }
+.nav-tab:active { transform: scale(0.96); }
 
-/* Raised center FAB — primary "log" action. Brand gradient, sits on
-   top of the bar, scales/warps via LiquidPress on press. */
-.nav-fab {
-  width: 60px;
-  height: 60px;
-  flex: 0 0 60px;
-  border-radius: 50%;
+.nav-tab.is-active {
+  flex: 1 1 auto;
+  padding: 0 18px;
+  gap: 8px;
+  /* Brand-coral pill — uses the gradient tokens so light + dark
+     pick up their respective brand stops. White text/icon reads on
+     either coral. */
   background: linear-gradient(
     135deg,
     var(--brand-grad-from),
     var(--brand-grad-to)
   );
   color: #fff;
-  /* Lift above the bar by half its height so it pokes out the top —
-     classic Dribbble FAB pattern. */
-  transform: translateY(-22px);
   box-shadow: var(--brand-shadow),
-              0 12px 24px color-mix(in srgb, var(--brand) 35%, transparent),
-              inset 0 1px 0 rgba(255, 255, 255, 0.45);
+              inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
-.nav-fab :deep(.nav-fab-icon) {
-  display: block;
+
+.nav-tab-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+.nav-tab-icon :deep(svg) { display: block; }
+
+.nav-tab-label {
+  /* Hidden when not active. Width animates via the parent's flex
+     transition; the label fades in once the pill has opened. */
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: max-width 0.32s cubic-bezier(0.2, 0.85, 0.2, 1),
+              opacity 0.18s ease 0.10s,
+              transform 0.32s cubic-bezier(0.2, 0.85, 0.2, 1);
+}
+.nav-tab.is-active .nav-tab-label {
+  max-width: 200px;
+  opacity: 1;
+  transform: none;
 }
 </style>
