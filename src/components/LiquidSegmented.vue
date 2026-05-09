@@ -185,22 +185,40 @@ function isActive(i: number): boolean {
 }
 
 // === Geometry observation ==========================================
+// `isRtl` follows the runtime computed direction on the root element
+// so the thumb / drag math can mirror itself in RTL locales (the
+// flex track already flips visually because the buttons are flex
+// children, but `translateX` is a physical transform so we have to
+// flip its sign explicitly).
+const isRtl = ref(false)
 let resizeObs: ResizeObserver | null = null
 function refreshSize() {
   const el = rootEl.value
   if (!el) return
   containerWidth.value = el.clientWidth
   containerHeight.value = el.clientHeight
+  isRtl.value = getComputedStyle(el).direction === 'rtl'
 }
+// Live locale switches flip the document `dir` attribute without a
+// page reload — observe it so isRtl updates when that happens.
+let dirObs: MutationObserver | null = null
 onMounted(() => {
   refreshSize()
   if (typeof ResizeObserver !== 'undefined' && rootEl.value) {
     resizeObs = new ResizeObserver(() => refreshSize())
     resizeObs.observe(rootEl.value)
   }
+  if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
+    dirObs = new MutationObserver(() => refreshSize())
+    dirObs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['dir', 'lang'],
+    })
+  }
 })
 onBeforeUnmount(() => {
   resizeObs?.disconnect()
+  dirObs?.disconnect()
   cleanupListeners()
 })
 
@@ -228,15 +246,20 @@ const thumbStyle = computed(() => {
   const opPct = (
     Math.max(0, Math.min(1, thumbBgOpacity.value)) * 100
   ).toFixed(1)
+  // RTL: the flex children visually run right-to-left, so the thumb
+  // anchors to the inline-start (which maps to `right: 0` in RTL) and
+  // we flip the sign of the physical translateX so positive xRatio
+  // moves the thumb in the inline-end direction (visually leftward).
+  const tx = isRtl.value ? -x : x
   return {
     position: 'absolute' as const,
-    left: '0',
+    insetInlineStart: '0',
     top: `${top}px`,
     width: `${thumbActualWidth.value}px`,
     height: `${thumbActualHeight.value}px`,
-    marginLeft: `${ml}px`,
+    marginInlineStart: `${ml}px`,
     borderRadius: '999px',
-    transform: `translateY(-50%) translateX(${x}px) scale(${thumbScale.value})`,
+    transform: `translateY(-50%) translateX(${tx}px) scale(${thumbScale.value})`,
     backgroundColor: `color-mix(in srgb, var(--card) ${opPct}%, transparent)`,
     boxShadow: baseShadow + pressedShadow,
     transition: 'none',
@@ -278,11 +301,14 @@ function startDrag(clientX: number) {
 function processMove(clientX: number) {
   if (!isPressed.value || tabWidth.value === 0) return
   const base = dragStartIndex.value
-  const dx = clientX - initialPointerX.value
-  if (Math.abs(dx) > 4) {
+  const dxRaw = clientX - initialPointerX.value
+  if (Math.abs(dxRaw) > 4) {
     isDragging.value = true
     movedFlag.value = true
   }
+  // RTL: rightward pointer movement should DECREASE the index (the
+  // tabs run right-to-left visually), so we flip the signed delta.
+  const dx = isRtl.value ? -dxRaw : dxRaw
   const ratio = base + dx / tabWidth.value
   const max = Math.max(0, N.value - 1)
   const overflow = ratio < 0 ? -ratio : ratio > max ? ratio - max : 0

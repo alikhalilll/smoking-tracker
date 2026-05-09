@@ -24,6 +24,7 @@
     out) so the feel maps to motion/react's damping=80 stiffness=2000.
   -->
   <button
+    ref="rootEl"
     type="button"
     class="lg-switch"
     :class="{ 'is-on': isOn, 'is-pressed': isPressed, 'is-disabled': disabled }"
@@ -44,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useHaptics } from '../composables/useHaptics'
 import { useSpring } from '../composables/useSpring'
 import {
@@ -103,6 +104,13 @@ const REFRACTION_BASE = computed(
 )
 
 // === Reactive state ================================================
+const rootEl = ref<HTMLButtonElement | null>(null)
+// Mirror the thumb position + drag math when the host is RTL. The
+// switch's track is fixed size, so we don't need a ResizeObserver —
+// reading the runtime direction once on mount (and re-checking via
+// MutationObserver on the document so locale switches re-evaluate)
+// is enough.
+const isRtl = ref(false)
 const isOn = computed(() => props.modelValue)
 const isPressed = ref(false)
 const isDragging = ref(false)
@@ -190,16 +198,20 @@ const thumbStyle = computed(() => {
   const pressedShadow = isPressed.value
     ? ', inset 2px 7px 24px rgba(0,0,0,0.09), inset -2px -7px 24px rgba(255,255,255,0.09)'
     : ''
+  // RTL: anchor the thumb to the inline-start (right edge in RTL) and
+  // flip the physical translateX so isOn=1 still travels the thumb in
+  // the inline-end direction (visually leftward in RTL).
+  const tx = isRtl.value ? -x : x
   return {
     width: `${THUMB_WIDTH}px`,
     height: `${THUMB_HEIGHT}px`,
     borderRadius: `${THUMB_RADIUS}px`,
-    marginLeft: `${
+    marginInlineStart: `${
       -THUMB_REST_OFFSET.value +
       (SLIDER_HEIGHT - THUMB_HEIGHT * THUMB_REST_SCALE.value) / 2
     }px`,
     top: `${SLIDER_HEIGHT / 2}px`,
-    transform: `translateY(-50%) translateX(${x}px) scale(${thumbScale.value})`,
+    transform: `translateY(-50%) translateX(${tx}px) scale(${thumbScale.value})`,
     backgroundColor: `rgba(255, 255, 255, ${thumbBgOpacity.value})`,
     boxShadow: baseShadow + pressedShadow,
     // No CSS transitions — every animated value is spring-driven by the
@@ -243,11 +255,14 @@ function startDrag(clientX: number) {
 function processMove(clientX: number) {
   if (!isPressed.value) return
   const baseRatio = isOn.value ? 1 : 0
-  const dx = clientX - initialPointerX.value
-  if (Math.abs(dx) > LIQUID_INPUT_TOKENS.drag.tapThreshold) {
+  const dxRaw = clientX - initialPointerX.value
+  if (Math.abs(dxRaw) > LIQUID_INPUT_TOKENS.drag.tapThreshold) {
     isDragging.value = true
     movedFlag.value = true
   }
+  // RTL: rightward pointer movement should DECREASE ratio (visually,
+  // moving right in RTL is moving toward the off side of the track).
+  const dx = isRtl.value ? -dxRaw : dxRaw
   const ratio = baseRatio + dx / TRAVEL.value
   const overflow = ratio < 0 ? -ratio : ratio > 1 ? ratio - 1 : 0
   const overflowSign = ratio < 0 ? -1 : 1
@@ -330,12 +345,34 @@ function onTrackClick(e: MouseEvent) {
   emit('update:modelValue', !isOn.value)
 }
 
+function refreshDirection() {
+  const el = rootEl.value
+  if (!el) return
+  isRtl.value = getComputedStyle(el).direction === 'rtl'
+}
+
+let dirObs: MutationObserver | null = null
+onMounted(() => {
+  refreshDirection()
+  // Locale switches in this app toggle the document's `dir` attribute;
+  // observe so live language changes flip the thumb math without a
+  // page reload.
+  if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
+    dirObs = new MutationObserver(refreshDirection)
+    dirObs.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['dir', 'lang'],
+    })
+  }
+})
+
 onBeforeUnmount(() => {
   window.removeEventListener('mousemove', onWindowMouseMove)
   window.removeEventListener('mouseup', onWindowMouseUp)
   window.removeEventListener('touchmove', onWindowTouchMove)
   window.removeEventListener('touchend', onWindowTouchEnd)
   window.removeEventListener('touchcancel', onWindowTouchEnd)
+  dirObs?.disconnect()
 })
 </script>
 
@@ -370,7 +407,7 @@ onBeforeUnmount(() => {
 .lg-switch-thumb {
   position: absolute;
   display: block;
-  left: 0;
+  inset-inline-start: 0;
   pointer-events: auto;
   /* The directive sets backdrop-filter inline at runtime.
      Default everything else; transform/background/box-shadow are
