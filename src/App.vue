@@ -319,6 +319,23 @@ function readHashView(): TabId {
   return 'home'
 }
 
+// Supabase's recovery / OAuth callback lands with its session tokens in
+// the URL — in the hash for the implicit flow (#access_token=…&type=
+// recovery) or the query for PKCE (?code=…). Because this app routes off
+// the hash, we must NOT rewrite the URL until supabase-js has parsed and
+// stripped those tokens itself (detectSessionInUrl). Otherwise setView's
+// replaceState wipes the fragment first and PASSWORD_RECOVERY never fires.
+function hasPendingAuthCallback(): boolean {
+  if (typeof window === 'undefined') return false
+  const { hash, search } = window.location
+  return (
+    /[#&?](access_token|refresh_token|provider_token)=/.test(hash) ||
+    /[#&?]type=recovery/.test(hash) ||
+    /[#&?]error(_description)?=/.test(hash + search) ||
+    /[?&]code=/.test(search)
+  )
+}
+
 const view = ref<TabId>(readHashView())
 const showReport = ref(false)
 const haptics = useHaptics()
@@ -326,6 +343,9 @@ const haptics = useHaptics()
 function setView(id: TabId): void {
   view.value = id
   if (typeof window !== 'undefined') {
+    // Don't clobber a Supabase auth payload sitting in the URL — let
+    // supabase-js consume it first (it cleans the URL when done).
+    if (hasPendingAuthCallback()) return
     // Preserve any sub-route that's already encoded in the hash
     // (e.g. "#/settings/app") when this call is just navigating to
     // the same top-level tab — otherwise we'd clobber the settings
