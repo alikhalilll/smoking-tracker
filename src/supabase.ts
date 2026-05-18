@@ -20,7 +20,17 @@ export const supabase: SupabaseClient | null =
           persistSession: true,
           autoRefreshToken: true,
           detectSessionInUrl: true,
-          flowType: 'pkce',
+          // Implicit flow: Supabase's default email links (recovery /
+          // confirmation) redirect with the session in the URL hash
+          // (#access_token=…&type=recovery). auth-js *rejects* those
+          // hash callbacks when flowType is 'pkce' ("Not a valid PKCE
+          // flow url"), which broke the password-reset link. OAuth —
+          // the only thing that benefits from PKCE — is disabled
+          // (SOCIAL_LOGIN_ENABLED=false); password/OTP are flow-
+          // agnostic. Revisit (PKCE + an /auth/confirm verifyOtp
+          // handler + email-template change) if social login is
+          // enabled later.
+          flowType: 'implicit',
         },
       })
     : null
