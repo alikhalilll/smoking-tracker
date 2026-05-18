@@ -369,6 +369,18 @@ const auth = useAuth()
 const { open: openAuth } = useAuthModal()
 const { show: showToast } = useToast()
 
+// Arrived via a Supabase password-recovery link: pop the auth sheet so
+// the user can set a new password (the rest of the app renders a
+// recovery session behind it). `immediate` handles the event firing
+// before this watcher is registered.
+watch(
+  () => auth.recovering.value,
+  (on) => {
+    if (on) openAuth()
+  },
+  { immediate: true }
+)
+
 const {
   data,
   addEntries,

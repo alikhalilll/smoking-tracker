@@ -20,7 +20,10 @@
         <DrawerTitle class="modal-title">{{ t('login.title') }}</DrawerTitle>
         <DrawerDescription class="modal-sub">{{ t('login.subtitle') }}</DrawerDescription>
 
-        <SignInCard @signed-in="onSignedIn" />
+        <SignInCard
+          @signed-in="onSignedIn"
+          @password-reset-done="onResetDone"
+        />
       </DrawerContent>
     </DrawerPortal>
   </DrawerRoot>
@@ -47,11 +50,13 @@ const { isOpen, close } = useAuthModal()
 const auth = useAuth()
 const { show } = useToast()
 
-// Close automatically once we're signed in (e.g. via OTP).
+// Close automatically once we're signed in (e.g. via OTP). A recovery
+// session also flips isAuthed true — skip the auto-close/toast in that
+// case so the user can actually set a new password first.
 watch(
   () => auth.isAuthed.value,
   (now, was) => {
-    if (now && !was && isOpen.value) {
+    if (now && !was && isOpen.value && !auth.recovering.value) {
       close()
       show(t('cloud.signed_in_toast'), 'success')
     }
@@ -61,6 +66,11 @@ watch(
 function onSignedIn(): void {
   close()
   show(t('cloud.signed_in_toast'), 'success')
+}
+
+function onResetDone(): void {
+  close()
+  show(t('cloud.password_updated_toast'), 'success')
 }
 </script>
 

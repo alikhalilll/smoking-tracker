@@ -27,6 +27,11 @@ export const PROVIDER_LABELS: Record<SocialProvider, string> = {
 
 const user: Ref<User | null> = ref(null)
 const loading: Ref<boolean> = ref(true)
+// True between the moment Supabase exchanges a recovery link for a
+// (temporary) session and the moment the user saves a new password. We
+// track it so the UI shows the "set a new password" screen instead of
+// treating the recovery session as a normal sign-in.
+const recovering: Ref<boolean> = ref(false)
 
 if (supabase) {
   void supabase.auth
@@ -38,8 +43,9 @@ if (supabase) {
       loading.value = false
     })
 
-  supabase.auth.onAuthStateChange((_event, session) => {
+  supabase.auth.onAuthStateChange((event, session) => {
     user.value = session?.user ?? null
+    if (event === 'PASSWORD_RECOVERY') recovering.value = true
   })
 } else {
   loading.value = false
@@ -49,6 +55,20 @@ export interface UseAuth {
   user: ComputedRef<User | null>
   isAuthed: ComputedRef<boolean>
   loading: ComputedRef<boolean>
+  /** True while the user is mid password-recovery (arrived via a reset
+   *  link, hasn't saved a new password yet). Drives the reset screen. */
+  recovering: ComputedRef<boolean>
+  /** Email the user a password-recovery link. The link returns to the
+   *  app's origin + base path, where detectSessionInUrl exchanges the
+   *  PKCE code and fires a PASSWORD_RECOVERY auth event. */
+  sendPasswordReset: (
+    email: string
+  ) => Promise<{ ok: boolean; error?: string }>
+  /** Set a new password for the user (used during recovery, once the
+   *  recovery session is active). Clears `recovering` on success. */
+  updatePassword: (
+    password: string
+  ) => Promise<{ ok: boolean; error?: string }>
   /** Send a 6-digit OTP code to the email. PWA-friendly (no link redirect). */
   sendOtp: (email: string) => Promise<{ ok: boolean; error?: string }>
   verifyOtp: (
@@ -95,6 +115,31 @@ export function useAuth(): UseAuth {
     user: computed(() => user.value),
     isAuthed: computed(() => user.value !== null),
     loading: computed(() => loading.value),
+    recovering: computed(() => recovering.value),
+
+    async sendPasswordReset(
+      email: string
+    ): Promise<{ ok: boolean; error?: string }> {
+      if (!supabase) return { ok: false, error: 'Supabase not configured' }
+      // Returns to the same origin + base path; detectSessionInUrl picks
+      // up the recovery code on arrival (same pattern as OAuth).
+      const redirectTo = window.location.origin + import.meta.env.BASE_URL
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        { redirectTo }
+      )
+      return error ? { ok: false, error: error.message } : { ok: true }
+    },
+
+    async updatePassword(
+      password: string
+    ): Promise<{ ok: boolean; error?: string }> {
+      if (!supabase) return { ok: false, error: 'Supabase not configured' }
+      const { error } = await supabase.auth.updateUser({ password })
+      if (error) return { ok: false, error: error.message }
+      recovering.value = false
+      return { ok: true }
+    },
 
     async sendOtp(
       email: string
@@ -206,6 +251,7 @@ export function useAuth(): UseAuth {
 
     async signOut(): Promise<void> {
       if (!supabase) return
+      recovering.value = false
       await supabase.auth.signOut()
     },
 
