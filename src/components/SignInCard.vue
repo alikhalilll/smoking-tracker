@@ -122,8 +122,86 @@
         {{ busy === 'submit' ? t('cloud.sending') : t('cloud.sign_in') }}
       </button>
 
+      <button
+        type="button"
+        class="link-btn"
+        :disabled="busy !== null"
+        @click="onForgotPassword"
+      >
+        <span v-if="busy === 'reset'" class="spinner"></span>
+        {{ t('cloud.forgot_password') }}
+      </button>
+
       <button type="button" class="link-btn" @click="resetToEmail">
         {{ t('cloud.use_different_email') }}
+      </button>
+    </template>
+
+    <!-- Step 2c: set a new password (arrived via a recovery link) -->
+    <template v-else-if="step === 'password-reset'">
+      <div class="step-header">
+        <h3 class="step-title">{{ t('cloud.reset_password_title') }}</h3>
+        <p class="step-sub">{{ t('cloud.reset_password_sub') }}</p>
+      </div>
+
+      <div class="field">
+        <span class="field-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 1 1 8 0v4"/></svg>
+        </span>
+        <input
+          type="email"
+          autocomplete="username"
+          name="email"
+          :value="emailInput"
+          class="hidden-username"
+          readonly
+          tabindex="-1"
+          aria-hidden="true"
+        />
+        <input
+          ref="passwordEl"
+          v-model="passwordInput"
+          :type="showPassword ? 'text' : 'password'"
+          autocomplete="new-password"
+          name="new-password"
+          class="field-input with-icon with-action"
+          :placeholder="t('cloud.password_placeholder')"
+          :disabled="busy !== null"
+        />
+        <button
+          type="button"
+          class="field-action"
+          :aria-label="showPassword ? t('cloud.hide_password') : t('cloud.show_password')"
+          @click="showPassword = !showPassword"
+        >
+          <svg v-if="showPassword" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+          <svg v-else width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        </button>
+      </div>
+
+      <div class="field">
+        <span class="field-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        </span>
+        <input
+          v-model="confirmInput"
+          :type="showPassword ? 'text' : 'password'"
+          autocomplete="new-password"
+          name="new-password-confirm"
+          class="field-input with-icon"
+          :placeholder="t('cloud.password_confirm_placeholder')"
+          :disabled="busy !== null"
+          @keydown.enter="onSubmitReset"
+        />
+      </div>
+
+      <button
+        class="btn btn-primary block"
+        :disabled="busy !== null || passwordInput.length < 6 || confirmInput.length < 6"
+        @click="onSubmitReset"
+      >
+        <span v-if="busy === 'submit'" class="spinner"></span>
+        {{ busy === 'submit' ? t('cloud.sending') : t('cloud.reset_password_cta') }}
       </button>
     </template>
 
@@ -205,6 +283,12 @@
       <span>{{ t('cloud.signup_confirm_sent', { email: emailInput }) }}</span>
     </div>
 
+    <!-- Confirmation hint after a password-recovery email was sent -->
+    <div v-if="resetEmailSent" class="hint-msg success-chip">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      <span>{{ t('cloud.reset_email_sent', { email: emailInput }) }}</span>
+    </div>
+
     <!-- Error -->
     <div v-if="signInError" class="hint-msg error-chip">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
@@ -214,20 +298,21 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { nextTick, ref, watch } from 'vue'
 import { useI18n } from '../i18n'
 import { useAuth, SOCIAL_LOGIN_ENABLED, type SocialProvider } from '../composables/useAuth'
 
 const emit = defineEmits<{
   'signed-in': []
+  'password-reset-done': []
 }>()
 
 const { t } = useI18n()
 const auth = useAuth()
 const socialEnabled = SOCIAL_LOGIN_ENABLED
 
-type Step = 'email' | 'password-existing' | 'password-new'
-type Busy = null | 'email' | 'submit' | SocialProvider
+type Step = 'email' | 'password-existing' | 'password-new' | 'password-reset'
+type Busy = null | 'email' | 'submit' | 'reset' | SocialProvider
 
 const step = ref<Step>('email')
 const emailInput = ref('')
@@ -236,6 +321,7 @@ const confirmInput = ref('')
 const showPassword = ref(false)
 const busy = ref<Busy>(null)
 const signupNeedsConfirm = ref(false)
+const resetEmailSent = ref(false)
 const signInError = ref<string | null>(null)
 const passwordEl = ref<HTMLInputElement | null>(null)
 
@@ -287,6 +373,7 @@ function resetToEmail(): void {
   showPassword.value = false
   signInError.value = null
   signupNeedsConfirm.value = false
+  resetEmailSent.value = false
 }
 
 async function onContinueEmail(): Promise<void> {
@@ -340,6 +427,51 @@ async function onSubmitNew(): Promise<void> {
     emit('signed-in')
   }
 }
+
+async function onForgotPassword(): Promise<void> {
+  busy.value = 'reset'
+  signInError.value = null
+  resetEmailSent.value = false
+  const result = await auth.sendPasswordReset(emailInput.value.trim())
+  busy.value = null
+  if (!result.ok) {
+    signInError.value = result.error ?? 'Could not send reset email'
+  } else {
+    resetEmailSent.value = true
+  }
+}
+
+async function onSubmitReset(): Promise<void> {
+  if (passwordInput.value.length < 6) return
+  if (passwordInput.value !== confirmInput.value) {
+    signInError.value = t('cloud.password_mismatch')
+    return
+  }
+  busy.value = 'submit'
+  signInError.value = null
+  const result = await auth.updatePassword(passwordInput.value)
+  busy.value = null
+  if (!result.ok) {
+    signInError.value = result.error ?? 'Could not update password'
+  } else {
+    emit('password-reset-done')
+  }
+}
+
+// A recovery link was opened: Supabase has established the temporary
+// recovery session and fired PASSWORD_RECOVERY. Jump straight to the
+// "set a new password" step. `immediate` covers the case where the
+// event fired before this card mounted.
+watch(
+  () => auth.recovering.value,
+  (on) => {
+    if (on) {
+      resetToEmail()
+      step.value = 'password-reset'
+    }
+  },
+  { immediate: true }
+)
 
 async function onProvider(provider: SocialProvider): Promise<void> {
   busy.value = provider
