@@ -5,6 +5,8 @@ import { useTheme, type ThemeMode } from './useTheme'
 import { useReminders, type ReminderSettings } from './useReminders'
 import { useEconomy, type EconomySettings } from './useEconomy'
 import { useHaptics } from './useHaptics'
+import { useActiveMode } from './useActiveMode'
+import type { EntryType } from '../types'
 import {
   currentLocale,
   applyRemoteLocale,
@@ -24,6 +26,9 @@ interface SyncedSettings {
   reminders: ReminderSettings
   economy?: EconomySettings
   hapticsEnabled?: boolean
+  /** Active consumable mode. Carries across devices so toggling on
+   *  mobile flips desktop too. Optional for back-compat with v1 rows. */
+  activeMode?: EntryType
 }
 
 interface ServerRow {
@@ -66,6 +71,7 @@ export function useSettingsSync(): UseSettingsSync {
   const reminders = useReminders()
   const economy = useEconomy()
   const haptics = useHaptics()
+  const activeMode = useActiveMode()
 
   const status: Ref<SettingsSyncStatus> = ref('idle')
   const lastError: Ref<string | null> = ref(null)
@@ -87,6 +93,7 @@ export function useSettingsSync(): UseSettingsSync {
       reminders: { ...reminders.settings.value },
       economy: { ...economy.settings.value },
       hapticsEnabled: haptics.enabled.value,
+      activeMode: activeMode.mode.value,
     }
   }
 
@@ -107,6 +114,9 @@ export function useSettingsSync(): UseSettingsSync {
       }
       if (typeof s.hapticsEnabled === 'boolean') {
         haptics.applyRemote(s.hapticsEnabled)
+      }
+      if (s.activeMode === 'cigarette' || s.activeMode === 'vape') {
+        activeMode.applyRemote(s.activeMode)
       }
     } finally {
       applyingRemote = false
@@ -196,6 +206,7 @@ export function useSettingsSync(): UseSettingsSync {
       () => reminders.settings.value,
       () => economy.settings.value,
       () => haptics.enabled.value,
+      () => activeMode.mode.value,
     ],
     () => {
       if (applyingRemote) return

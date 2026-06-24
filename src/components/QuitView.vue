@@ -3,7 +3,7 @@
     <!-- Setup screen: no plan yet -->
     <template v-if="!isActive">
       <div class="section-title">{{ t('quit.title') }}</div>
-      <div class="intro">{{ t('quit.intro') }}</div>
+      <div class="intro">{{ quitIntroText }}</div>
 
       <!-- Suggestion hero. When we have ≥3 days of history we offer a
            one-tap plan; otherwise we show a soft empty state. The
@@ -46,7 +46,7 @@
           <div class="baseline-value">{{ formatNumber(baselineInput) }}</div>
           <button class="round-btn" @click="incBaseline">+</button>
         </div>
-        <div class="baseline-hint">{{ t('quit.baseline_hint') }}</div>
+        <div class="baseline-hint">{{ baselineHintText }}</div>
       </div>
 
       <div v-if="customizing" class="section-title" style="margin-top: 1.75rem">
@@ -137,9 +137,7 @@
           <div class="smoke-free-number">{{ formatNumber(smokeFreeDays) }}</div>
           <div class="smoke-free-label">
             {{
-              smokeFreeDays === 1
-                ? t('quit.smoke_free_days_one')
-                : t('quit.smoke_free_days_many', { n: smokeFreeDays })
+              smokeFreeDays === 1 ? smokeFreeOneText : smokeFreeManyText
             }}
           </div>
           <div class="smoke-free-sub">{{ t('quit.smoke_free_since') }}</div>
@@ -259,6 +257,7 @@ import {
 } from '../composables/useQuitPlan'
 import { useI18n, intlLocale, tArray, formatNumber } from '../i18n'
 import { useConfirm } from '../composables/useConfirm'
+import { useActiveMode } from '../composables/useActiveMode'
 import type {
   QuitDay,
   QuitIntensity,
@@ -288,6 +287,27 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const activeMode = useActiveMode()
+
+// QuitView reads the active mode to swap cigarette/vape copy. New
+// plans inherit the active mode at creation time (App.vue passes it
+// into startQuitPlan), so the setup screen reflects whatever the
+// user currently picked on Home.
+const isVape = computed(() => activeMode.mode.value === 'vape')
+const quitIntroText = computed(() =>
+  isVape.value ? t('quit.intro_vape') : t('quit.intro')
+)
+const baselineHintText = computed(() =>
+  isVape.value ? t('quit.baseline_hint_vape') : t('quit.baseline_hint')
+)
+const smokeFreeOneText = computed(() =>
+  isVape.value ? t('quit.smoke_free_days_one_vape') : t('quit.smoke_free_days_one')
+)
+const smokeFreeManyText = computed(() =>
+  isVape.value
+    ? t('quit.smoke_free_days_many_vape', { n: props.smokeFreeDays })
+    : t('quit.smoke_free_days_many', { n: props.smokeFreeDays })
+)
 
 const intensities = ALL_INTENSITIES
 

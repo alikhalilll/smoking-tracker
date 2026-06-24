@@ -8,6 +8,7 @@ import type {
 } from '../types'
 
 import { formatLocalDate as formatDate, getToday, daysBetween } from './useDate'
+import { useActiveMode } from './useActiveMode'
 
 function addDays(dateStr: string, n: number): string {
   const d = new Date(dateStr + 'T00:00:00')
@@ -105,7 +106,20 @@ export function useQuitPlan(
   byDay: ComputedRef<Record<string, number>>,
   dailyAvg: ComputedRef<number>
 ): UseQuitPlan {
-  const plan = computed<QuitPlan | null>(() => data.value.quitPlan ?? null)
+  const activeMode = useActiveMode()
+
+  // Single-plan model: only surface the plan when its type matches the
+  // currently active mode. Pre-v2 plans (no type) are treated as
+  // cigarette plans so existing users see no change. When the user
+  // toggles modes, the plan card disappears — switching back restores
+  // it. This avoids doubling the sync schema for an edge case most
+  // users won't hit.
+  const plan = computed<QuitPlan | null>(() => {
+    const p = data.value.quitPlan
+    if (!p) return null
+    const planType = p.type ?? 'cigarette'
+    return planType === activeMode.mode.value ? p : null
+  })
 
   const isActive = computed(() => plan.value !== null)
 

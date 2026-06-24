@@ -1,5 +1,18 @@
 <template>
   <div class="fade-in home">
+    <!-- Cigarette / vape mode switch. Lives above everything so it's
+         the first thing the user touches when their day's behavior
+         doesn't match yesterday's. Uses a plain blurred-pill style
+         (no SVG refraction) so it stays cheap to render. -->
+    <ModeToggle
+      v-reveal
+      data-onboard="home-mode"
+      :model-value="activeMode"
+      :options="modeOptions"
+      :aria-label="t('home.mode_aria')"
+      @update:model-value="(m: EntryType) => emit('set-mode', m)"
+    />
+
     <!-- Status chips: smoke-free streak (after a finished plan) or quit target -->
     <button
       v-if="quitIsComplete && (smokeFreeDays ?? 0) > 0"
@@ -10,13 +23,21 @@
     >
       <span class="status-icon">🌱</span>
       <span class="status-body">
-        <span class="status-label">{{ t('quit.smoke_free_chip') }}</span>
+        <span class="status-label">{{
+          activeMode === 'vape'
+            ? t('quit.smoke_free_chip_vape')
+            : t('quit.smoke_free_chip')
+        }}</span>
         <span class="status-value tabular">
           {{ formatNumber(smokeFreeDays ?? 0) }}
           {{
-            smokeFreeDays === 1
-              ? t('quit.smoke_free_days_one')
-              : t('quit.smoke_free_days_many')
+            activeMode === 'vape'
+              ? (smokeFreeDays === 1
+                  ? t('quit.smoke_free_days_one_vape')
+                  : t('quit.smoke_free_days_many_vape'))
+              : (smokeFreeDays === 1
+                  ? t('quit.smoke_free_days_one')
+                  : t('quit.smoke_free_days_many'))
           }}
         </span>
       </span>
@@ -84,7 +105,7 @@
               <span :key="todayCount">{{ formatNumber(todayCount) }}</span>
             </Transition>
           </div>
-          <div class="counter-label">{{ t('home.cigarettes_today') }}</div>
+          <div class="counter-label">{{ labels.todayCounter }}</div>
         </div>
       </div>
       <div v-if="stopwatchParts" class="gap-stopwatch">
@@ -135,7 +156,7 @@
             </Transition>
           </span>
         </div>
-        <div class="stopwatch-label">{{ t('home.since_last') }}</div>
+        <div class="stopwatch-label">{{ labels.sinceLast }}</div>
         <div
           v-if="(longestGapMs ?? 0) > 0"
           class="stopwatch-best"
@@ -185,9 +206,7 @@
           stroke-linejoin="round"
         ><path d="M5 13l4 4L19 7" /></svg>
         <span>{{
-          logCount === 1
-            ? t('home.log_one')
-            : t('home.log_many', { n: logCount })
+          logCount === 1 ? labels.logOne : labels.logMany(logCount)
         }}</span>
       </button>
 
@@ -231,14 +250,14 @@
         <div class="stat-icon icon-peach">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
         </div>
-        <div class="stat-label">{{ t('home.daily_avg') }}</div>
+        <div class="stat-label">{{ labels.dailyAvg }}</div>
         <div class="stat-value tabular">{{ formatNumber(dailyAvg) }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon icon-mint">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h12"/></svg>
         </div>
-        <div class="stat-label">{{ t('home.total_logged') }}</div>
+        <div class="stat-label">{{ labels.totalLogged }}</div>
         <div class="stat-value tabular">{{ formatNumber(totalSmoked) }}</div>
       </div>
       <div class="stat-card">
@@ -252,7 +271,7 @@
         <div class="stat-icon icon-sun">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 9 22 10 17 14 18 22 12 18 6 22 7 14 2 10 9 9"/></svg>
         </div>
-        <div class="stat-label">{{ t('home.best_day') }}</div>
+        <div class="stat-label">{{ labels.bestDay }}</div>
         <div class="stat-value tabular">{{ formatNumber(bestDay) }}</div>
       </div>
       <div
@@ -268,8 +287,17 @@
       </div>
     </div>
 
-    <!-- Health milestones — only meaningful once at least one cig logged -->
-    <section v-if="hasEntries" v-reveal class="health-section" data-onboard="home-health">
+    <!-- Health milestones — only meaningful once at least one entry
+         is logged. Shown in both modes; vape mode gets a caveat
+         banner because the CDC/NHS milestones (cilia, lung capacity,
+         etc.) are cigarette-cessation specific and don't translate
+         cleanly to vape cessation. -->
+    <section
+      v-if="hasEntries"
+      v-reveal
+      class="health-section"
+      data-onboard="home-health"
+    >
       <div class="health-header">
         <h3 class="h-section" style="margin: 0">{{ t('home.health_section') }}</h3>
         <span v-if="nextMilestone" class="health-next">
@@ -331,11 +359,13 @@ import { useEconomy, formatMoney } from '../composables/useEconomy'
 import { useHealthMilestones } from '../composables/useHealthMilestones'
 import { formatDuration } from '../composables/useStats'
 import Confetti from './Confetti.vue'
-import type { DayBucket } from '../types'
+import ModeToggle from './ModeToggle.vue'
+import type { DayBucket, EntryType } from '../types'
 
 const { t } = useI18n()
 
 interface Props {
+  activeMode: EntryType
   todayCount: number
   lastSmokeTime?: string
   last7: DayBucket[]
@@ -360,7 +390,31 @@ const emit = defineEmits<{
   undo: []
   'open-report': []
   'open-quit': []
+  'set-mode': [mode: EntryType]
 }>()
+
+// Single source of truth for vape ↔ cigarette string swaps. Adding a
+// new mode-aware label means adding one line here, not hunting
+// through the template. `t(...)` is reactive so locale switches still
+// re-render.
+const labels = computed(() => {
+  const vape = props.activeMode === 'vape'
+  return {
+    todayCounter: vape ? t('home.puffs_today') : t('home.cigarettes_today'),
+    sinceLast: vape ? t('home.since_last_puff') : t('home.since_last'),
+    logOne: vape ? t('home.log_one_puff') : t('home.log_one'),
+    logMany: (n: number) =>
+      vape ? t('home.log_many_puffs', { n }) : t('home.log_many', { n }),
+    dailyAvg: vape ? t('home.daily_avg_puffs') : t('home.daily_avg'),
+    totalLogged: vape ? t('home.total_logged_puffs') : t('home.total_logged'),
+    bestDay: vape ? t('home.best_day_puffs') : t('home.best_day'),
+  }
+})
+
+const modeOptions = computed(() => [
+  { value: 'cigarette' as EntryType, label: t('home.mode_cigarette'), emoji: '🚬' },
+  { value: 'vape' as EntryType, label: t('home.mode_vape'), emoji: '💨' },
+])
 
 const logCount = ref(1)
 const isPulsing = ref(false)
@@ -374,11 +428,11 @@ const confettiTrigger = ref(0)
 const economy = useEconomy()
 const currency = computed(() => economy.settings.value.currency)
 const moneyMode = computed<'saved' | 'spent' | null>(() => {
-  if (economy.pricePerCigarette.value <= 0) return null
+  if (economy.pricePerUnit.value <= 0) return null
   return (props.smokeFreeDays ?? 0) > 0 ? 'saved' : 'spent'
 })
 const moneyAmount = computed<number>(() => {
-  const price = economy.pricePerCigarette.value
+  const price = economy.pricePerUnit.value
   if (moneyMode.value === 'saved') {
     return price * props.dailyAvg * (props.smokeFreeDays ?? 0)
   }
@@ -388,13 +442,16 @@ const moneyLabel = computed<string>(() =>
   moneyMode.value === 'saved' ? t('home.money_saved') : t('home.money_spent')
 )
 
-// Health milestones tick relative to the last logged cigarette.
+// Health milestones tick relative to the last log of the active
+// mode. Cigarette mode uses CDC / NHS data; vape mode uses
+// nicotine-cessation + vape-specific recovery research.
 const lastSmokeRef = toRef(props, 'lastSmokeTime')
 const lastSmokeOrNull = computed<string | null>(
   () => lastSmokeRef.value ?? null
 )
+const activeModeRef = toRef(props, 'activeMode')
 const { all: milestones, next: nextMilestone } =
-  useHealthMilestones(lastSmokeOrNull)
+  useHealthMilestones(lastSmokeOrNull, activeModeRef)
 
 function formatRemaining(ms: number): string {
   return formatDuration(ms)
@@ -509,10 +566,15 @@ watch(
     if (MILESTONES.includes(n) && lastCelebrated.value !== n) {
       lastCelebrated.value = n
       confettiTrigger.value++
+      const vape = props.activeMode === 'vape'
       showToast(
         n === 1
-          ? t('home.milestone_one_day')
-          : t('home.milestone_n_days', { n }),
+          ? vape
+            ? t('home.milestone_one_day_vape')
+            : t('home.milestone_one_day')
+          : vape
+            ? t('home.milestone_n_days_vape', { n })
+            : t('home.milestone_n_days', { n }),
         'success'
       )
     }
@@ -537,16 +599,26 @@ function dayAbbr(dateStr: string): string {
 }
 
 function shareText(): string {
+  const vape = props.activeMode === 'vape'
   if (props.quitIsComplete && (props.smokeFreeDays ?? 0) > 0) {
-    return t('share.smoke_free', { n: props.smokeFreeDays! })
+    return vape
+      ? t('share.smoke_free_vape', { n: props.smokeFreeDays! })
+      : t('share.smoke_free', { n: props.smokeFreeDays! })
   }
   if (props.totalSmoked === 0) return t('share.nothing_yet')
-  return t('share.summary', {
-    total: props.totalSmoked,
-    days: props.totalDays,
-    avg: props.dailyAvg,
-    longest: '—',
-  })
+  return vape
+    ? t('share.summary_vape', {
+        total: props.totalSmoked,
+        days: props.totalDays,
+        avg: props.dailyAvg,
+        longest: '—',
+      })
+    : t('share.summary', {
+        total: props.totalSmoked,
+        days: props.totalDays,
+        avg: props.dailyAvg,
+        longest: '—',
+      })
 }
 
 async function onShare(): Promise<void> {

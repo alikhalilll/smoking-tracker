@@ -1,7 +1,7 @@
 import { ref, watch, type Ref } from 'vue'
 import { supabase } from '../supabase'
 import { useAuth } from './useAuth'
-import type { AppData, QuitPlan, SmokeEntry } from '../types'
+import type { AppData, EntryType, QuitPlan, SmokeEntry } from '../types'
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline'
 
@@ -9,6 +9,10 @@ interface ServerEntry {
   id: string
   time: string
   date: string
+  /** Optional in the row shape because pre-migration rows lack the
+   *  column; once the SQL in SUPABASE_SETUP.md is applied the DB
+   *  default fills missing values with 'cigarette'. */
+  type?: EntryType | null
 }
 
 interface ServerPlan {
@@ -19,6 +23,7 @@ interface ServerPlan {
   intensity: QuitPlan['intensity']
   targets: Record<string, number>
   updated_at: string
+  type?: EntryType | null
 }
 
 export interface UseSync {
@@ -66,6 +71,7 @@ export function useSync(data: Ref<AppData>): UseSync {
             user_id: user.value!.id,
             time: e.time,
             date: e.date,
+            type: e.type,
           })),
           { onConflict: 'id' }
         )
@@ -78,7 +84,7 @@ export function useSync(data: Ref<AppData>): UseSync {
     // Step 2 — re-fetch the canonical server set.
     const { data: serverEntries, error: entriesErr } = await supabase
       .from('entries')
-      .select('id, time, date')
+      .select('id, time, date, type')
       .order('time')
     if (entriesErr) {
       setStatus('error', entriesErr.message)
@@ -96,6 +102,10 @@ export function useSync(data: Ref<AppData>): UseSync {
         id: e.id,
         time: e.time,
         date: e.date,
+        // Pre-migration rows can come back with the column missing
+        // (Postgrest omits null columns) — coerce so the local shape
+        // is always populated.
+        type: e.type ?? 'cigarette',
         synced: true,
       }))
     } finally {
@@ -195,6 +205,7 @@ export function useSync(data: Ref<AppData>): UseSync {
             user_id: user.value!.id,
             time: e.time,
             date: e.date,
+            type: e.type,
           })),
           { onConflict: 'id' }
         )
@@ -252,6 +263,7 @@ export function useSync(data: Ref<AppData>): UseSync {
       duration_days: plan.durationDays,
       intensity: plan.intensity,
       targets: plan.targetsByDate,
+      type: plan.type ?? 'cigarette',
     })
     if (error) {
       setStatus('error', error.message)
@@ -265,6 +277,7 @@ export function useSync(data: Ref<AppData>): UseSync {
       durationDays: p.duration_days,
       intensity: p.intensity,
       targetsByDate: p.targets,
+      type: p.type ?? 'cigarette',
     }
   }
 

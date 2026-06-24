@@ -1,5 +1,5 @@
 import { ref, watch, type Ref } from 'vue'
-import type { AppData, QuitIntensity, QuitPlan } from '../types'
+import type { AppData, EntryType, QuitIntensity, QuitPlan } from '../types'
 import { generateTargets, INTENSITY_DURATIONS } from './useQuitPlan'
 import { getToday } from './useDate'
 
@@ -14,14 +14,24 @@ function getDefaultData(): AppData {
 
 export interface UseStorage {
   data: Ref<AppData>
-  addEntries: (count: number) => void
-  undoLast: () => void
-  deleteDay: (date: string) => void
+  addEntries: (count: number, type: EntryType) => void
+  /** Undo the last entry of the given type. Scoping by type means an
+   *  "undo" tap in vape mode never silently rolls back a cigarette
+   *  the user logged ten minutes ago. */
+  undoLast: (type: EntryType) => void
+  /** Delete every entry of the given type for the given date. History
+   *  is mode-scoped, so deleting a day from the vape view must NOT
+   *  wipe the cigarette entries that share the date. */
+  deleteDay: (date: string, type: EntryType) => void
   /** Update an entry's timestamp. Recomputes `date` from the new time
    *  and marks `synced: false` so the next sync pass UPSERTs it. */
   editEntryTime: (id: string, newIsoTime: string) => void
   resetAll: () => void
-  startQuitPlan: (intensity: QuitIntensity, baseline: number) => void
+  startQuitPlan: (
+    intensity: QuitIntensity,
+    baseline: number,
+    type: EntryType
+  ) => void
   abandonQuitPlan: () => void
 }
 
@@ -44,7 +54,12 @@ export function useStorage(): UseStorage {
       if (!raw) return getDefaultData()
       const parsed = JSON.parse(raw) as AppData
       // Backfill IDs and assume previously-stored entries are unsynced
-      // (the next pull will reconcile them with the server).
+      // (the next pull will reconcile them with the server). Pre-v2
+      // entries lack a `type` — coerce to 'cigarette' so filters and
+      // counts treat them the same as they always did. We deliberately
+      // do NOT flip `synced` here: the server's DB-level default for
+      // `type` is also 'cigarette', so the local + server values match
+      // and there's nothing to push.
       let mutated = false
       for (const e of parsed.entries) {
         if (!e.id) {
@@ -53,6 +68,10 @@ export function useStorage(): UseStorage {
         }
         if (e.synced === undefined) {
           e.synced = false
+          mutated = true
+        }
+        if (!e.type) {
+          e.type = 'cigarette'
           mutated = true
         }
       }
@@ -82,7 +101,7 @@ export function useStorage(): UseStorage {
   // are lost on reload and sync re-pushes the same rows → 409 collision.
   watch(data, save, { deep: true })
 
-  function addEntries(count: number): void {
+  function addEntries(count: number, type: EntryType): void {
     const now = new Date().toISOString()
     const today = getToday()
     for (let i = 0; i < count; i++) {
@@ -90,21 +109,32 @@ export function useStorage(): UseStorage {
         id: newId(),
         time: now,
         date: today,
+        type,
         synced: false,
       })
     }
     save()
   }
 
-  function undoLast(): void {
-    if (data.value.entries.length > 0) {
-      data.value.entries.pop()
-      save()
+  function undoLast(type: EntryType): void {
+    // Find the chronologically-last entry of the requested type. We
+    // walk backwards because the array is roughly time-ordered (and
+    // the most-recent log is the one the user expects "undo" to act
+    // on). Skip-and-find rather than reverse-sort to keep this cheap.
+    for (let i = data.value.entries.length - 1; i >= 0; i--) {
+      const e = data.value.entries[i]
+      if ((e.type ?? 'cigarette') === type) {
+        data.value.entries.splice(i, 1)
+        save()
+        return
+      }
     }
   }
 
-  function deleteDay(date: string): void {
-    data.value.entries = data.value.entries.filter((e) => e.date !== date)
+  function deleteDay(date: string, type: EntryType): void {
+    data.value.entries = data.value.entries.filter(
+      (e) => !(e.date === date && (e.type ?? 'cigarette') === type)
+    )
     save()
   }
 
@@ -129,15 +159,23 @@ export function useStorage(): UseStorage {
     save()
   }
 
-  function startQuitPlan(intensity: QuitIntensity, baseline: number): void {
+  function startQuitPlan(
+    intensity: QuitIntensity,
+    baseline: number,
+    type: EntryType
+  ): void {
     const today = getToday()
     const durationDays = INTENSITY_DURATIONS[intensity]
+    // Single-plan model: starting a vape plan while a cigarette plan
+    // exists (or vice versa) overwrites the previous one. Multi-plan
+    // support is a follow-up if users ask for it.
     const plan: QuitPlan = {
       startDate: today,
       baseline,
       durationDays,
       intensity,
       targetsByDate: generateTargets(baseline, durationDays, today),
+      type,
     }
     data.value.quitPlan = plan
     // Starting a fresh plan invalidates any prior abandon stamp — the

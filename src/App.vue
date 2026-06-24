@@ -106,6 +106,7 @@
     <main class="view-host">
       <HomeView
         v-if="view === 'home'"
+        :active-mode="activeMode.mode.value"
         :today-count="todayCount"
         :last-smoke-time="lastSmoke ?? undefined"
         :last7="last7"
@@ -115,15 +116,16 @@
         :total-days="totalDays"
         :best-day="bestDay"
         :longest-gap-ms="gapStats.longest"
-        :has-entries="data.entries.length > 0"
+        :has-entries="modeHasEntries"
         :quit-today-target="quit.todayTarget.value"
         :quit-today-status="quit.todayStatus.value"
         :quit-is-complete="quit.isComplete.value"
         :smoke-free-days="smokeFreeDays"
         @log="handleLog"
-        @undo="undoLast"
+        @undo="() => undoLast(activeMode.mode.value)"
         @open-report="showReport = true"
         @open-quit="setView('quit')"
+        @set-mode="handleSetMode"
       />
 
       <HistoryView
@@ -236,6 +238,7 @@ import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useStorage } from './composables/useStorage'
 import { useStats } from './composables/useStats'
 import { useQuitPlan } from './composables/useQuitPlan'
+import { useActiveMode } from './composables/useActiveMode'
 import { useReminders, resolvedNotificationLocale } from './composables/useReminders'
 import { useSync } from './composables/useSync'
 import { useSettingsSync } from './composables/useSettingsSync'
@@ -260,7 +263,7 @@ import UpdatePrompt from './components/UpdatePrompt.vue'
 import OnboardingOverlay from './components/OnboardingOverlay.vue'
 import BottomNav from './components/BottomNav.vue'
 import { useOnboarding, type OnboardingStep } from './composables/useOnboarding'
-import type { QuitIntensity } from './types'
+import type { EntryType, QuitIntensity } from './types'
 
 type TabId =
   | 'home'
@@ -412,6 +415,23 @@ const {
   abandonQuitPlan,
 } = useStorage()
 
+const activeMode = useActiveMode()
+
+// "Has entries" used by HomeView decides whether to show health
+// milestones, undo, share, report etc. Scoped to the active mode so
+// switching modes flips the empty-state correctly (vape mode with no
+// puffs logged should look fresh, even if cigarettes have history).
+const modeHasEntries = computed(() =>
+  data.value.entries.some(
+    (e) => (e.type ?? 'cigarette') === activeMode.mode.value
+  )
+)
+
+// Per-session, per-mode confirmation toast — fires only the first
+// time each mode is logged in a session, so the user gets reassurance
+// they tapped + in the mode they meant. Reset on a full page reload.
+const modeToastShownThisSession = new Set<EntryType>()
+
 const stats = useStats(data)
 const {
   byDay,
@@ -460,18 +480,40 @@ const reminders = useReminders()
 
 function reminderPayload(): { title: string; body: string } {
   const loc = resolvedNotificationLocale()
+  const bodyKey =
+    activeMode.mode.value === 'vape'
+      ? 'reminders.notification_body_vape'
+      : 'reminders.notification_body'
   return {
     title: tIn(loc, 'reminders.notification_title'),
-    body: tIn(loc, 'reminders.notification_body', {
+    body: tIn(loc, bodyKey, {
       minutes: reminders.settings.value.gapMinutes,
     }),
   }
 }
 
 function handleLog(count: number): void {
-  addEntries(count)
+  const mode = activeMode.mode.value
+  addEntries(count, mode)
   haptics.fire('success')
   reminders.scheduleNext(reminderPayload())
+  if (!modeToastShownThisSession.has(mode)) {
+    modeToastShownThisSession.add(mode)
+    const key =
+      mode === 'vape'
+        ? count === 1
+          ? 'home.toast_logged_one_puff'
+          : 'home.toast_logged_many_puffs'
+        : count === 1
+          ? 'home.toast_logged_one_cigarette'
+          : 'home.toast_logged_many_cigarettes'
+    showToast(t(key, { n: count }), 'success')
+  }
+}
+
+function handleSetMode(m: EntryType): void {
+  activeMode.setMode(m)
+  haptics.fire('tap')
 }
 
 function handleRemindersChanged(): void {
@@ -519,13 +561,15 @@ function handleStartQuit(payload: {
   intensity: QuitIntensity
   baseline: number
 }): void {
-  startQuitPlan(payload.intensity, payload.baseline)
+  startQuitPlan(payload.intensity, payload.baseline, activeMode.mode.value)
 }
 
 function handleDeleteDay(date: string): void {
   // Local removal triggers useSync's debounced pushDiff, which mirrors
   // the deletion to Supabase via its server-only-id delete pass.
-  deleteDay(date)
+  // Scope to the active mode so deleting a day from vape history
+  // doesn't take cigarette entries with it.
+  deleteDay(date, activeMode.mode.value)
   haptics.fire('tap')
 }
 
@@ -591,6 +635,13 @@ function buildTourSteps(): OnboardingStep[] {
       titleKey: 'onboarding.steps.home.title',
       bodyKey: 'onboarding.steps.home.body',
       children: [
+        {
+          id: 'home-mode',
+          view: 'home',
+          selector: '[data-onboard="home-mode"]',
+          titleKey: 'onboarding.steps.home.children.mode.title',
+          bodyKey: 'onboarding.steps.home.children.mode.body',
+        },
         {
           id: 'home-hero',
           view: 'home',

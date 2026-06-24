@@ -465,18 +465,31 @@
         </div>
       </div>
 
-      <!-- Cigarette price (drives the "money saved" widget on Home) -->
+      <!-- Price config — drives the "money saved" widget on Home.
+           Cigarette mode shows pack inputs, vape mode shows pod
+           inputs. Currency is shared. Inline LiquidSegmented at the
+           top lets the user edit the inactive mode's numbers
+           without leaving Settings. -->
       <div v-reveal class="card" data-onboard="settings-economy">
         <div class="card-header">
           <div class="card-icon icon-mint">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           </div>
           <div>
-            <div class="card-title">{{ t('settings.economy_title') }}</div>
-            <div class="card-sub">{{ t('settings.economy_help') }}</div>
+            <div class="card-title">{{ economyTitle }}</div>
+            <div class="card-sub">{{ economyHelp }}</div>
           </div>
         </div>
-        <div class="economy-row">
+
+        <div style="margin-bottom: 12px">
+          <LiquidSegmented
+            :model-value="activeMode.mode.value"
+            :options="economyModeOptions"
+            @update:model-value="activeMode.setMode"
+          />
+        </div>
+
+        <div v-if="activeMode.mode.value === 'cigarette'" class="economy-row">
           <label class="economy-field">
             <span class="economy-label">{{ t('settings.economy_pack_price_label') }}</span>
             <input
@@ -502,6 +515,32 @@
             />
           </label>
         </div>
+        <div v-else class="economy-row">
+          <label class="economy-field">
+            <span class="economy-label">{{ t('settings.economy_pod_price_label') }}</span>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              inputmode="decimal"
+              class="field-input"
+              :value="economy.settings.value.pricePerPod"
+              @input="onPodPriceInput"
+            />
+          </label>
+          <label class="economy-field economy-field-cigs">
+            <span class="economy-label">{{ t('settings.economy_puffs_per_pod_label') }}</span>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              inputmode="numeric"
+              class="field-input"
+              :value="economy.settings.value.puffsPerPod"
+              @input="onPuffsPerPodInput"
+            />
+          </label>
+        </div>
 
         <div class="economy-field" style="margin-top: 12px">
           <span class="economy-label">{{ t('settings.economy_currency_label') }}</span>
@@ -513,17 +552,10 @@
         </div>
 
         <div
-          v-if="economy.settings.value.pricePerPack > 0"
+          v-if="economyDerivedVisible"
           class="economy-derived"
         >
-          {{
-            t('settings.economy_derived', {
-              price: formatMoney(
-                economy.pricePerCigarette.value,
-                economy.settings.value.currency
-              ),
-            })
-          }}
+          {{ economyDerivedText }}
         </div>
       </div>
 
@@ -602,8 +634,10 @@ import Toggle from './Toggle.vue'
 import Select from './Select.vue'
 import TimePicker from './TimePicker.vue'
 import LiquidSegmented from './LiquidSegmented.vue'
+import { useActiveMode } from '../composables/useActiveMode'
 import type { UseSync } from '../composables/useSync'
 import type { UseLeaderboard } from '../composables/useLeaderboard'
+import type { EntryType } from '../types'
 
 // Onboarding state is read up front so the section ref can be
 // initialized from a tour-requested section before any watcher fires.
@@ -714,6 +748,7 @@ interface ExportEntry {
   id: string
   time: string
   date: string
+  type?: EntryType
 }
 
 interface Props {
@@ -738,6 +773,40 @@ const emit = defineEmits<{
 
 const economy = useEconomy()
 const haptics = useHaptics()
+const activeMode = useActiveMode()
+
+// Economy section toggles its inputs by the active mode. Cigarette
+// branch shows pack price + cigs-per-pack; vape branch shows pod
+// price + puffs-per-pod. Each mode keeps its own values so flipping
+// the toggle doesn't blow away the inactive mode's numbers.
+const economyModeOptions = computed(() => [
+  { value: 'cigarette' as EntryType, label: t('home.mode_cigarette') },
+  { value: 'vape' as EntryType, label: t('home.mode_vape') },
+])
+const economyTitle = computed(() =>
+  activeMode.mode.value === 'vape'
+    ? t('settings.economy_title_vape')
+    : t('settings.economy_title')
+)
+const economyHelp = computed(() =>
+  activeMode.mode.value === 'vape'
+    ? t('settings.economy_help_vape')
+    : t('settings.economy_help')
+)
+const economyDerivedText = computed(() => {
+  const price = economy.pricePerUnit.value
+  if (price <= 0) return ''
+  return activeMode.mode.value === 'vape'
+    ? t('settings.economy_derived_vape', {
+        price: formatMoney(price, economy.settings.value.currency),
+      })
+    : t('settings.economy_derived', {
+        price: formatMoney(price, economy.settings.value.currency),
+      })
+})
+const economyDerivedVisible = computed(
+  () => economy.pricePerUnit.value > 0
+)
 
 // Delete-account flow. Confirmation goes through the vaul-driven
 // confirm drawer; errors surface as a toast. Local data is wiped via
@@ -863,6 +932,14 @@ function onCigsPerPackInput(e: Event): void {
   const v = parseInt((e.target as HTMLInputElement).value, 10)
   economy.setCigsPerPack(Number.isFinite(v) && v >= 1 ? v : 20)
 }
+function onPodPriceInput(e: Event): void {
+  const v = parseFloat((e.target as HTMLInputElement).value)
+  economy.setPodPrice(Number.isFinite(v) && v >= 0 ? v : 0)
+}
+function onPuffsPerPodInput(e: Event): void {
+  const v = parseInt((e.target as HTMLInputElement).value, 10)
+  economy.setPuffsPerPod(Number.isFinite(v) && v >= 1 ? v : 600)
+}
 
 function csvEscape(v: string): string {
   // Quote if it contains a comma, quote, or newline; double inner quotes.
@@ -872,9 +949,12 @@ function csvEscape(v: string): string {
 
 function onExportCsv(): void {
   const rows = props.entries ?? []
-  const header = 'id,time,date'
+  const header = 'id,time,date,type'
   const body = rows
-    .map((e) => `${csvEscape(e.id)},${csvEscape(e.time)},${csvEscape(e.date)}`)
+    .map(
+      (e) =>
+        `${csvEscape(e.id)},${csvEscape(e.time)},${csvEscape(e.date)},${csvEscape(e.type ?? 'cigarette')}`
+    )
     .join('\n')
   const blob = new Blob([`${header}\n${body}\n`], {
     type: 'text/csv;charset=utf-8',

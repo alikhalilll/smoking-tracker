@@ -1,3 +1,9 @@
+/** What was consumed for this entry. Drives the active-mode filter
+ *  across the app (Home / History / stats / economy) so a single user
+ *  can log both cigarettes and vape puffs without conflating them. */
+export type EntryType = 'cigarette' | 'vape'
+export const ALL_ENTRY_TYPES = ['cigarette', 'vape'] as const
+
 export interface SmokeEntry {
   /** Stable client-generated UUID — the sync key. */
   id: string
@@ -5,6 +11,9 @@ export interface SmokeEntry {
   time: string
   /** YYYY-MM-DD */
   date: string
+  /** 'cigarette' | 'vape'. Backfilled to 'cigarette' on load for
+   *  pre-v2 entries that predate the toggle. */
+  type: EntryType
   /**
    * True once this entry is confirmed to live on the server. Local-only
    * (offline-created) entries have synced=false until the next push.
@@ -39,6 +48,10 @@ export interface QuitPlan {
   intensity: QuitIntensity
   /** date (YYYY-MM-DD) → target cigarette count for that day. */
   targetsByDate: Record<string, number>
+  /** Which entry type this plan targets. Optional — undefined on
+   *  pre-v2 plans, treated as 'cigarette'. The plan card on Home is
+   *  hidden when the active mode doesn't match. */
+  type?: EntryType
 }
 
 export interface QuitDay {

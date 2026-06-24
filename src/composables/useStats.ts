@@ -12,6 +12,7 @@ import type {
 
 import { formatLocalDate as formatDate, getToday } from './useDate'
 import { useReminders } from './useReminders'
+import { useActiveMode } from './useActiveMode'
 
 /**
  * Returns [startMs, endMs] of the bedtime episode that *starts* on the
@@ -138,9 +139,21 @@ const GAP_BUCKET_DEFS: Array<Pick<GapDistributionBucket, 'key' | 'minMs' | 'maxM
 
 export function useStats(data: Ref<AppData>) {
   const reminders = useReminders()
+  const activeMode = useActiveMode()
+
+  // Every downstream stat (counts, distributions, gaps, streak) reads
+  // from this — flipping the active mode toggle automatically rescopes
+  // the dashboard. Untyped pre-v2 entries get the same backfill default
+  // as the load-time pass in useStorage, so an older user who never
+  // touches the toggle keeps seeing their cigarette history.
+  const filteredEntries = computed(() =>
+    data.value.entries.filter(
+      (e) => (e.type ?? 'cigarette') === activeMode.mode.value
+    )
+  )
 
   const sortedEntries = computed(() =>
-    [...data.value.entries].sort(
+    [...filteredEntries.value].sort(
       (a, b) => new Date(a.time).getTime() - new Date(b.time).getTime()
     )
   )
@@ -176,7 +189,7 @@ export function useStats(data: Ref<AppData>) {
 
   const byDay = computed<Record<string, number>>(() => {
     const map: Record<string, number> = {}
-    for (const e of data.value.entries) {
+    for (const e of filteredEntries.value) {
       map[e.date] = (map[e.date] || 0) + 1
     }
     return map
@@ -187,7 +200,7 @@ export function useStats(data: Ref<AppData>) {
   )
 
   const totalDays = computed(() => days.value.length || 1)
-  const totalSmoked = computed(() => data.value.entries.length)
+  const totalSmoked = computed(() => filteredEntries.value.length)
   const dailyAvg = computed(
     () => Math.round((totalSmoked.value / totalDays.value) * 10) / 10
   )
@@ -296,7 +309,7 @@ export function useStats(data: Ref<AppData>) {
       hour: h,
       count: 0,
     }))
-    for (const e of data.value.entries) {
+    for (const e of filteredEntries.value) {
       const h = new Date(e.time).getHours()
       buckets[h].count++
     }
@@ -309,7 +322,7 @@ export function useStats(data: Ref<AppData>) {
     const dayCounts = new Array(7).fill(0)
     const seenDates = new Set<string>()
 
-    for (const e of data.value.entries) {
+    for (const e of filteredEntries.value) {
       const d = new Date(e.time)
       const wd = d.getDay()
       totals[wd]++
