@@ -46,6 +46,7 @@ coverage
 
 # Local-only docs (audit artifacts, scratch notes, etc.)
 docs/
+SUPABASE_SETUP.md
 
 # Supabase CLI local state — keep `supabase/functions/` and
 # `supabase/config.toml` committed; the rest is per-machine scratch
