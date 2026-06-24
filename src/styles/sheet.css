@@ -57,13 +57,6 @@
   z-index: 1;
 }
 
-@supports (backdrop-filter: url(#liquid-glass)) {
-  .sheet-content {
-    -webkit-backdrop-filter: var(--glass-blur-strong) url(#liquid-glass);
-    backdrop-filter: var(--glass-blur-strong) url(#liquid-glass);
-  }
-}
-
 .sheet-handle-row {
   display: flex;
   justify-content: center;

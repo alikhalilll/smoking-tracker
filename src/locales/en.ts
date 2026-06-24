@@ -15,6 +15,11 @@ const en = {
   update: {
     available_title: 'Update available',
     available_body: 'A new version of Smoking Tracker is ready.',
+    // Short release-note line shown inside the update banner so the
+    // user knows what they're loading before they tap Refresh. Bump
+    // this with each visible release.
+    whats_new: 'New: track vape puffs alongside cigarettes — toggle on Home.',
+    toast_announce: '✨ Update available — tap Refresh to load it.',
     refresh_btn: 'Update',
     dismiss_btn: 'Later',
   },

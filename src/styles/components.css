@@ -77,23 +77,6 @@
   z-index: 1;
 }
 
-/* Chromium only: layer the SVG displacement map on top of the existing
-   blur for true refraction. Safari/Firefox skip this entirely and keep
-   the baseline frosted glass — the @supports query gates it because
-   only Chromium currently honors `backdrop-filter: url(#filter)`. */
-@supports (backdrop-filter: url(#liquid-glass)) {
-  .glass {
-    -webkit-backdrop-filter: var(--glass-blur) url(#liquid-glass);
-    backdrop-filter: var(--glass-blur) url(#liquid-glass);
-  }
-  .glass-strong {
-    -webkit-backdrop-filter: var(--glass-blur-strong) url(#liquid-glass);
-    backdrop-filter: var(--glass-blur-strong) url(#liquid-glass);
-  }
-  /* Small controls keep the lighter blur but skip the displacement —
-     the warp reads as noise on tiny surfaces. */
-}
-
 /* === Buttons === */
 .btn {
   appearance: none;

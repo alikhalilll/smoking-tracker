@@ -1,42 +1,4 @@
 <template>
-  <!-- Liquid Glass refraction filter (Chromium-only). Mounted once at
-       app root so any .glass surface can opt into the displacement via
-       the @supports query in components.css. Keep the filter off-canvas
-       (zero size, absolute) so it never paints itself. -->
-  <svg
-    aria-hidden="true"
-    width="0"
-    height="0"
-    style="position: absolute; width: 0; height: 0; pointer-events: none;"
-  >
-    <defs>
-      <filter
-        id="liquid-glass"
-        x="0%"
-        y="0%"
-        width="100%"
-        height="100%"
-        color-interpolation-filters="sRGB"
-      >
-        <feTurbulence
-          type="fractalNoise"
-          baseFrequency="0.012 0.018"
-          numOctaves="2"
-          seed="3"
-          result="turbulence"
-        />
-        <feGaussianBlur in="turbulence" stdDeviation="2" result="softNoise" />
-        <feDisplacementMap
-          in="SourceGraphic"
-          in2="softNoise"
-          scale="6"
-          xChannelSelector="R"
-          yChannelSelector="G"
-        />
-      </filter>
-    </defs>
-  </svg>
-
   <!-- Ambient floating dots — fixed behind every screen, dim by default,
        brighter on the leaderboard tab. -->
   <div

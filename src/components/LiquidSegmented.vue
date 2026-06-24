@@ -1,20 +1,16 @@
 <template>
   <!--
-    N-position segmented control with the kube.io <Switch> drag flow:
+    N-position segmented control with drag-snap. Stripped of the SVG
+    refraction filter — the thumb is now a plain backdrop-blur card
+    that lives inside the active theme palette.
 
+    Behaviors kept:
       - pointerdown anywhere on the control starts a "potential drag"
-        (the article puts mousedown on the thumb, but our thumb is only
-        1/N of the bar so we widen the target to the whole control)
       - window-level mousemove/touchmove updates xDragRatio in [0..N-1]
-        with the same baseRatio + dx/tabWidth math
       - rubber-band overflow past the ends with damping / 22
       - on pointerup: movement < 4px is a tap (the @click on the tab
         you released over emits the selection); >= 4px is a drag and
         we snap to round(xDragRatio), suppressing the trailing click
-
-    The thumb is the glass surface — backdrop-filter is applied to it
-    via the v-liquid-glass directive with the article's lip bezel
-    parameters. Track + tab labels live alongside.
   -->
   <div
     ref="rootEl"
@@ -24,11 +20,7 @@
     @mousedown="onMouseDown"
     @touchstart.passive="onTouchStart"
   >
-    <span
-      v-liquid-glass="thumbLg"
-      class="lg-seg-thumb"
-      :style="thumbStyle"
-    />
+    <span class="lg-seg-thumb" :style="thumbStyle" />
     <button
       v-for="(opt, i) in options"
       :key="opt.value"
@@ -55,67 +47,38 @@ import {
   watch,
 } from 'vue'
 import { useHaptics } from '../composables/useHaptics'
-import { useSpring } from '../composables/useSpring'
-import {
-  LIQUID_INPUT_TOKENS,
-  liquidFilterOptions,
-  type LiquidFilterParams,
-  type LiquidGeometryParams,
-} from '../lib/liquidGlass/tokens'
 
 interface Option<V> {
   value: V
   label?: string
 }
 
-type ComponentProps = {
+const props = defineProps<{
   modelValue: T
   options: ReadonlyArray<Option<T>>
   /** Drop the track background — useful when embedded inside another
-   *  glass surface (e.g. the floating bottom nav) so we don't double up. */
+   *  surface so we don't double up. */
   flat?: boolean
   /** Extra padding between the thumb and the track edges, in px. */
   trackPadding?: number
-} & Partial<LiquidFilterParams & LiquidGeometryParams>
-
-const props = defineProps<ComponentProps>()
+}>()
 const emit = defineEmits<{ 'update:modelValue': [value: T] }>()
 const haptics = useHaptics()
 
 const rootEl = ref<HTMLDivElement | null>(null)
 
 // === Sizing ========================================================
-// We measure the container on mount and on resize. The thumb width is
-// `(containerWidth - 2*PADDING) / N`; travel = thumbWidth * (N - 1).
 const containerWidth = ref(0)
 const containerHeight = ref(0)
 const PADDING = computed(() => props.trackPadding ?? 4)
 
 const N = computed(() => props.options.length)
-// Width of one tab slot — the *visible* thumb at rest matches this.
 const tabWidth = computed(() => {
   if (!containerWidth.value || !N.value) return 0
   return (containerWidth.value - PADDING.value * 2) / N.value
 })
-const trackHeight = computed(() => Math.max(0, containerHeight.value - PADDING.value * 2))
-
-// Geometry constants pulled from tokens (article-faithful defaults).
-// Thumb is bigger than its visible slot, scaled DOWN at rest so its
-// bezel stays inside the track, and grows toward 0.9 when active for
-// the "splash" effect.
-const THUMB_REST_SCALE =
-  props.thumbRestScale ?? LIQUID_INPUT_TOKENS.geometry.thumbRestScale
-const THUMB_ACTIVE_SCALE =
-  props.thumbActiveScale ?? LIQUID_INPUT_TOKENS.geometry.thumbActiveScale
-// Actual (unscaled) thumb dims. Multiplying by 1/REST_SCALE keeps the
-// rest-state visual size equal to the tab slot (and the active scale
-// then overflows slightly into neighbors — same as Switch.tsx).
-const thumbActualWidth = computed(() => tabWidth.value / THUMB_REST_SCALE)
-const thumbActualHeight = computed(
-  () => trackHeight.value / THUMB_REST_SCALE
-)
-const THUMB_REST_OFFSET = computed(
-  () => ((1 - THUMB_REST_SCALE) * thumbActualWidth.value) / 2
+const trackHeight = computed(() =>
+  Math.max(0, containerHeight.value - PADDING.value * 2)
 )
 
 // === State =========================================================
@@ -130,54 +93,16 @@ const isDragging = ref(false)
 const xDragRatio = ref(0)
 const initialPointerX = ref(0)
 const movedFlag = ref(false)
-/** Index from which the current drag started — used as the base ratio. */
 const dragStartIndex = ref(0)
 
-// === Spring state (mirrors Switch.tsx motion values) ================
-// `activeRaw` = 1 while pressed, 0 otherwise. Drives every derived
-// motion (scale, opacity, filter intensity); each is spring-smoothed
-// individually below to match the article's per-value spring configs.
-const activeRaw = computed(() => (isPressed.value ? 1 : 0))
-
-// Thumb scale: 0.65 → 0.9, spring-smoothed.
-const thumbScaleRaw = computed(
-  () =>
-    THUMB_REST_SCALE +
-    (THUMB_ACTIVE_SCALE - THUMB_REST_SCALE) * activeRaw.value
-)
-const thumbScale = useSpring(
-  thumbScaleRaw,
-  LIQUID_INPUT_TOKENS.springs.thumbScale
-)
-
-// Background opacity on the thumb: 1 at rest → 0.1 while pressed.
-const thumbBgOpacityRaw = computed(() => 1 - 0.9 * activeRaw.value)
-const thumbBgOpacity = useSpring(
-  thumbBgOpacityRaw,
-  LIQUID_INPUT_TOKENS.springs.thumbBgOpacity
-)
-
-// Filter scale ratio: (0.4 + 0.5·active)·refractionBase.
-const refractionBase =
-  props.refractionBase ?? LIQUID_INPUT_TOKENS.filter.refractionBase
-const filterScaleRatioRaw = computed(
-  () => (0.4 + 0.5 * activeRaw.value) * refractionBase
-)
-const filterScaleRatio = useSpring(
-  filterScaleRatioRaw,
-  LIQUID_INPUT_TOKENS.springs.filterScale
-)
-
-// xRatio: thumb position in [0..N-1]. Spring-tracks xDragRatio during
-// drag and currentIndex when at rest.
-const xRatioTarget = computed(() =>
+// Eased thumb position. We don't reach for a spring lib — a simple
+// CSS transition on `transform` handles rest-state easing, and we
+// switch it off mid-drag so the thumb tracks the finger 1:1.
+const xRatioDisplay = computed(() =>
   isPressed.value ? xDragRatio.value : currentIndex.value
 )
-const xRatio = useSpring(xRatioTarget, LIQUID_INPUT_TOKENS.springs.xRatio)
 
 function isActive(i: number): boolean {
-  // While pressed, the active label tracks the snap target preview
-  // (round of xDragRatio) — the article's `considerChecked`.
   if (isPressed.value) {
     return Math.round(xDragRatio.value) === i
   }
@@ -185,11 +110,6 @@ function isActive(i: number): boolean {
 }
 
 // === Geometry observation ==========================================
-// `isRtl` follows the runtime computed direction on the root element
-// so the thumb / drag math can mirror itself in RTL locales (the
-// flex track already flips visually because the buttons are flex
-// children, but `translateX` is a physical transform so we have to
-// flip its sign explicitly).
 const isRtl = ref(false)
 let resizeObs: ResizeObserver | null = null
 function refreshSize() {
@@ -199,8 +119,6 @@ function refreshSize() {
   containerHeight.value = el.clientHeight
   isRtl.value = getComputedStyle(el).direction === 'rtl'
 }
-// Live locale switches flip the document `dir` attribute without a
-// page reload — observe it so isRtl updates when that happens.
 let dirObs: MutationObserver | null = null
 onMounted(() => {
   refreshSize()
@@ -208,7 +126,10 @@ onMounted(() => {
     resizeObs = new ResizeObserver(() => refreshSize())
     resizeObs.observe(rootEl.value)
   }
-  if (typeof MutationObserver !== 'undefined' && typeof document !== 'undefined') {
+  if (
+    typeof MutationObserver !== 'undefined' &&
+    typeof document !== 'undefined'
+  ) {
     dirObs = new MutationObserver(() => refreshSize())
     dirObs.observe(document.documentElement, {
       attributes: true,
@@ -223,72 +144,27 @@ onBeforeUnmount(() => {
 })
 
 // === Styles ========================================================
-// Position the thumb's BOUNDING BOX so that — at rest scale 0.65 —
-// the visible thumb sits exactly inside the tab slot. The rest of the
-// math is verbatim from Switch.tsx: marginLeft = -REST_OFFSET +
-// (slot - actual·rest)/2, and we add x = ratio·tabWidth so the
-// position interpolates between segments.
 const thumbStyle = computed(() => {
-  const x = PADDING.value + xRatio.value * tabWidth.value
-  const baseShadow = '0 4px 22px rgba(0,0,0,0.10)'
-  const pressedShadow = isPressed.value
-    ? ', inset 2px 7px 24px rgba(0,0,0,0.09), inset -2px -7px 24px rgba(255,255,255,0.09)'
-    : ''
-  const top = PADDING.value + trackHeight.value / 2
-  const ml =
-    -THUMB_REST_OFFSET.value +
-    (tabWidth.value - thumbActualWidth.value * THUMB_REST_SCALE) / 2
-  // Fade the theme-aware --card color toward transparent on press (so
-  // the warped track behind shows through the glass). Doing the fade
-  // via color-mix keeps the rest-state colour theme-correct in both
-  // light and dark; an `rgba(255,255,255,X)` fill would always be
-  // white regardless of theme.
-  const opPct = (
-    Math.max(0, Math.min(1, thumbBgOpacity.value)) * 100
-  ).toFixed(1)
-  // RTL: the flex children visually run right-to-left, so the thumb
-  // anchors to the inline-start (which maps to `right: 0` in RTL) and
-  // we flip the sign of the physical translateX so positive xRatio
-  // moves the thumb in the inline-end direction (visually leftward).
+  // Anchor the thumb to the start edge (RTL flips this via insetInlineStart)
+  // and use a physical translateX whose sign flips in RTL so positive
+  // xRatio always moves toward the end edge visually.
+  const x = PADDING.value + xRatioDisplay.value * tabWidth.value
   const tx = isRtl.value ? -x : x
   return {
     position: 'absolute' as const,
     insetInlineStart: '0',
-    top: `${top}px`,
-    width: `${thumbActualWidth.value}px`,
-    height: `${thumbActualHeight.value}px`,
-    marginInlineStart: `${ml}px`,
-    borderRadius: '999px',
-    transform: `translateY(-50%) translateX(${tx}px) scale(${thumbScale.value})`,
-    backgroundColor: `color-mix(in srgb, var(--card) ${opPct}%, transparent)`,
-    boxShadow: baseShadow + pressedShadow,
-    transition: 'none',
+    top: `${PADDING.value}px`,
+    width: `${tabWidth.value}px`,
+    height: `${trackHeight.value}px`,
+    transform: `translateX(${tx}px)`,
+    // Live drag = no transition (finger tracking); rest = ease in.
+    transition: isPressed.value
+      ? 'none'
+      : 'transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)',
   }
 })
 
-// Refraction lives on the THUMB (matches the article's switch). The
-// thumb's backdrop is the colored track around it (--btn-ghost-bg);
-// that translucent fill plus the parent card behind gives the warp
-// enough contrast to read. Whole-track refraction was tried but the
-// uniform card backdrop in settings made the warp invisible — only
-// surfaces with rich page content behind them (the bottom nav) read
-// well with whole-surface refraction.
-const thumbLg = computed(() =>
-  liquidFilterOptions({
-    blur: props.blur,
-    specularOpacity: props.specularOpacity,
-    specularSaturation: props.specularSaturation,
-    refractionBase: props.refractionBase,
-    surface: props.surface ?? 'convex',
-    bezelWidth: props.bezelWidth,
-    glassThickness: props.glassThickness,
-    refractiveIndex: props.refractiveIndex,
-    forceActive: isPressed.value,
-    refractionRatio: filterScaleRatio.value,
-  })
-)
-
-// === Drag flow (mirrors Switch.tsx) ================================
+// === Drag flow =====================================================
 
 function startDrag(clientX: number) {
   isPressed.value = true
@@ -306,8 +182,6 @@ function processMove(clientX: number) {
     isDragging.value = true
     movedFlag.value = true
   }
-  // RTL: rightward pointer movement should DECREASE the index (the
-  // tabs run right-to-left visually), so we flip the signed delta.
   const dx = isRtl.value ? -dxRaw : dxRaw
   const ratio = base + dx / tabWidth.value
   const max = Math.max(0, N.value - 1)
@@ -322,7 +196,10 @@ function endDrag(clientX: number) {
   const dx = clientX - initialPointerX.value
   const moved = Math.abs(dx) > 4
   if (moved) {
-    const snapped = Math.max(0, Math.min(N.value - 1, Math.round(xDragRatio.value)))
+    const snapped = Math.max(
+      0,
+      Math.min(N.value - 1, Math.round(xDragRatio.value))
+    )
     const next = props.options[snapped]
     if (next && next.value !== props.modelValue) {
       haptics.fire('tap')
@@ -334,9 +211,6 @@ function endDrag(clientX: number) {
 }
 
 function onMouseDown(e: MouseEvent) {
-  // Only primary button. Don't preventDefault — the @click on the
-  // child tab is how taps select; we just attach window listeners to
-  // catch any subsequent drag.
   if (e.button !== 0) return
   startDrag(e.clientX)
   window.addEventListener('mousemove', onWindowMouseMove)
@@ -394,8 +268,6 @@ function onTabClick(i: number, e: MouseEvent) {
   }
 }
 
-// If the bound value is changed externally (e.g. from a hash route),
-// keep xDragRatio in sync at rest.
 watch(
   () => props.modelValue,
   () => {
@@ -410,32 +282,37 @@ watch(
   display: flex;
   width: 100%;
   background: var(--btn-ghost-bg);
+  border: 1px solid var(--hairline);
   border-radius: var(--radius-pill);
   padding: 4px;
   user-select: none;
   -webkit-user-select: none;
-  /* Allow page to pan vertically; we own horizontal gestures. */
   touch-action: pan-y;
 }
 .lg-seg.is-flat {
   background: transparent;
+  border: none;
 }
 
 .lg-seg-thumb {
-  /* Position / size / transform are written inline from the spring-
-     driven thumbStyle. Background lives here so it can theme via
-     CSS vars; pointer-events stay disabled so taps fall through to
-     the tab buttons / root drag listeners. */
+  /* Plain frosted card — sits behind the active tab. The blur stays
+     visible against the page background (which is what backdrop-filter
+     reads); the card tint guarantees a readable surface even on
+     theme variants where backdrop-filter is unsupported. */
   pointer-events: none;
   z-index: 0;
+  border-radius: var(--radius-pill);
   background: var(--card);
-  box-shadow: 0 4px 22px rgba(0, 0, 0, 0.10),
-              inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.10),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
 }
 .lg-seg.is-pressed .lg-seg-thumb {
-  box-shadow: 0 4px 22px rgba(0, 0, 0, 0.10),
-              inset 2px 7px 24px rgba(0, 0, 0, 0.09),
-              inset -2px -7px 24px rgba(255, 255, 255, 0.09);
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 .lg-seg.is-pressed {
   cursor: grabbing;
@@ -463,5 +340,10 @@ watch(
 }
 .lg-seg-tab.is-active {
   color: var(--text);
+}
+@media (prefers-reduced-motion: reduce) {
+  .lg-seg-tab {
+    transition: none;
+  }
 }
 </style>
