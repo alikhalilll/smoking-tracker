@@ -35,9 +35,13 @@ const { messages } = useToast()
 }
 .toast {
   pointer-events: auto;
-  background: var(--glass-bg-strong);
-  -webkit-backdrop-filter: var(--glass-blur);
-  backdrop-filter: var(--glass-blur);
+  /* Heavier blur + a more opaque card so the text reads cleanly
+     against busy backgrounds (ambient dots, dashboards, etc.).
+     color-mix off --card keeps the surface theme-correct in light
+     and dark. */
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  -webkit-backdrop-filter: var(--glass-blur-strong);
+  backdrop-filter: var(--glass-blur-strong);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-highlight), var(--glass-shadow);
   color: var(--text);
