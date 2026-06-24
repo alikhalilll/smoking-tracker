@@ -86,7 +86,7 @@ const ICONS_FILLED: Record<BottomNavTabId, string> = {
   left: 50%;
   transform: translateX(-50%);
   width: min(448px, calc(100vw - 32px));
-  bottom: max(7px, env(safe-area-inset-bottom));
+  bottom: max(21px, env(safe-area-inset-bottom));
   z-index: 100;
   display: flex;
   align-items: stretch;
