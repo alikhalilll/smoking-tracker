@@ -12,6 +12,11 @@ export interface EconomySettings {
   pricePerPod: number
   /** Estimated puffs per pod. Defaults to 600 (typical disposable). */
   puffsPerPod: number
+  /** ISO timestamp of when the current pod started. `null` until the
+   *  user taps "start new pod" for the first time. Drives the pod-life
+   *  ring on the home screen (puffs logged since this stamp vs
+   *  `puffsPerPod`). */
+  podStartedAt: string | null
   /** ISO 4217 code, e.g. 'USD', 'EUR', 'EGP', 'AED'. */
   currency: string
 }
@@ -23,6 +28,7 @@ const DEFAULT_SETTINGS: EconomySettings = {
   cigsPerPack: 20,
   pricePerPod: 0,
   puffsPerPod: 600,
+  podStartedAt: null,
   currency: 'EGP',
 }
 
@@ -72,6 +78,10 @@ function load(): EconomySettings {
       cigsPerPack,
       pricePerPod,
       puffsPerPod,
+      podStartedAt:
+        typeof parsed.podStartedAt === 'string' && parsed.podStartedAt.length > 0
+          ? parsed.podStartedAt
+          : null,
       currency:
         typeof parsed.currency === 'string' && parsed.currency.length > 0
           ? parsed.currency
@@ -102,6 +112,9 @@ export interface UseEconomy {
   setCigsPerPack: (n: number) => void
   setPodPrice: (n: number) => void
   setPuffsPerPod: (n: number) => void
+  /** Sets the current pod's start timestamp (or clears it with `null`).
+   *  Used by the pod-life ring's "start new pod" action. */
+  setPodStartedAt: (iso: string | null) => void
   setCurrency: (c: string) => void
   /** Apply a value pulled from the cloud without echoing back to push. */
   applyRemote: (s: EconomySettings) => void
@@ -150,6 +163,13 @@ export function useEconomy(): UseEconomy {
     }
     persist(settings.value)
   }
+  function setPodStartedAt(iso: string | null): void {
+    settings.value = {
+      ...settings.value,
+      podStartedAt: typeof iso === 'string' && iso.length > 0 ? iso : null,
+    }
+    persist(settings.value)
+  }
   function setCurrency(c: string): void {
     settings.value = { ...settings.value, currency: c }
     persist(settings.value)
@@ -160,6 +180,10 @@ export function useEconomy(): UseEconomy {
       cigsPerPack: Math.max(1, s.cigsPerPack ?? 20),
       pricePerPod: Math.max(0, s.pricePerPod ?? 0),
       puffsPerPod: Math.max(1, s.puffsPerPod ?? 600),
+      podStartedAt:
+        typeof s.podStartedAt === 'string' && s.podStartedAt.length > 0
+          ? s.podStartedAt
+          : null,
       currency: s.currency || 'USD',
     }
     persist(settings.value)
@@ -171,6 +195,7 @@ export function useEconomy(): UseEconomy {
     setCigsPerPack,
     setPodPrice,
     setPuffsPerPod,
+    setPodStartedAt,
     setCurrency,
     applyRemote,
   }

@@ -542,6 +542,29 @@
           </label>
         </div>
 
+        <!-- Manual pod-start reset. Vape-only; the home ring resets via
+             tap-and-confirm, but users who inserted a new pod without
+             opening Home need the same action here. -->
+        <div
+          v-if="activeMode.mode.value === 'vape'"
+          class="pod-reset-row"
+          data-onboard="settings-new-pod"
+        >
+          <div class="pod-reset-body">
+            <div class="pod-reset-label">{{ t('settings.pod_reset_label') }}</div>
+            <div class="pod-reset-sub">
+              {{
+                economy.settings.value.podStartedAt
+                  ? t('settings.pod_reset_started', { at: formatPodStartedAt(economy.settings.value.podStartedAt) })
+                  : t('settings.pod_reset_none')
+              }}
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost" @click="onStartNewPod">
+            {{ t('home.pod_new_cta') }}
+          </button>
+        </div>
+
         <div class="economy-field" style="margin-top: 12px">
           <span class="economy-label">{{ t('settings.economy_currency_label') }}</span>
           <Select
@@ -939,6 +962,30 @@ function onPodPriceInput(e: Event): void {
 function onPuffsPerPodInput(e: Event): void {
   const v = parseInt((e.target as HTMLInputElement).value, 10)
   economy.setPuffsPerPod(Number.isFinite(v) && v >= 1 ? v : 600)
+}
+
+// Localized "started {when}" for the pod-reset row. Falls back to a
+// raw ISO string if the timestamp is unparseable so the UI doesn't
+// silently swallow a bad value.
+function formatPodStartedAt(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleString(intlLocale(), {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  })
+}
+
+async function onStartNewPod(): Promise<void> {
+  const ok = await confirmDrawer({
+    title: t('home.pod_new_confirm_title'),
+    body: t('home.pod_new_confirm_body'),
+    confirmText: t('home.pod_new_confirm_ok'),
+    cancelText: t('home.pod_new_confirm_cancel'),
+  })
+  if (!ok) return
+  economy.setPodStartedAt(new Date().toISOString())
+  showToast(t('home.pod_new_cta') + ' ✓', 'success')
 }
 
 function csvEscape(v: string): string {
@@ -1666,6 +1713,36 @@ async function handleReset(): Promise<void> {
   color: var(--muted);
   font-weight: 500;
   text-align: center;
+}
+.pod-reset-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, #14b8a6 8%, var(--card));
+  border: 1px solid color-mix(in srgb, #14b8a6 25%, var(--hairline));
+  border-radius: 12px;
+}
+.pod-reset-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.pod-reset-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.pod-reset-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.pod-reset-row .btn {
+  flex-shrink: 0;
 }
 
 .danger-btn {

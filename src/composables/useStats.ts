@@ -128,6 +128,16 @@ export function awakeGapMs(
   return splitGapMs(prevMs, currMs, startHM, endHM, entrySortedMs).awakeMs
 }
 
+/**
+ * Two vape entries within this window count as the same session. Chosen
+ * because a real vape session (picking up the device, hitting it a few
+ * times, putting it down) rarely lasts more than 5–10 minutes; anything
+ * beyond that reads as a new sitting. Cigarette mode ignores this — the
+ * session concept is vape-specific but the grouping is timestamp-driven
+ * so it stays a pure read-time derivation with no schema change.
+ */
+const SESSION_GAP_MS = 10 * 60_000
+
 const GAP_BUCKET_DEFS: Array<Pick<GapDistributionBucket, 'key' | 'minMs' | 'maxMs'>> = [
   { key: 'report.gap_buckets.lt_15m',  minMs: 0, maxMs: 15 * 60_000 },
   { key: 'report.gap_buckets.b15_30m', minMs: 15 * 60_000, maxMs: 30 * 60_000 },
@@ -205,6 +215,35 @@ export function useStats(data: Ref<AppData>) {
     () => Math.round((totalSmoked.value / totalDays.value) * 10) / 10
   )
   const todayCount = computed(() => byDay.value[getToday()] || 0)
+
+  // Sessions today — count of timestamp clusters where consecutive
+  // entries within SESSION_GAP_MS collapse into one. Used in vape mode
+  // to render "N puffs · M sessions" inline under the pod-life ring.
+  // For cigarettes each entry is a session of 1, which happens to be
+  // the correct answer for the cigarette case too even though the UI
+  // never surfaces it.
+  const sessionsToday = computed<number>(() => {
+    const today = getToday()
+    const times: number[] = []
+    for (const e of sortedEntries.value) {
+      if (e.date === today) times.push(new Date(e.time).getTime())
+    }
+    if (times.length === 0) return 0
+    let count = 1
+    for (let i = 1; i < times.length; i++) {
+      if (times[i] - times[i - 1] > SESSION_GAP_MS) count++
+    }
+    return count
+  })
+
+  // Average puffs per session today. 0 when no sessions logged. Used in
+  // the vape stats grid to swap "Daily avg" (per-day) for the more
+  // vape-native "Avg session" (per-session) number.
+  const avgPuffsPerSession = computed<number>(() => {
+    const s = sessionsToday.value
+    if (s === 0) return 0
+    return Math.round((todayCount.value / s) * 10) / 10
+  })
 
   const lastSmoke = computed<string | null>(() => {
     if (sortedEntries.value.length === 0) return null
@@ -387,6 +426,8 @@ export function useStats(data: Ref<AppData>) {
     totalSmoked,
     dailyAvg,
     todayCount,
+    sessionsToday,
+    avgPuffsPerSession,
     lastSmoke,
     last7,
     last30,

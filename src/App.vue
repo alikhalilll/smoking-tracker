@@ -83,11 +83,19 @@
         :quit-today-status="quit.todayStatus.value"
         :quit-is-complete="quit.isComplete.value"
         :smoke-free-days="smokeFreeDays"
+        :puffs-this-pod="podLife.puffsThisPod.value"
+        :puffs-remaining="podLife.puffsRemaining.value"
+        :pod-life-pct="podLife.podLifePct.value"
+        :pod-overflow="podLife.podOverflow.value"
+        :has-active-pod="podLife.hasActivePod.value"
+        :sessions-today="sessionsToday"
+        :avg-puffs-per-session="avgPuffsPerSession"
         @log="handleLog"
         @undo="() => undoLast(activeMode.mode.value)"
         @open-report="showReport = true"
         @open-quit="setView('quit')"
         @set-mode="handleSetMode"
+        @start-new-pod="handleStartNewPod"
       />
 
       <HistoryView
@@ -199,6 +207,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useStorage } from './composables/useStorage'
 import { useStats } from './composables/useStats'
+import { usePodLife } from './composables/usePodLife'
 import { useQuitPlan } from './composables/useQuitPlan'
 import { useActiveMode } from './composables/useActiveMode'
 import { useReminders, resolvedNotificationLocale } from './composables/useReminders'
@@ -402,6 +411,8 @@ const {
   totalSmoked,
   dailyAvg,
   todayCount,
+  sessionsToday,
+  avgPuffsPerSession,
   lastSmoke,
   last7,
   last30,
@@ -414,6 +425,15 @@ const {
   gapDistribution,
   smokeFreeDays,
 } = stats
+
+// Pod-life state (vape). Cigarette mode never renders these, so the
+// values just idle at "no pod started". A "start new pod" tap from
+// HomeView routes here so the mutation stays outside the view layer.
+const podLife = usePodLife(data)
+function handleStartNewPod(): void {
+  podLife.startNewPod()
+  haptics.fire('tap')
+}
 
 const quit = useQuitPlan(data, byDay, dailyAvg)
 

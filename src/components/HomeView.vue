@@ -65,8 +65,23 @@
       </span>
     </button>
 
-    <!-- Hero counter ring -->
-    <div v-reveal class="hero" data-onboard="home-hero">
+    <!-- Hero: vape = pod-life ring; cigarette = counter ring + stopwatch.
+         Split because the vape user's mental model is "when does my pod
+         die?" and a resetting "since last puff" clock is meaningless when
+         a session drops 20 puffs in a minute. -->
+    <div v-if="activeMode === 'vape'" v-reveal class="hero" data-onboard="home-hero">
+      <PodLifeRing
+        :pct="podLifePct ?? 1"
+        :puffs-remaining="puffsRemaining ?? 0"
+        :puffs-this-pod="puffsThisPod ?? 0"
+        :overflow="podOverflow ?? false"
+        :has-pod="hasActivePod ?? false"
+        :today-count="todayCount"
+        :sessions-today="sessionsToday ?? 0"
+        @start-new-pod="onStartNewPod"
+      />
+    </div>
+    <div v-else v-reveal class="hero" data-onboard="home-hero">
       <div class="ring-wrap" :class="{ pulsing: isPulsing }">
         <Confetti :trigger="confettiTrigger" />
         <svg class="ring" viewBox="0 0 120 120">
@@ -176,8 +191,48 @@
       </div>
     </div>
 
-    <!-- Log composer -->
-    <div v-reveal="{ delay: 80 }" class="log-card card" data-onboard="home-log">
+    <!-- Log composer. Cigarette: keep the +/- stepper because each
+         cigarette *is* a discrete unit. Vape: real vapers take sessions
+         of many puffs at once — the +/- stepper misrepresents that as
+         one discrete "puff" per tap. Chips let the user log a whole
+         session in one tap; "Custom" opens a slider for edge cases. -->
+    <div
+      v-if="activeMode === 'vape'"
+      v-reveal="{ delay: 80 }"
+      class="log-card card"
+      data-onboard="home-log"
+    >
+      <div class="log-chips">
+        <button
+          v-for="preset in vapePresets"
+          :key="preset.value"
+          type="button"
+          class="chip"
+          data-onboard="log-button"
+          @click="onPresetTap(preset.value)"
+        >
+          <span class="chip-label">{{ preset.label }}</span>
+          <em class="chip-approx">{{ t('home.preset_approx', { n: formatNumber(preset.value) }) }}</em>
+        </button>
+        <button type="button" class="chip chip-custom" @click="customSheetOpen = true">
+          <span class="chip-label">{{ t('home.preset_custom_label') }}</span>
+          <em class="chip-approx">{{
+            lastCustom > 0 ? formatNumber(lastCustom) : '…'
+          }}</em>
+        </button>
+      </div>
+
+      <button v-if="hasEntries" class="undo-btn" @click="emit('undo')">
+        {{ t('home.undo_last') }}
+      </button>
+    </div>
+
+    <div
+      v-else
+      v-reveal="{ delay: 80 }"
+      class="log-card card"
+      data-onboard="home-log"
+    >
       <div class="log-stepper">
         <button class="step-btn" @click="decrement" :aria-label="'minus'">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg>
@@ -215,6 +270,15 @@
       </button>
     </div>
 
+    <!-- Custom-puffs sheet (vape only). Mounted whenever we're in vape
+         mode so the drawer transition is smooth on repeat opens. -->
+    <PuffCountSheet
+      v-if="activeMode === 'vape'"
+      v-model:open="customSheetOpen"
+      :initial="lastCustom > 0 ? lastCustom : 15"
+      @log="onCustomLog"
+    />
+
     <!-- Last 7 days chart -->
     <div v-reveal class="chart-section" data-onboard="home-chart">
       <h3 class="h-section">{{ t('home.last_7_days') }}</h3>
@@ -251,7 +315,9 @@
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
         </div>
         <div class="stat-label">{{ labels.dailyAvg }}</div>
-        <div class="stat-value tabular">{{ formatNumber(dailyAvg) }}</div>
+        <div class="stat-value tabular">{{
+          formatNumber(activeMode === 'vape' ? (avgPuffsPerSession ?? 0) : dailyAvg)
+        }}</div>
       </div>
       <div class="stat-card">
         <div class="stat-icon icon-mint">
@@ -360,6 +426,9 @@ import { useHealthMilestones } from '../composables/useHealthMilestones'
 import { formatDuration } from '../composables/useStats'
 import Confetti from './Confetti.vue'
 import ModeToggle from './ModeToggle.vue'
+import PodLifeRing from './PodLifeRing.vue'
+import PuffCountSheet from './PuffCountSheet.vue'
+import { useConfirm } from '../composables/useConfirm'
 import type { DayBucket, EntryType } from '../types'
 
 const { t } = useI18n()
@@ -381,6 +450,15 @@ interface Props {
   quitTodayStatus?: 'on-track' | 'over' | null
   quitIsComplete?: boolean
   smokeFreeDays?: number
+  // Vape-mode pod life + session stats. Zero / default values are safe
+  // in cigarette mode — the pod ring / session inline never renders.
+  puffsThisPod?: number
+  puffsRemaining?: number
+  podLifePct?: number
+  podOverflow?: boolean
+  hasActivePod?: boolean
+  sessionsToday?: number
+  avgPuffsPerSession?: number
 }
 
 const props = defineProps<Props>()
@@ -391,6 +469,7 @@ const emit = defineEmits<{
   'open-report': []
   'open-quit': []
   'set-mode': [mode: EntryType]
+  'start-new-pod': []
 }>()
 
 // Single source of truth for vape ↔ cigarette string swaps. Adding a
@@ -420,6 +499,41 @@ const logCount = ref(1)
 const isPulsing = ref(false)
 const showCheck = ref(false)
 const confettiTrigger = ref(0)
+
+// Vape session presets. Sizes tuned to the three coarse ways people
+// actually vape: a "just needed a hit" moment (~5), a normal sitting
+// (~15), and the sustained watch-a-movie-with-a-vape session (~30).
+// Labels come from i18n; values are the puff counts we log on tap.
+const vapePresets = computed(() => [
+  { value: 5, label: t('home.preset_quick_label') },
+  { value: 15, label: t('home.preset_session_label') },
+  { value: 30, label: t('home.preset_long_label') },
+])
+const customSheetOpen = ref(false)
+const lastCustom = ref<number>(0)
+
+function onPresetTap(count: number): void {
+  emit('log', count)
+  isPulsing.value = true
+  showCheck.value = true
+  setTimeout(() => (isPulsing.value = false), 500)
+  setTimeout(() => (showCheck.value = false), 700)
+}
+function onCustomLog(count: number): void {
+  lastCustom.value = count
+  emit('log', count)
+  isPulsing.value = true
+  setTimeout(() => (isPulsing.value = false), 500)
+}
+async function onStartNewPod(): Promise<void> {
+  const ok = await useConfirm().confirm({
+    title: t('home.pod_new_confirm_title'),
+    body: t('home.pod_new_confirm_body'),
+    confirmText: t('home.pod_new_confirm_ok'),
+    cancelText: t('home.pod_new_confirm_cancel'),
+  })
+  if (ok) emit('start-new-pod')
+}
 
 // Economy: when the user has a smoke-free streak, show "money saved
 // during this streak". Otherwise (they're actively smoking), show
@@ -942,6 +1056,55 @@ async function onShare(): Promise<void> {
 }
 .undo-btn:hover {
   color: var(--text);
+}
+
+/* Vape session-preset chip row. 2×2 grid of pill buttons; each chip is
+   a one-tap logger (Quick hit / Session / Long session / Custom). The
+   `~N` count is emphasized in italic so users learn what each preset
+   stamps without a legend. */
+.log-chips {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.chip {
+  appearance: none;
+  border: 1.5px solid var(--hairline);
+  background: var(--card);
+  font-family: inherit;
+  cursor: pointer;
+  padding: 12px 14px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 48px;
+  color: var(--text);
+  transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.chip:active {
+  transform: scale(0.97);
+  background: color-mix(in srgb, #14b8a6 12%, var(--card));
+  border-color: color-mix(in srgb, #14b8a6 45%, var(--hairline));
+}
+.chip-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+.chip-approx {
+  font-style: normal;
+  font-size: 13px;
+  font-weight: 700;
+  color: #14b8a6;
+  font-variant-numeric: tabular-nums;
+}
+.chip-custom {
+  background: color-mix(in srgb, #14b8a6 8%, var(--card));
+  border-color: color-mix(in srgb, #14b8a6 30%, var(--hairline));
+}
+.chip-custom .chip-approx {
+  color: var(--muted);
 }
 
 /* Chart */
