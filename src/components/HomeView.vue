@@ -1,17 +1,38 @@
 <template>
   <div class="fade-in home">
-    <!-- Cigarette / vape mode switch. Lives above everything so it's
-         the first thing the user touches when their day's behavior
-         doesn't match yesterday's. Uses a plain blurred-pill style
-         (no SVG refraction) so it stays cheap to render. -->
-    <ModeToggle
-      v-reveal
-      data-onboard="home-mode"
-      :model-value="activeMode"
-      :options="modeOptions"
-      :aria-label="t('home.mode_aria')"
-      @update:model-value="(m: EntryType) => emit('set-mode', m)"
-    />
+    <!-- Header row: cigarette/vape mode switch on the left, quick-
+         action icons (report + share) on the right. Merging the
+         actions row into the header cuts a whole scroll page below
+         the fold and makes both buttons reachable without scrolling. -->
+    <div v-reveal class="home-header">
+      <ModeToggle
+        data-onboard="home-mode"
+        :model-value="activeMode"
+        :options="modeOptions"
+        :aria-label="t('home.mode_aria')"
+        @update:model-value="(m: EntryType) => emit('set-mode', m)"
+      />
+      <div v-if="hasEntries" class="header-actions" data-onboard="home-actions">
+        <button
+          type="button"
+          class="icon-btn"
+          :aria-label="t('home.generate_report')"
+          :title="t('home.generate_report')"
+          @click="emit('open-report')"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-5"/></svg>
+        </button>
+        <button
+          type="button"
+          class="icon-btn"
+          :aria-label="t('share.btn')"
+          :title="t('share.btn')"
+          @click="onShare"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
+        </button>
+      </div>
+    </div>
 
     <!-- Status chips: smoke-free streak (after a finished plan) or quit target -->
     <button
@@ -201,33 +222,37 @@
     <div
       v-if="activeMode === 'vape'"
       v-reveal="{ delay: 80 }"
-      class="log-card card"
+      class="log-row"
       data-onboard="home-log"
     >
-      <div class="log-chips">
-        <button
-          v-for="preset in vapePresets"
-          :key="preset.value"
-          type="button"
-          class="chip"
-          data-onboard="log-button"
-          @click="onPresetTap(preset.value)"
-        >
-          <span class="chip-label">{{ preset.label }}</span>
-          <em class="chip-approx">{{ t('home.preset_approx', { n: formatNumber(preset.value) }) }}</em>
-        </button>
-        <button type="button" class="chip chip-custom" @click="customSheetOpen = true">
-          <span class="chip-label">{{ t('home.preset_custom_label') }}</span>
-          <em class="chip-approx">{{
-            lastCustom > 0 ? formatNumber(lastCustom) : '…'
-          }}</em>
-        </button>
-      </div>
-
-      <button v-if="hasEntries" class="undo-btn" @click="emit('undo')">
-        {{ t('home.undo_last') }}
+      <button
+        v-for="preset in vapePresets"
+        :key="preset.value"
+        type="button"
+        class="log-pill"
+        data-onboard="log-button"
+        :aria-label="`${preset.label} — ${preset.value} puffs`"
+        @click="onPresetTap(preset.value)"
+      >
+        <span class="log-pill-num tabular">{{ formatNumber(preset.value) }}</span>
+        <span class="log-pill-unit">{{ preset.label }}</span>
+      </button>
+      <button
+        type="button"
+        class="log-pill log-pill-more"
+        :aria-label="t('home.preset_custom_label')"
+        @click="customSheetOpen = true"
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
       </button>
     </div>
+    <button
+      v-if="activeMode === 'vape' && hasEntries"
+      class="undo-btn undo-standalone"
+      @click="emit('undo')"
+    >
+      {{ t('home.undo_last') }}
+    </button>
 
     <div
       v-else
@@ -281,9 +306,11 @@
       @log="onCustomLog"
     />
 
-    <!-- Last 7 days chart -->
+    <!-- 7-day sparkline. Dropped the section header + card chrome —
+         the tiny caption below the strip identifies it, and losing
+         the boxed background lets the bars read as ambient data
+         rather than a heavyweight "section". -->
     <div v-reveal class="chart-section" data-onboard="home-chart">
-      <h3 class="h-section">{{ t('home.last_7_days') }}</h3>
       <div class="bar-chart">
         <div v-for="(d, i) in last7" :key="i" class="bar-col">
           <div
@@ -308,76 +335,86 @@
           </div>
         </div>
       </div>
+      <div class="chart-caption">{{ t('home.last_7_days') }}</div>
     </div>
 
-    <!-- Stats grid: white cards with tinted icon bubbles -->
-    <div v-reveal class="stats-grid" data-onboard="home-stats">
-      <div class="stat-card">
-        <div class="stat-icon icon-peach">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
-        </div>
-        <div class="stat-label">{{ labels.dailyAvg }}</div>
-        <div class="stat-value tabular">{{
+    <!-- Insight strip: horizontal-scroll chips. Replaces the old
+         2-column card grid so at-a-glance stats live on one row
+         instead of eating half a screen of vertical space. Users
+         who care about a specific number can flick sideways; the
+         page above the fold stays lighter. -->
+    <div v-reveal class="insight-strip" data-onboard="home-stats">
+      <div class="insight-card">
+        <div class="insight-label">{{ labels.dailyAvg }}</div>
+        <div class="insight-value tabular">{{
           formatNumber(activeMode === 'vape' ? (avgPuffsPerSession ?? 0) : dailyAvg)
         }}</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon icon-mint">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M3 12h18M3 18h12"/></svg>
-        </div>
-        <div class="stat-label">{{ labels.totalLogged }}</div>
-        <div class="stat-value tabular">{{ formatNumber(totalSmoked) }}</div>
+      <div class="insight-card">
+        <div class="insight-label">{{ labels.totalLogged }}</div>
+        <div class="insight-value tabular">{{ formatNumber(totalSmoked) }}</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon icon-lavender">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>
-        </div>
-        <div class="stat-label">{{ t('home.days_tracked') }}</div>
-        <div class="stat-value tabular">{{ formatNumber(totalDays) }}</div>
+      <div class="insight-card">
+        <div class="insight-label">{{ t('home.days_tracked') }}</div>
+        <div class="insight-value tabular">{{ formatNumber(totalDays) }}</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon icon-sun">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 9 22 10 17 14 18 22 12 18 6 22 7 14 2 10 9 9"/></svg>
-        </div>
-        <div class="stat-label">{{ labels.bestDay }}</div>
-        <div class="stat-value tabular">{{ formatNumber(bestDay) }}</div>
+      <div class="insight-card">
+        <div class="insight-label">{{ labels.bestDay }}</div>
+        <div class="insight-value tabular">{{ formatNumber(bestDay) }}</div>
       </div>
       <div
         v-if="moneyMode != null"
-        class="stat-card stat-money"
-        :class="moneyMode === 'saved' ? 'stat-money-saved' : 'stat-money-spent'"
+        class="insight-card insight-money"
+        :class="moneyMode === 'saved' ? 'is-saved' : ''"
       >
-        <div class="stat-icon icon-mint">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        </div>
-        <div class="stat-label">{{ moneyLabel }}</div>
-        <div class="stat-value tabular">{{ formatMoney(moneyAmount, currency) }}</div>
+        <div class="insight-label">{{ moneyLabel }}</div>
+        <div class="insight-value tabular">{{ formatMoney(moneyAmount, currency) }}</div>
       </div>
     </div>
 
-    <!-- Health milestones — only meaningful once at least one entry
-         is logged. Shown in both modes; vape mode gets a caveat
-         banner because the CDC/NHS milestones (cilia, lung capacity,
-         etc.) are cigarette-cessation specific and don't translate
-         cleanly to vape cessation. -->
+    <!-- Health milestones — collapsed by default. Only the "Next: X
+         in Y" summary is visible without a tap. The full progress
+         list was a big card that dominated the fold once a user
+         had scrolled once; hiding it behind a disclosure keeps the
+         top of the screen focused on today's log. -->
     <section
       v-if="hasEntries"
       v-reveal
       class="health-section"
+      :class="{ 'is-expanded': healthOpen }"
       data-onboard="home-health"
     >
-      <div class="health-header">
-        <h3 class="h-section" style="margin: 0">{{ t('home.health_section') }}</h3>
-        <span v-if="nextMilestone" class="health-next">
-          {{
-            t('home.health_next', {
-              label: t(`health.${nextMilestone.key}.label`),
-              time: formatRemaining(nextMilestone.remainingMs),
-            })
-          }}
+      <button
+        type="button"
+        class="health-toggle"
+        :aria-expanded="healthOpen"
+        @click="healthOpen = !healthOpen"
+      >
+        <span class="health-toggle-body">
+          <span class="health-toggle-label">{{ t('home.health_section') }}</span>
+          <span v-if="nextMilestone" class="health-toggle-next">
+            {{
+              t('home.health_next', {
+                label: t(`health.${nextMilestone.key}.label`),
+                time: formatRemaining(nextMilestone.remainingMs),
+              })
+            }}
+          </span>
         </span>
-      </div>
-      <div class="milestones-grid">
+        <svg
+          class="health-chev"
+          :class="{ 'is-open': healthOpen }"
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        ><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <div v-if="healthOpen" class="milestones-grid">
         <div
           v-for="m in milestones"
           :key="m.key"
@@ -403,17 +440,6 @@
       </div>
     </section>
 
-    <!-- Generate report + Share -->
-    <div v-if="hasEntries" v-reveal class="bottom-actions" data-onboard="home-actions">
-      <button class="btn btn-ghost" @click="emit('open-report')">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-3 3 3 5-5"/></svg>
-        {{ t('home.generate_report') }}
-      </button>
-      <button class="btn btn-ghost" @click="onShare">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.59 13.51l6.83 3.98M15.41 6.51l-6.82 3.98"/></svg>
-        {{ t('share.btn') }}
-      </button>
-    </div>
   </div>
 </template>
 
@@ -504,6 +530,10 @@ const logCount = ref(1)
 const isPulsing = ref(false)
 const showCheck = ref(false)
 const confettiTrigger = ref(0)
+// Health section is collapsed by default so the ring + log + strip
+// stay the fold. The user opens it deliberately when they want to
+// see progress.
+const healthOpen = ref(false)
 
 // Vape session presets. Sizes tuned to the three coarse ways people
 // actually vape: a "just needed a hit" moment (~5), a normal sitting
@@ -1067,72 +1097,93 @@ async function onShare(): Promise<void> {
   color: var(--text);
 }
 
-/* Vape session-preset chip row. 2×2 grid of pill buttons; each chip is
-   a one-tap logger (Quick hit / Session / Long session / Custom). The
-   `~N` count is emphasized in italic so users learn what each preset
-   stamps without a legend. */
-.log-chips {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
+/* Vape log row — single horizontal row of number-forward pills
+   instead of the old 2×2 chip grid. Cutting to one row keeps the
+   log control roughly the same footprint as the cigarette stepper
+   below it (fair comparison across modes) and stops the log block
+   from dominating the fold. Each pill shows the puff count in a
+   big tabular numeral because that's what matters — the verb
+   ("Quick hit" etc.) is the caption underneath. */
+.log-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
 }
-.chip {
+.log-pill {
   appearance: none;
   border: 1.5px solid var(--hairline);
   background: var(--card);
   font-family: inherit;
   cursor: pointer;
-  padding: 12px 14px;
-  border-radius: 999px;
+  flex: 1;
+  min-height: 64px;
+  border-radius: 18px;
+  padding: 8px 6px;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 48px;
+  justify-content: center;
+  gap: 2px;
   color: var(--text);
   transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
 }
-.chip:active {
-  transform: scale(0.97);
-  background: color-mix(in srgb, #14b8a6 12%, var(--card));
+.log-pill:active {
+  transform: scale(0.96);
+  background: color-mix(in srgb, #14b8a6 10%, var(--card));
   border-color: color-mix(in srgb, #14b8a6 45%, var(--hairline));
 }
-.chip-label {
-  font-size: 14px;
-  font-weight: 600;
-}
-.chip-approx {
-  font-style: normal;
-  font-size: 13px;
-  font-weight: 700;
+.log-pill-num {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
   color: #14b8a6;
-  font-variant-numeric: tabular-nums;
 }
-.chip-custom {
-  background: color-mix(in srgb, #14b8a6 8%, var(--card));
-  border-color: color-mix(in srgb, #14b8a6 30%, var(--hairline));
-}
-.chip-custom .chip-approx {
+.log-pill-unit {
+  font-size: 11px;
+  font-weight: 600;
   color: var(--muted);
+  letter-spacing: 0.02em;
+}
+.log-pill-more {
+  flex: 0 0 56px;
+  color: var(--muted);
+  background: var(--surface-tint);
+  border-color: transparent;
+}
+.log-pill-more:active {
+  background: color-mix(in srgb, #14b8a6 8%, var(--surface-tint));
+}
+/* Vape mode's undo lives outside the log-row (no card wrap) so it
+   needs its own margin instead of relying on card gap. */
+.undo-standalone {
+  margin-top: 6px;
 }
 
-/* Chart */
+/* Chart — stripped of card chrome so it reads as ambient data next
+   to the hero rather than a discrete "section". Kept the fixed
+   height so the bars can't push into the strip below. */
 .chart-section {
-  margin-top: 4px;
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-/* Fixed-height columns so the bar can never push the value or
-   label out of the card. Each column is a flex stack pinned to the
-   bottom; the bar's pixel height is clamped to a hard ceiling. */
+.chart-caption {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--subtle);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+}
 .bar-chart {
   display: flex;
   gap: 6px;
-  padding: 14px;
-  background: var(--card);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-sm);
+  padding: 4px 2px 0;
   overflow: hidden;
   align-items: flex-end;
-  height: 144px;
+  height: 116px;
 }
 .bar-col {
   flex: 1;
@@ -1181,72 +1232,111 @@ async function onShare(): Promise<void> {
   line-height: 1;
 }
 
-/* Stats grid — white cards with tinted icon bubbles (wellness vibe) */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+/* Insight strip — replaces the 2-column stat card grid. Horizontal
+   scroll keeps every metric one flick away without demanding half
+   the fold. Snap prevents landing on a card boundary. */
+.insight-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  scroll-snap-type: x proximity;
+  padding: 2px 0 4px;
+  margin: 0 -4px;
+  scrollbar-width: none;
 }
-.stat-card {
-  position: relative;
+.insight-strip::-webkit-scrollbar { display: none; }
+.insight-card {
+  flex: 0 0 118px;
+  scroll-snap-align: start;
   background: var(--card);
-  border-radius: var(--radius-card);
-  padding: 16px;
+  border-radius: 16px;
+  padding: 12px 14px;
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  /* Allow flex children (the value text) to actually shrink below
-     their intrinsic width — without this, long currency strings
-     ("EGP 1,234.50") push the card past its grid cell. */
+  gap: 6px;
   min-width: 0;
 }
-.stat-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 12px;
-}
-.stat-icon.icon-peach { background: var(--tint-peach-bg); color: var(--tint-peach-fg); }
-.stat-icon.icon-mint { background: var(--tint-mint-bg); color: var(--tint-mint-fg); }
-.stat-icon.icon-lavender { background: var(--tint-lavender-bg); color: var(--tint-lavender-fg); }
-.stat-icon.icon-sun { background: var(--tint-sun-bg); color: var(--tint-sun-fg); }
-.stat-label {
-  font-size: 12px;
+.insight-label {
+  font-size: 11px;
   font-weight: 600;
   color: var(--muted);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.stat-value {
-  font-size: 32px;
+.insight-value {
+  font-size: 22px;
   font-weight: 800;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.02em;
   color: var(--text);
   line-height: 1;
-  /* Cap intrinsic width and let long values wrap rather than overflow.
-     The money card's value can be 12+ chars ("EGP 1,234.50") and
-     wouldn't fit at 32px on a narrow phone. */
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+.insight-money {
+  background: color-mix(in srgb, #22c55e 8%, var(--card));
+}
+.insight-money.is-saved .insight-value {
+  color: var(--success);
+}
 
-/* Health milestones */
+/* Health milestones — disclosure pill by default, expands into the
+   full list when tapped. The toggle button is styled as a soft chip
+   so it doesn't compete visually with real cards. */
 .health-section {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.health-header {
+.health-toggle {
+  appearance: none;
+  border: 1px solid var(--hairline);
+  background: var(--card);
+  font-family: inherit;
+  cursor: pointer;
+  padding: 10px 14px;
+  border-radius: 14px;
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
+  text-align: start;
+  color: var(--text);
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
-.health-next {
+.health-toggle:active {
+  background: var(--surface-tint);
+}
+.health-section.is-expanded .health-toggle {
+  border-bottom-left-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+.health-toggle-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  gap: 2px;
+}
+.health-toggle-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.005em;
+}
+.health-toggle-next {
   font-size: 11px;
   color: var(--muted);
   font-weight: 500;
+}
+.health-chev {
+  color: var(--muted);
+  flex-shrink: 0;
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.health-chev.is-open {
+  transform: rotate(180deg);
 }
 .milestones-grid {
   display: flex;
@@ -1317,24 +1407,44 @@ async function onShare(): Promise<void> {
   letter-spacing: 0.02em;
 }
 
-/* Money card: clamp keeps the currency string readable on narrow
-   phones (~20px) and lets larger screens stretch back up to 28px,
-   so "EGP 1,234.50" never crashes through the card edge. */
-.stat-money .stat-value {
-  font-size: clamp(20px, 6.5vw, 28px);
-}
-.stat-money-saved .stat-value {
-  color: var(--success);
-}
-
-/* Bottom actions */
-.bottom-actions {
+/* Header row — mode toggle stretches, action icons cluster on the
+   right. Same-line placement means the two most common non-log
+   actions (open full report, share) are always one tap away and
+   the old "bottom actions" scroll target is gone. */
+.home-header {
   display: flex;
+  align-items: center;
   gap: 8px;
 }
-.bottom-actions .btn {
+.home-header > :first-child {
   flex: 1;
-  font-size: 13px;
-  padding: 12px;
+  min-width: 0;
+}
+.header-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.icon-btn {
+  appearance: none;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--surface-tint);
+  color: var(--muted);
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease, background 0.15s ease, color 0.15s ease;
+}
+.icon-btn:hover {
+  color: var(--text);
+}
+.icon-btn:active {
+  transform: scale(0.94);
+  background: color-mix(in srgb, var(--text) 8%, var(--surface-tint));
 }
 </style>
