@@ -83,11 +83,12 @@
         :quit-today-status="quit.todayStatus.value"
         :quit-is-complete="quit.isComplete.value"
         :smoke-free-days="smokeFreeDays"
-        :puffs-this-pod="podLife.puffsThisPod.value"
-        :puffs-remaining="podLife.puffsRemaining.value"
-        :pod-life-pct="podLife.podLifePct.value"
-        :pod-overflow="podLife.podOverflow.value"
-        :has-active-pod="podLife.hasActivePod.value"
+        :hero-consumable="heroConsumable"
+        :puffs-this-pod="heroLife.puffsThisUnit.value"
+        :puffs-remaining="heroLife.puffsRemaining.value"
+        :pod-life-pct="heroLife.lifePct.value"
+        :pod-overflow="heroLife.overflow.value"
+        :has-active-pod="heroLife.hasActive.value"
         :sessions-today="sessionsToday"
         :avg-puffs-per-session="avgPuffsPerSession"
         @log="handleLog"
@@ -207,7 +208,8 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useStorage } from './composables/useStorage'
 import { useStats } from './composables/useStats'
-import { usePodLife } from './composables/usePodLife'
+import { useConsumableLife } from './composables/useConsumableLife'
+import { useEconomy } from './composables/useEconomy'
 import { useQuitPlan } from './composables/useQuitPlan'
 import { useActiveMode } from './composables/useActiveMode'
 import { useReminders, resolvedNotificationLocale } from './composables/useReminders'
@@ -426,12 +428,26 @@ const {
   smokeFreeDays,
 } = stats
 
-// Pod-life state (vape). Cigarette mode never renders these, so the
-// values just idle at "no pod started". A "start new pod" tap from
-// HomeView routes here so the mutation stays outside the view layer.
-const podLife = usePodLife(data)
+// Vape consumables. All four (pod / coil / bottle / disposable) are
+// tracked in parallel — whichever the user marks as `heroConsumable`
+// in Settings gets its ring on the Home hero. The others sit idle
+// (their `hasActive` is false unless the user started one).
+const economy = useEconomy()
+const podLife = useConsumableLife(data, 'pod')
+const coilLife = useConsumableLife(data, 'coil')
+const bottleLife = useConsumableLife(data, 'bottle')
+const disposableLife = useConsumableLife(data, 'disposable')
+const heroConsumable = computed(() => economy.settings.value.heroConsumable)
+const heroLife = computed(() => {
+  switch (heroConsumable.value) {
+    case 'coil': return coilLife
+    case 'bottle': return bottleLife
+    case 'disposable': return disposableLife
+    default: return podLife
+  }
+})
 function handleStartNewPod(): void {
-  podLife.startNewPod()
+  heroLife.value.startNew()
   haptics.fire('tap')
 }
 

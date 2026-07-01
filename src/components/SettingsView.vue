@@ -515,55 +515,79 @@
             />
           </label>
         </div>
-        <div v-else class="economy-row">
-          <label class="economy-field">
-            <span class="economy-label">{{ t('settings.economy_pod_price_label') }}</span>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              inputmode="decimal"
-              class="field-input"
-              :value="economy.settings.value.pricePerPod"
-              @input="onPodPriceInput"
+        <template v-else>
+          <!-- Hero picker: which consumable's ring lives on the home
+               hero. Non-hero kinds still get tracked below; only one
+               ring is featured. -->
+          <div class="economy-field" style="margin-bottom: 12px" data-onboard="settings-hero-consumable">
+            <span class="economy-label">{{ t('settings.hero_consumable_label') }}</span>
+            <Select
+              :model-value="economy.settings.value.heroConsumable"
+              :options="heroConsumableOptions"
+              @update:model-value="onHeroConsumableChange"
             />
-          </label>
-          <label class="economy-field economy-field-cigs">
-            <span class="economy-label">{{ t('settings.economy_puffs_per_pod_label') }}</span>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              inputmode="numeric"
-              class="field-input"
-              :value="economy.settings.value.puffsPerPod"
-              @input="onPuffsPerPodInput"
-            />
-          </label>
-        </div>
+            <span class="field-help">{{ t('settings.hero_consumable_help') }}</span>
+          </div>
 
-        <!-- Manual pod-start reset. Vape-only; the home ring resets via
-             tap-and-confirm, but users who inserted a new pod without
-             opening Home need the same action here. -->
-        <div
-          v-if="activeMode.mode.value === 'vape'"
-          class="pod-reset-row"
-          data-onboard="settings-new-pod"
-        >
-          <div class="pod-reset-body">
-            <div class="pod-reset-label">{{ t('settings.pod_reset_label') }}</div>
-            <div class="pod-reset-sub">
-              {{
-                economy.settings.value.podStartedAt
-                  ? t('settings.pod_reset_started', { at: formatPodStartedAt(economy.settings.value.podStartedAt) })
-                  : t('settings.pod_reset_none')
-              }}
+          <!-- One block per vape consumable. Each has its own price +
+               capacity + reset row so a mod-and-tank user can track a
+               coil separately from a bottle without hunting for it. -->
+          <div
+            v-for="kind in allConsumableKinds"
+            :key="kind"
+            class="consumable-block"
+            :class="{ 'is-hero': economy.settings.value.heroConsumable === kind }"
+          >
+            <div class="consumable-header">
+              <span class="consumable-emoji" aria-hidden="true">{{ consumableEmoji(kind) }}</span>
+              <span class="consumable-title">{{ t(`settings.consumable_kind_${kind}`) }}</span>
+              <span v-if="economy.settings.value.heroConsumable === kind" class="consumable-hero-chip">
+                {{ t('settings.hero_consumable_label') }}
+              </span>
+            </div>
+            <div class="economy-row">
+              <label class="economy-field">
+                <span class="economy-label">{{ t(`settings.economy_${kind}_price_label`) }}</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputmode="decimal"
+                  class="field-input"
+                  :value="economy.settings.value[priceKeyFor(kind)]"
+                  @input="(e) => onConsumablePriceInput(kind, e)"
+                />
+              </label>
+              <label class="economy-field economy-field-cigs">
+                <span class="economy-label">{{ t(`settings.economy_puffs_per_${kind}_label`) }}</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  inputmode="numeric"
+                  class="field-input"
+                  :value="economy.settings.value[capacityKeyFor(kind)]"
+                  @input="(e) => onConsumableCapacityInput(kind, e)"
+                />
+              </label>
+            </div>
+            <div class="pod-reset-row">
+              <div class="pod-reset-body">
+                <div class="pod-reset-label">{{ t(`settings.consumable_current_${kind}`) }}</div>
+                <div class="pod-reset-sub">
+                  {{
+                    startedAtFor(kind)
+                      ? t('settings.consumable_started', { at: formatPodStartedAt(startedAtFor(kind)!) })
+                      : t('settings.consumable_none')
+                  }}
+                </div>
+              </div>
+              <button type="button" class="btn btn-ghost" @click="() => onStartNewConsumable(kind)">
+                {{ t(`home.consumable_${kind}_new_cta`) }}
+              </button>
             </div>
           </div>
-          <button type="button" class="btn btn-ghost" @click="onStartNewPod">
-            {{ t('home.pod_new_cta') }}
-          </button>
-        </div>
+        </template>
 
         <div class="economy-field" style="margin-top: 12px">
           <span class="economy-label">{{ t('settings.economy_currency_label') }}</span>
@@ -645,7 +669,14 @@ import {
   SOCIAL_LOGIN_ENABLED,
   type SocialProvider,
 } from '../composables/useAuth'
-import { useEconomy, formatMoney } from '../composables/useEconomy'
+import {
+  useEconomy,
+  formatMoney,
+  priceKeyFor,
+  capacityKeyFor,
+  startedAtKeyFor,
+} from '../composables/useEconomy'
+import { ALL_CONSUMABLE_KINDS, type ConsumableKind } from '../types'
 import { useHaptics } from '../composables/useHaptics'
 import { useConfirm } from '../composables/useConfirm'
 import { useToast } from '../composables/useToast'
@@ -955,13 +986,50 @@ function onCigsPerPackInput(e: Event): void {
   const v = parseInt((e.target as HTMLInputElement).value, 10)
   economy.setCigsPerPack(Number.isFinite(v) && v >= 1 ? v : 20)
 }
-function onPodPriceInput(e: Event): void {
-  const v = parseFloat((e.target as HTMLInputElement).value)
-  economy.setPodPrice(Number.isFinite(v) && v >= 0 ? v : 0)
+// Vape consumables — generic input handlers driven by kind, so all
+// four (pod / coil / bottle / disposable) share one code path.
+const allConsumableKinds = ALL_CONSUMABLE_KINDS
+const heroConsumableOptions = computed(() =>
+  ALL_CONSUMABLE_KINDS.map((k) => ({
+    value: k,
+    label: t(`settings.consumable_kind_${k}`),
+  }))
+)
+const CONSUMABLE_EMOJI: Record<ConsumableKind, string> = {
+  pod: '💨',
+  coil: '🌀',
+  bottle: '💧',
+  disposable: '🪫',
 }
-function onPuffsPerPodInput(e: Event): void {
+function consumableEmoji(kind: ConsumableKind): string {
+  return CONSUMABLE_EMOJI[kind]
+}
+function startedAtFor(kind: ConsumableKind): string | null {
+  return economy.settings.value[startedAtKeyFor(kind)] as string | null
+}
+function onHeroConsumableChange(v: string): void {
+  if ((ALL_CONSUMABLE_KINDS as ReadonlyArray<string>).includes(v)) {
+    economy.setHeroConsumable(v as ConsumableKind)
+  }
+}
+function onConsumablePriceInput(kind: ConsumableKind, e: Event): void {
+  const v = parseFloat((e.target as HTMLInputElement).value)
+  economy.setConsumablePrice(kind, Number.isFinite(v) && v >= 0 ? v : 0)
+}
+function onConsumableCapacityInput(kind: ConsumableKind, e: Event): void {
   const v = parseInt((e.target as HTMLInputElement).value, 10)
-  economy.setPuffsPerPod(Number.isFinite(v) && v >= 1 ? v : 600)
+  economy.setConsumableCapacity(kind, Number.isFinite(v) && v >= 1 ? v : 1)
+}
+async function onStartNewConsumable(kind: ConsumableKind): Promise<void> {
+  const ok = await confirmDrawer({
+    title: t(`home.consumable_${kind}_new_confirm_title`),
+    body: t(`home.consumable_${kind}_new_confirm_body`),
+    confirmText: t(`home.consumable_${kind}_new_cta`),
+    cancelText: t('home.pod_new_confirm_cancel'),
+  })
+  if (!ok) return
+  economy.setConsumableStartedAt(kind, new Date().toISOString())
+  showToast(t(`home.consumable_${kind}_new_cta`) + ' ✓', 'success')
 }
 
 // Localized "started {when}" for the pod-reset row. Falls back to a
@@ -974,18 +1042,6 @@ function formatPodStartedAt(iso: string): string {
     dateStyle: 'medium',
     timeStyle: 'short',
   })
-}
-
-async function onStartNewPod(): Promise<void> {
-  const ok = await confirmDrawer({
-    title: t('home.pod_new_confirm_title'),
-    body: t('home.pod_new_confirm_body'),
-    confirmText: t('home.pod_new_confirm_ok'),
-    cancelText: t('home.pod_new_confirm_cancel'),
-  })
-  if (!ok) return
-  economy.setPodStartedAt(new Date().toISOString())
-  showToast(t('home.pod_new_cta') + ' ✓', 'success')
 }
 
 function csvEscape(v: string): string {
@@ -1713,6 +1769,43 @@ async function handleReset(): Promise<void> {
   color: var(--muted);
   font-weight: 500;
   text-align: center;
+}
+.consumable-block {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: var(--card);
+}
+.consumable-block.is-hero {
+  border-color: color-mix(in srgb, #14b8a6 45%, var(--hairline));
+  background: color-mix(in srgb, #14b8a6 6%, var(--card));
+}
+.consumable-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.consumable-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+.consumable-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.consumable-hero-chip {
+  margin-inline-start: auto;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #14b8a6;
+  background: color-mix(in srgb, #14b8a6 12%, transparent);
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
 }
 .pod-reset-row {
   display: flex;

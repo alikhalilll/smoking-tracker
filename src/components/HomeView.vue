@@ -70,15 +70,16 @@
          die?" and a resetting "since last puff" clock is meaningless when
          a session drops 20 puffs in a minute. -->
     <div v-if="activeMode === 'vape'" v-reveal class="hero" data-onboard="home-hero">
-      <PodLifeRing
+      <ConsumableRing
+        :kind="heroConsumable ?? 'pod'"
         :pct="podLifePct ?? 1"
         :puffs-remaining="puffsRemaining ?? 0"
-        :puffs-this-pod="puffsThisPod ?? 0"
+        :puffs-this-unit="puffsThisPod ?? 0"
         :overflow="podOverflow ?? false"
-        :has-pod="hasActivePod ?? false"
+        :has-active="hasActivePod ?? false"
         :today-count="todayCount"
         :sessions-today="sessionsToday ?? 0"
-        @start-new-pod="onStartNewPod"
+        @start-new="onStartNewPod"
       />
     </div>
     <div v-else v-reveal class="hero" data-onboard="home-hero">
@@ -426,10 +427,10 @@ import { useHealthMilestones } from '../composables/useHealthMilestones'
 import { formatDuration } from '../composables/useStats'
 import Confetti from './Confetti.vue'
 import ModeToggle from './ModeToggle.vue'
-import PodLifeRing from './PodLifeRing.vue'
+import ConsumableRing from './ConsumableRing.vue'
 import PuffCountSheet from './PuffCountSheet.vue'
 import { useConfirm } from '../composables/useConfirm'
-import type { DayBucket, EntryType } from '../types'
+import type { ConsumableKind, DayBucket, EntryType } from '../types'
 
 const { t } = useI18n()
 
@@ -450,8 +451,11 @@ interface Props {
   quitTodayStatus?: 'on-track' | 'over' | null
   quitIsComplete?: boolean
   smokeFreeDays?: number
-  // Vape-mode pod life + session stats. Zero / default values are safe
-  // in cigarette mode — the pod ring / session inline never renders.
+  // Vape-mode hero-consumable life + session stats. Zero / default
+  // values are safe in cigarette mode — the ring / session inline
+  // never renders. Prop names still say "pod" for backward-compat but
+  // now refer to whichever consumable is the hero.
+  heroConsumable?: ConsumableKind
   puffsThisPod?: number
   puffsRemaining?: number
   podLifePct?: number
@@ -526,10 +530,14 @@ function onCustomLog(count: number): void {
   setTimeout(() => (isPulsing.value = false), 500)
 }
 async function onStartNewPod(): Promise<void> {
+  // Confirm copy varies per consumable — "Start a new pod?" reads
+  // wrong for coil / bottle / disposable users. Falls back to the
+  // pod copy if the hero is somehow undefined.
+  const kind = props.heroConsumable ?? 'pod'
   const ok = await useConfirm().confirm({
-    title: t('home.pod_new_confirm_title'),
-    body: t('home.pod_new_confirm_body'),
-    confirmText: t('home.pod_new_confirm_ok'),
+    title: t(`home.consumable_${kind}_new_confirm_title`),
+    body: t(`home.consumable_${kind}_new_confirm_body`),
+    confirmText: t(`home.consumable_${kind}_new_cta`),
     cancelText: t('home.pod_new_confirm_cancel'),
   })
   if (ok) emit('start-new-pod')

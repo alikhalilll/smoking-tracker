@@ -4,6 +4,28 @@
 export type EntryType = 'cigarette' | 'vape'
 export const ALL_ENTRY_TYPES = ['cigarette', 'vape'] as const
 
+/**
+ * A vape "consumable" — the physical thing that runs out and gets
+ * replaced. Every kind is tracked as "puffs since it started" vs
+ * a rated capacity so the same ring geometry works for all four.
+ *
+ * - pod:        prefilled or refillable cartridge (JUUL / Elf Bar refills)
+ * - coil:       replaceable heating element inside a mod's tank
+ * - bottle:     bottle of e-liquid that fills the tank
+ * - disposable: single-use device with a fixed puff rating
+ *
+ * A user might have several going at once (mod-and-tank user tracks
+ * coil AND bottle; pod user just tracks pods). The `heroConsumable`
+ * economy setting picks which one occupies the home-screen ring.
+ */
+export type ConsumableKind = 'pod' | 'coil' | 'bottle' | 'disposable'
+export const ALL_CONSUMABLE_KINDS: ReadonlyArray<ConsumableKind> = [
+  'pod',
+  'coil',
+  'bottle',
+  'disposable',
+]
+
 export interface SmokeEntry {
   /** Stable client-generated UUID — the sync key. */
   id: string
