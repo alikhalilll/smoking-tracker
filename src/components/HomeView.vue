@@ -79,6 +79,7 @@
         :has-active="hasActivePod ?? false"
         :today-count="todayCount"
         :sessions-today="sessionsToday ?? 0"
+        :last-smoke-time="lastSmokeTime"
         @start-new="onStartNewPod"
       />
     </div>
