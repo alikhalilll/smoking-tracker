@@ -94,6 +94,14 @@ export function useSync(data: Ref<AppData>): UseSync {
     // Step 3 — REPLACE local entries with the server snapshot. The DB
     // is the source of truth; an entry deleted on another device is
     // gone here too once the pull lands.
+    // Preserve locally-stored puffCount across the replace: the server
+    // schema doesn't (yet) carry it, so a naive replace would collapse
+    // every vape session back to a single puff. Rehydrate from the
+    // pre-replace local snapshot keyed by id.
+    const puffCountById = new Map<string, number>()
+    for (const e of data.value.entries) {
+      if (e.puffCount != null) puffCountById.set(e.id, e.puffCount)
+    }
     applyingRemote = true
     try {
       data.value.entries = (
@@ -107,6 +115,9 @@ export function useSync(data: Ref<AppData>): UseSync {
         // is always populated.
         type: e.type ?? 'cigarette',
         synced: true,
+        ...(puffCountById.has(e.id)
+          ? { puffCount: puffCountById.get(e.id) }
+          : {}),
       }))
     } finally {
       applyingRemote = false

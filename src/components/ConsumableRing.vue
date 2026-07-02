@@ -5,12 +5,16 @@
       class="ring-wrap"
       :class="[
         `kind-${kind}`,
-        { 'is-overflow': overflow, 'is-empty': !hasActive },
+        {
+          'is-overflow': overflow,
+          'is-empty': !hasActive,
+          pulsing: isPulsing,
+        },
       ]"
       :aria-label="startNewLabel"
       @click="emit('start-new')"
     >
-      <svg class="ring" viewBox="0 0 120 120">
+      <svg class="ring" viewBox="0 0 240 240" aria-hidden="true">
         <defs>
           <linearGradient :id="gradId" x1="0" y1="0" x2="1" y2="1">
             <stop offset="0%" :stop-color="palette.from" />
@@ -20,30 +24,75 @@
             <stop offset="0%" stop-color="#fb7185" />
             <stop offset="100%" stop-color="#ef4444" />
           </linearGradient>
+          <linearGradient :id="haloId" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" :stop-color="palette.from" stop-opacity="0.55" />
+            <stop offset="100%" :stop-color="palette.to" stop-opacity="0" />
+          </linearGradient>
+          <radialGradient :id="innerId" cx="50%" cy="50%" r="55%">
+            <stop offset="60%" stop-color="var(--card)" stop-opacity="0" />
+            <stop offset="100%" stop-color="rgba(0,0,0,0.06)" />
+          </radialGradient>
         </defs>
+
+        <!-- Soft halo. Breathes when a consumable is active; sits still
+             (dim) when the ring is empty so the empty state doesn't feel
+             fake-alive. -->
+        <circle
+          v-if="hasActive"
+          class="ring-halo"
+          cx="120" cy="120" r="116"
+          fill="none"
+          :stroke="`url(#${haloId})`"
+          stroke-width="6"
+        />
+
+        <!-- Ticks — 12 short marks like a clock face for texture. -->
+        <g class="ring-ticks">
+          <line v-for="i in 12" :key="'tk'+i"
+            x1="120" :y1="10"
+            x2="120" :y2="14"
+            stroke="var(--faint)"
+            stroke-width="1.5"
+            stroke-linecap="round"
+            :transform="`rotate(${(i - 1) * 30} 120 120)`"
+          />
+        </g>
+
         <circle
           class="ring-bg"
-          cx="60"
-          cy="60"
-          r="52"
+          cx="120"
+          cy="120"
+          r="102"
           fill="none"
           stroke="var(--surface-tint)"
-          stroke-width="10"
+          stroke-width="16"
         />
         <circle
           v-if="hasActive"
           class="ring-fg"
-          cx="60"
-          cy="60"
-          r="52"
+          cx="120"
+          cy="120"
+          r="102"
           fill="none"
           :stroke="`url(#${overflow ? gradIdOver : gradId})`"
-          stroke-width="10"
+          stroke-width="16"
           stroke-linecap="round"
-          transform="rotate(-90 60 60)"
+          transform="rotate(-90 120 120)"
           :stroke-dasharray="ringCircumference"
           :stroke-dashoffset="ringOffset"
         />
+
+        <!-- Cursor dot at the end of the arc — matches the cigarette
+             hero's leading indicator so the two rings feel like a pair. -->
+        <g
+          v-if="hasActive && !overflow && pct > 0.02"
+          :transform="`rotate(${ringAngleDeg - 90} 120 120)`"
+        >
+          <circle class="ring-cursor" cx="222" cy="120" r="9" :style="`fill: ${palette.to};`" />
+        </g>
+
+        <!-- Inner vignette for depth. -->
+        <circle cx="120" cy="120" r="94" :fill="`url(#${innerId})`" />
       </svg>
       <div class="ring-content">
         <template v-if="!hasActive">
@@ -52,23 +101,36 @@
         </template>
         <template v-else-if="overflow">
           <div class="counter-number tabular over">
-            {{ formatNumber(Math.abs(puffsRemaining)) }}
+            <Transition name="num-flip" mode="out-in">
+              <span :key="todayCount">{{ formatNumber(todayCount) }}</span>
+            </Transition>
           </div>
-          <div class="counter-label">{{ overflowShort }}</div>
+          <div class="counter-label">{{ t('home.puffs_today') }}</div>
+          <div class="counter-target counter-target-danger">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+            <span>{{ startNewLabel }}</span>
+          </div>
         </template>
         <template v-else>
-          <div class="counter-number tabular">{{ formatNumber(pctLabel) }}%</div>
-          <div class="counter-label">{{ leftLabel }}</div>
+          <div class="counter-number tabular">
+            <Transition name="num-flip" mode="out-in">
+              <span :key="todayCount">{{ formatNumber(todayCount) }}</span>
+            </Transition>
+          </div>
+          <div class="counter-label">{{ t('home.puffs_today') }}</div>
+          <div class="counter-target">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21c0-4 4-5 4-9 0-3-2-4-2-7"/><path d="M13 21c0-4 4-5 4-9 0-3-2-4-2-7"/></svg>
+            <span class="tabular">{{ formatNumber(puffsRemaining) }} {{ t('home.consumable_chip_puffs_left') }}</span>
+          </div>
         </template>
       </div>
     </button>
 
-    <!-- Today summary: puffs + session count. Sits where the stopwatch
-         lives on the cigarette hero so the vertical rhythm stays intact. -->
-    <div v-if="hasActive" class="today-summary">
-      <span class="tabular">{{ formatNumber(todayCount) }}</span>
-      <span class="today-label">{{ t('home.puffs_today') }}</span>
-      <span v-if="sessionsToday > 0" class="sessions-suffix">
+    <!-- Sessions today. Puffs count is already in the ring center
+         (matching the cigarette hero's "count today" pattern), so this
+         row only carries the session count as secondary context. -->
+    <div v-if="hasActive && sessionsToday > 0" class="today-summary">
+      <span class="today-label">
         {{
           sessionsToday === 1
             ? t('home.sessions_today_one')
@@ -116,7 +178,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n, intlLocale, formatNumber } from '../i18n'
 import type { ConsumableKind } from '../types'
 
@@ -142,14 +204,11 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const RING_R = 52
+const RING_R = 102
 const ringCircumference = 2 * Math.PI * RING_R
-const ringOffset = computed(() => {
-  const filled = Math.max(0, Math.min(1, props.pct))
-  return ringCircumference * (1 - filled)
-})
-
-const pctLabel = computed(() => Math.round(props.pct * 100))
+const ringFilled = computed(() => Math.max(0, Math.min(1, props.pct)))
+const ringOffset = computed(() => ringCircumference * (1 - ringFilled.value))
+const ringAngleDeg = computed(() => ringFilled.value * 360)
 
 // Per-kind visual palette. All are teal-adjacent except overflow so
 // vape mode reads as one visual family; only the hue shifts per kind
@@ -170,14 +229,29 @@ const palette = computed(() => PALETTES[props.kind])
 // rings side-by-side later) don't collide on the same #ringGrad ID.
 const gradId = computed(() => `consumableRingGrad_${props.kind}`)
 const gradIdOver = computed(() => `consumableRingGradOver_${props.kind}`)
+const haloId = computed(() => `consumableRingHalo_${props.kind}`)
+const innerId = computed(() => `consumableRingInner_${props.kind}`)
 
-// i18n resolves labels per kind. Keys follow `home.consumable_{kind}_*`.
-const leftLabel = computed(() =>
-  t(`home.consumable_${props.kind}_left`, { n: formatNumber(props.puffsRemaining) })
-)
 const noneLabel = computed(() => t(`home.consumable_${props.kind}_none`))
 const startNewLabel = computed(() => t(`home.consumable_${props.kind}_new_cta`))
-const overflowShort = computed(() => t(`home.consumable_${props.kind}_overflow`))
+
+// Self-triggered pulse animation on todayCount increase — matches the
+// cigarette hero's log-tap feedback so both rings feel equally alive
+// when the user logs. Watched here rather than passed as a prop so the
+// parent HomeView doesn't need to plumb `isPulsing` through.
+const isPulsing = ref(false)
+let pulseTimer: ReturnType<typeof setTimeout> | null = null
+watch(
+  () => props.todayCount,
+  (n, prev) => {
+    if (n <= prev) return
+    if (pulseTimer) clearTimeout(pulseTimer)
+    isPulsing.value = true
+    pulseTimer = setTimeout(() => {
+      isPulsing.value = false
+    }, 800)
+  }
+)
 
 // Live tick for the "since last session" clock. Same 1s cadence as
 // the cigarette hero — cheap because only the seconds digit changes
@@ -189,6 +263,7 @@ onMounted(() => {
 })
 onUnmounted(() => {
   if (nowTimer) clearInterval(nowTimer)
+  if (pulseTimer) clearTimeout(pulseTimer)
 })
 
 interface StopwatchParts {
@@ -237,12 +312,12 @@ const stopwatchParts = computed<StopwatchParts | null>(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  margin: 6px 0;
+  gap: 14px;
+  margin: 8px 0;
 }
 .ring-wrap {
   position: relative;
-  width: 220px;
+  width: 260px;
   aspect-ratio: 1;
   appearance: none;
   border: none;
@@ -256,20 +331,53 @@ const stopwatchParts = computed<StopwatchParts | null>(() => {
 .ring-wrap:active {
   transform: scale(0.985);
 }
+.ring-wrap.pulsing {
+  animation: ringPop 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes ringPop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
 .ring {
   width: 100%;
   height: 100%;
   display: block;
+  overflow: visible;
 }
+.ring-halo {
+  animation: ringHaloBreathe 4s ease-in-out infinite;
+  transform-origin: 120px 120px;
+}
+@keyframes ringHaloBreathe {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.03); opacity: 1; }
+}
+.ring-ticks { opacity: 0.5; }
 .ring-fg {
-  transition: stroke-dashoffset 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.2, 0.8, 0.2, 1),
+    stroke 0.4s ease;
 }
-.ring-wrap.kind-pod        .ring-fg { filter: drop-shadow(0 0 6px rgba(20, 184, 166, 0.28)); }
-.ring-wrap.kind-coil       .ring-fg { filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.32)); }
-.ring-wrap.kind-bottle     .ring-fg { filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.30)); }
-.ring-wrap.kind-disposable .ring-fg { filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.30)); }
+.ring-wrap.kind-pod        .ring-fg { filter: drop-shadow(0 4px 12px rgba(20, 184, 166, 0.32)); }
+.ring-wrap.kind-coil       .ring-fg { filter: drop-shadow(0 4px 12px rgba(245, 158, 11, 0.32)); }
+.ring-wrap.kind-bottle     .ring-fg { filter: drop-shadow(0 4px 12px rgba(59, 130, 246, 0.30)); }
+.ring-wrap.kind-disposable .ring-fg { filter: drop-shadow(0 4px 12px rgba(168, 85, 247, 0.30)); }
 .ring-wrap.is-overflow .ring-fg {
-  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.35));
+  filter: drop-shadow(0 4px 12px rgba(239, 68, 68, 0.35));
+}
+.ring-cursor {
+  stroke: var(--card);
+  stroke-width: 3;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.18));
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ring-wrap.pulsing .ring-cursor {
+  animation: ringCursorPulse 0.8s ease-out;
+}
+@keyframes ringCursorPulse {
+  0% { r: 9; }
+  40% { r: 13; }
+  100% { r: 9; }
 }
 .ring-content {
   position: absolute;
@@ -283,19 +391,85 @@ const stopwatchParts = computed<StopwatchParts | null>(() => {
 }
 .counter-number {
   font-family: inherit;
-  font-size: 52px;
-  font-weight: 700;
+  font-size: 76px;
+  font-weight: 800;
   line-height: 1;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.045em;
   color: var(--text);
+  /* Positioning context so the in/out spans of <Transition> stack over
+     each other during the cross-fade instead of shifting the layout. */
+  position: relative;
+  display: inline-block;
+  min-width: 1ch;
 }
+.counter-number > span { display: inline-block; }
 .counter-number.over { color: var(--danger); }
+
+/* Counter flip — slide + fade when todayCount changes. Mirrors the
+   cigarette hero's num-flip so both rings feel the same on log tap. */
+.num-flip-enter-active,
+.num-flip-leave-active {
+  transition: opacity 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: opacity, transform;
+}
+.num-flip-enter-from {
+  opacity: 0;
+  transform: translateY(14px) scale(0.85);
+}
+.num-flip-leave-to {
+  opacity: 0;
+  transform: translateY(-14px) scale(0.92);
+}
+@media (prefers-reduced-motion: reduce) {
+  .num-flip-enter-active,
+  .num-flip-leave-active {
+    transition: none;
+  }
+  .num-flip-enter-from,
+  .num-flip-leave-to {
+    opacity: 1;
+    transform: none;
+  }
+  .ring-wrap.pulsing,
+  .ring-halo,
+  .ring-wrap.pulsing .ring-cursor {
+    animation: none;
+  }
+}
 .counter-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
-  font-weight: 500;
+  font-weight: 700;
   text-align: center;
   margin-top: 4px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.counter-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card) 70%, transparent);
+  border: 1px solid color-mix(in srgb, currentColor 24%, transparent);
+  color: v-bind('palette.from');
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  animation: chipFadeIn 0.3s ease-out both;
+}
+.counter-target-danger {
+  color: var(--danger);
+  border-color: color-mix(in srgb, var(--danger) 28%, transparent);
+  background: color-mix(in srgb, var(--danger) 10%, var(--card));
+}
+@keyframes chipFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .empty-icon {
   font-size: 40px;

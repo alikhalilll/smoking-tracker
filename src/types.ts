@@ -42,6 +42,13 @@ export interface SmokeEntry {
    * Optional for backward compatibility with pre-sync local data.
    */
   synced?: boolean
+  /**
+   * Number of units this entry represents. For vape, one entry = one
+   * session and `puffCount` is the puffs taken in that session. For
+   * cigarette this is unused (each stick is its own entry). Absent on
+   * legacy entries — treat as 1 when summing.
+   */
+  puffCount?: number
 }
 
 export interface AppData {

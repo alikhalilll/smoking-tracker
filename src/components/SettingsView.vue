@@ -529,19 +529,37 @@
             <span class="field-help">{{ t('settings.hero_consumable_help') }}</span>
           </div>
 
-          <!-- One block per vape consumable. Each has its own price +
-               capacity + reset row so a mod-and-tank user can track a
-               coil separately from a bottle without hunting for it. -->
+          <!-- One block per vape consumable. Each block is a tinted card
+               (mint / sun / lavender / peach per kind) with its own
+               price + capacity inputs and a reset row so a mod-and-tank
+               user can track coil / bottle separately without hunting. -->
           <div
             v-for="kind in allConsumableKinds"
             :key="kind"
             class="consumable-block"
-            :class="{ 'is-hero': economy.settings.value.heroConsumable === kind }"
+            :class="[
+              `consumable-tint-${consumableTint(kind)}`,
+              { 'is-hero': economy.settings.value.heroConsumable === kind },
+            ]"
           >
             <div class="consumable-header">
-              <span class="consumable-emoji" aria-hidden="true">{{ consumableEmoji(kind) }}</span>
-              <span class="consumable-title">{{ t(`settings.consumable_kind_${kind}`) }}</span>
+              <span class="consumable-icon" aria-hidden="true">
+                <svg v-if="kind === 'pod'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21c0-4 4-5 4-9 0-3-2-4-2-7"/><path d="M13 21c0-4 4-5 4-9 0-3-2-4-2-7"/><path d="M3 21c0-2 2-3 2-5"/></svg>
+                <svg v-else-if="kind === 'coil'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12c0-4.4 3.6-8 8-8s8 3.6 8 8-3.6 8-8 8"/><path d="M4 12c0-2.2 1.8-4 4-4s4 1.8 4 4-1.8 4-4 4"/><path d="M8 12h.01"/></svg>
+                <svg v-else-if="kind === 'bottle'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2h4v4"/><path d="M8 6h8"/><path d="M9 6l-2 3v11a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V9l-2-3"/><path d="M7 13h10"/></svg>
+                <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="16" rx="3"/><path d="M10 8l4 4-4 4"/></svg>
+              </span>
+              <div class="consumable-title-wrap">
+                <div class="consumable-title">{{ t(`settings.consumable_kind_${kind}`) }}</div>
+                <div v-if="startedAtFor(kind)" class="consumable-title-sub">
+                  {{ t('settings.consumable_started', { at: formatPodStartedAt(startedAtFor(kind)!) }) }}
+                </div>
+                <div v-else class="consumable-title-sub">
+                  {{ t('settings.consumable_none') }}
+                </div>
+              </div>
               <span v-if="economy.settings.value.heroConsumable === kind" class="consumable-hero-chip">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 7 7 .5-5.4 4.5 1.8 7-6.4-4-6.4 4 1.8-7L2 9.5 9 9z"/></svg>
                 {{ t('settings.hero_consumable_label') }}
               </span>
             </div>
@@ -571,21 +589,14 @@
                 />
               </label>
             </div>
-            <div class="pod-reset-row">
-              <div class="pod-reset-body">
-                <div class="pod-reset-label">{{ t(`settings.consumable_current_${kind}`) }}</div>
-                <div class="pod-reset-sub">
-                  {{
-                    startedAtFor(kind)
-                      ? t('settings.consumable_started', { at: formatPodStartedAt(startedAtFor(kind)!) })
-                      : t('settings.consumable_none')
-                  }}
-                </div>
-              </div>
-              <button type="button" class="btn btn-ghost" @click="() => onStartNewConsumable(kind)">
-                {{ t(`home.consumable_${kind}_new_cta`) }}
-              </button>
-            </div>
+            <button
+              type="button"
+              class="consumable-reset-btn"
+              @click="() => onStartNewConsumable(kind)"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+              <span>{{ t(`home.consumable_${kind}_new_cta`) }}</span>
+            </button>
           </div>
         </template>
 
@@ -995,14 +1006,16 @@ const heroConsumableOptions = computed(() =>
     label: t(`settings.consumable_kind_${k}`),
   }))
 )
-const CONSUMABLE_EMOJI: Record<ConsumableKind, string> = {
-  pod: '💨',
-  coil: '🌀',
-  bottle: '💧',
-  disposable: '🪫',
+// Map each consumable to a tint token so the settings blocks pick up
+// the same design-system colors as the home stats cards.
+const CONSUMABLE_TINTS: Record<ConsumableKind, string> = {
+  pod: 'mint',
+  coil: 'sun',
+  bottle: 'lavender',
+  disposable: 'peach',
 }
-function consumableEmoji(kind: ConsumableKind): string {
-  return CONSUMABLE_EMOJI[kind]
+function consumableTint(kind: ConsumableKind): string {
+  return CONSUMABLE_TINTS[kind]
 }
 function startedAtFor(kind: ConsumableKind): string | null {
   return economy.settings.value[startedAtKeyFor(kind)] as string | null
@@ -1770,72 +1783,130 @@ async function handleReset(): Promise<void> {
   font-weight: 500;
   text-align: center;
 }
+/* Consumable blocks — one tinted card per kind (pod / coil / bottle /
+   disposable), coloured with the design-system tint tokens so the
+   settings screen speaks the same colour language as the home stats
+   grid. The active "hero" ring gets a subtle glow border. */
 .consumable-block {
+  position: relative;
   margin-top: 14px;
-  padding: 12px;
-  border: 1px solid var(--hairline);
-  border-radius: 14px;
+  padding: 16px 16px 14px;
+  border: 1px solid transparent;
+  border-radius: 18px;
   background: var(--card);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  --tile-fg: var(--brand);
+}
+.consumable-block.consumable-tint-peach {
+  background: var(--tint-peach-bg);
+  --tile-fg: var(--tint-peach-fg);
+}
+.consumable-block.consumable-tint-lavender {
+  background: var(--tint-lavender-bg);
+  --tile-fg: var(--tint-lavender-fg);
+}
+.consumable-block.consumable-tint-mint {
+  background: var(--tint-mint-bg);
+  --tile-fg: var(--tint-mint-fg);
+}
+.consumable-block.consumable-tint-sun {
+  background: var(--tint-sun-bg);
+  --tile-fg: var(--tint-sun-fg);
 }
 .consumable-block.is-hero {
-  border-color: color-mix(in srgb, #14b8a6 45%, var(--hairline));
-  background: color-mix(in srgb, #14b8a6 6%, var(--card));
+  border-color: color-mix(in srgb, var(--tile-fg) 45%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--tile-fg) 10%, transparent);
 }
 .consumable-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 12px;
+  margin-bottom: 14px;
 }
-.consumable-emoji {
-  font-size: 18px;
-  line-height: 1;
-}
-.consumable-title {
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--text);
-}
-.consumable-hero-chip {
-  margin-inline-start: auto;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 10px;
-  font-weight: 600;
-  color: #14b8a6;
-  background: color-mix(in srgb, #14b8a6 12%, transparent);
-  letter-spacing: 0.02em;
-  text-transform: lowercase;
-}
-.pod-reset-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: color-mix(in srgb, #14b8a6 8%, var(--card));
-  border: 1px solid color-mix(in srgb, #14b8a6 25%, var(--hairline));
+.consumable-icon {
+  width: 40px;
+  height: 40px;
   border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--tile-fg) 18%, transparent);
+  color: var(--tile-fg);
+  flex-shrink: 0;
 }
-.pod-reset-body {
+.consumable-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.consumable-title-wrap {
   display: flex;
   flex-direction: column;
-  min-width: 0;
+  gap: 2px;
   flex: 1;
+  min-width: 0;
 }
-.pod-reset-label {
-  font-size: 13px;
-  font-weight: 600;
+.consumable-title {
+  font-size: 15px;
+  font-weight: 800;
   color: var(--text);
+  letter-spacing: -0.005em;
+  line-height: 1.1;
 }
-.pod-reset-sub {
+.consumable-title-sub {
   font-size: 11px;
+  font-weight: 500;
   color: var(--muted);
-  margin-top: 2px;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.pod-reset-row .btn {
+.consumable-hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--tile-fg);
+  background: color-mix(in srgb, var(--card) 65%, transparent);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   flex-shrink: 0;
+}
+.consumable-hero-chip svg {
+  color: var(--tile-fg);
+}
+
+/* Reset ("start new pod / coil / …") is a full-width tinted button
+   that sits inside the consumable card so it clearly belongs to that
+   kind. Ghost styling to keep the tinted card as the main surface. */
+.consumable-reset-btn {
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--tile-fg) 32%, transparent);
+  background: color-mix(in srgb, var(--card) 55%, transparent);
+  color: var(--tile-fg);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  padding: 10px 14px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 12px;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.consumable-reset-btn:hover {
+  background: color-mix(in srgb, var(--tile-fg) 12%, var(--card));
+}
+.consumable-reset-btn:active {
+  transform: scale(0.985);
 }
 
 .danger-btn {

@@ -64,6 +64,19 @@ const en = {
     log_many: 'Log {n} cigarettes',
     log_one_puff: 'Log 1 puff',
     log_many_puffs: 'Log {n} puffs',
+    log_session: 'Log session',
+    log_done: 'Logged',
+    step_unit_puff_one: 'puff',
+    step_unit_puff_many: 'puffs',
+    step_unit_cig_one: 'cigarette',
+    step_unit_cig_many: 'cigarettes',
+    stat_sub_avg_puffs: 'puffs per session',
+    stat_sub_avg_cigs: 'per day, on average',
+    stat_sub_since_start: 'since you started',
+    stat_sub_days: 'with entries',
+    stat_sub_best_day: 'lowest on any day',
+    stat_sub_money_spent: 'total spent',
+    stat_sub_money_saved: 'kept in your pocket',
     // Vape session presets. Chip = one-tap log; the value in parens
     // ("~5") is the puff count that gets stamped when tapped.
     preset_quick_label: 'Quick hit',
@@ -87,6 +100,8 @@ const en = {
     // Generic consumable ring — one series per kind so pod / coil /
     // bottle / disposable can each read natively without a fallback.
     // The ring resolves `home.consumable_{kind}_{slot}` at render time.
+    consumable_chip_left: 'left',
+    consumable_chip_puffs_left: 'puffs left',
     consumable_pod_left: '~{n} puffs left',
     consumable_pod_overflow: 'past your pod',
     consumable_pod_none: 'Tap when you start a new pod',
@@ -131,6 +146,10 @@ const en = {
     money_spent: 'Total spent',
     health_section: 'Your body, recovering',
     health_next: 'Next: {label} in {time}',
+    milestone_reached: 'Reached',
+    milestone_in: 'in {time}',
+    ring_target_chip: '{count} / {target} target',
+    ring_avg_chip: 'vs {avg} avg',
     health_set_price: 'Set a cigarette price to see your savings.',
     vape_set_price: 'Set a pod price and puffs-per-pod to see your savings.',
     // Mode toggle + per-session confirmation toasts.
@@ -168,6 +187,17 @@ const en = {
     edit_entry_minute: 'Min',
     edit_entry_am: 'AM',
     edit_entry_pm: 'PM',
+    session_puffs_aria: 'Session of {n} puffs',
+    empty_vape: 'No vape sessions yet',
+    empty_sub: 'Log your first entry from the Home tab.',
+    empty_sub_vape: 'Log your first session from the Home tab.',
+    session_report: 'Session report',
+    section_sub_cig: 'Gaps between the cigarettes you\'ve logged.',
+    section_sub_vape: 'Gaps between your vape sessions.',
+    unit_puffs: 'puffs',
+    unit_cigarettes: 'cigarettes',
+    sessions_one: '1 session',
+    sessions_many: '{n} sessions',
   },
   report: {
     title: 'Full report',

@@ -7,8 +7,17 @@ import type {
   GapDistributionBucket,
   GapStats,
   HourBucket,
+  SmokeEntry,
   WeekdayBucket,
 } from '../types'
+
+/**
+ * Units this entry represents. Vape sessions carry `puffCount` (one row
+ * per session); cigarettes and pre-puffCount legacy rows count as 1.
+ */
+function unitsOf(e: SmokeEntry): number {
+  return e.puffCount ?? 1
+}
 
 import { formatLocalDate as formatDate, getToday } from './useDate'
 import { useReminders } from './useReminders'
@@ -200,7 +209,7 @@ export function useStats(data: Ref<AppData>) {
   const byDay = computed<Record<string, number>>(() => {
     const map: Record<string, number> = {}
     for (const e of filteredEntries.value) {
-      map[e.date] = (map[e.date] || 0) + 1
+      map[e.date] = (map[e.date] || 0) + unitsOf(e)
     }
     return map
   })
@@ -210,20 +219,29 @@ export function useStats(data: Ref<AppData>) {
   )
 
   const totalDays = computed(() => days.value.length || 1)
-  const totalSmoked = computed(() => filteredEntries.value.length)
+  const totalSmoked = computed(() =>
+    filteredEntries.value.reduce((s, e) => s + unitsOf(e), 0)
+  )
   const dailyAvg = computed(
     () => Math.round((totalSmoked.value / totalDays.value) * 10) / 10
   )
   const todayCount = computed(() => byDay.value[getToday()] || 0)
 
-  // Sessions today — count of timestamp clusters where consecutive
-  // entries within SESSION_GAP_MS collapse into one. Used in vape mode
-  // to render "N puffs · M sessions" inline under the pod-life ring.
-  // For cigarettes each entry is a session of 1, which happens to be
-  // the correct answer for the cigarette case too even though the UI
-  // never surfaces it.
+  // Sessions today. Vape: one row = one session (a Log tap creates one
+  // entry with `puffCount` set), so we just count today's rows. Legacy
+  // pre-puffCount rows still count as one session each, which slightly
+  // over-counts old data but keeps the number monotonic. Cigarette: fall
+  // back to the 10-minute timestamp-clustering rule the app has always
+  // used — the UI doesn't surface this for cigarettes anyway.
   const sessionsToday = computed<number>(() => {
     const today = getToday()
+    if (activeMode.mode.value === 'vape') {
+      let n = 0
+      for (const e of filteredEntries.value) {
+        if (e.date === today) n++
+      }
+      return n
+    }
     const times: number[] = []
     for (const e of sortedEntries.value) {
       if (e.date === today) times.push(new Date(e.time).getTime())
@@ -325,7 +343,7 @@ export function useStats(data: Ref<AppData>) {
       const first = entries[0]
       const last = entries[entries.length - 1]
       reports[date] = {
-        count: entries.length,
+        count: entries.reduce((s, e) => s + unitsOf(e), 0),
         first: first.time,
         last: last.time,
         activeSpanMs:
@@ -350,7 +368,7 @@ export function useStats(data: Ref<AppData>) {
     }))
     for (const e of filteredEntries.value) {
       const h = new Date(e.time).getHours()
-      buckets[h].count++
+      buckets[h].count += unitsOf(e)
     }
     return buckets
   })
@@ -364,7 +382,7 @@ export function useStats(data: Ref<AppData>) {
     for (const e of filteredEntries.value) {
       const d = new Date(e.time)
       const wd = d.getDay()
-      totals[wd]++
+      totals[wd] += unitsOf(e)
       const key = `${wd}-${e.date}`
       if (!seenDates.has(key)) {
         seenDates.add(key)

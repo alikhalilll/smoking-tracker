@@ -163,27 +163,59 @@
         </div>
       </div>
 
-      <!-- Progress stats -->
-      <div v-if="progress" v-reveal class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-label">{{ t('quit.day') }}</div>
-          <div class="stat-value">
-            {{ formatNumber(Math.min(progress.daysElapsed + 1, plan.durationDays)) }} /
-            {{ formatNumber(plan.durationDays) }}
-          </div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">{{ t('quit.streak') }}</div>
-          <div class="stat-value">{{ formatNumber(progress.currentStreak) }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">{{ t('quit.on_track_count') }}</div>
-          <div class="stat-value">{{ formatNumber(progress.daysOnTrack) }}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">{{ t('quit.over_count') }}</div>
-          <div class="stat-value">{{ formatNumber(progress.daysOver) }}</div>
-        </div>
+      <!-- Progress stats. Same <StatsCard> as the home insight grid so
+           the quit screen feels like part of the same dashboard family. -->
+      <div v-if="progress" v-reveal class="stat-grid">
+        <StatsCard tint="peach" :label="t('quit.day')">
+          <template #icon>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 3v4M16 3v4"/></svg>
+          </template>
+          <template #value>
+            {{ formatNumber(Math.min(progress.daysElapsed + 1, plan.durationDays)) }}<span class="stat-value-suffix">/ {{ formatNumber(plan.durationDays) }}</span>
+          </template>
+          <template #flourish>
+            <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="66" y="30" width="34" height="34" rx="4"/>
+              <path d="M66 42 L100 42"/>
+              <path d="M74 30 V26 M92 30 V26"/>
+              <path d="M76 52 h4 M88 52 h4 M76 60 h4 M88 60 h4"/>
+            </svg>
+          </template>
+        </StatsCard>
+        <StatsCard tint="lavender" :label="t('quit.streak')" :value="formatNumber(progress.currentStreak)">
+          <template #icon>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L4 14h7l-1 8 9-12h-7l1-8z"/></svg>
+          </template>
+          <template #flourish>
+            <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M84 18 c-6 12 -18 18 -18 34 c0 12 8 22 18 22 s18 -10 18 -22 c0 -10 -6 -14 -10 -22 c-2 -6 -4 -10 -8 -12 z"/>
+              <path d="M84 44 c-2 6 -8 8 -8 18 c0 6 4 10 8 10 s8 -4 8 -10"/>
+            </svg>
+          </template>
+        </StatsCard>
+        <StatsCard tint="mint" :label="t('quit.on_track_count')" :value="formatNumber(progress.daysOnTrack)">
+          <template #icon>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </template>
+          <template #flourish>
+            <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="86" cy="48" r="26"/>
+              <path d="M74 48 l8 8 l16 -18"/>
+            </svg>
+          </template>
+        </StatsCard>
+        <StatsCard tint="sun" :label="t('quit.over_count')" :value="formatNumber(progress.daysOver)">
+          <template #icon>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/></svg>
+          </template>
+          <template #flourish>
+            <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M86 20 L60 70 h52 z"/>
+              <path d="M86 40 v18"/>
+              <circle cx="86" cy="64" r="1.5" fill="currentColor" stroke="none"/>
+            </svg>
+          </template>
+        </StatsCard>
       </div>
 
       <!-- Plan timeline grouped by week -->
@@ -264,6 +296,7 @@ import type {
   QuitPlan,
   QuitProgress,
 } from '../types'
+import StatsCard from './StatsCard.vue'
 
 interface Props {
   plan: QuitPlan | null
@@ -717,28 +750,25 @@ function shortDate(dateStr: string): string {
   color: var(--muted);
   margin-top: 6px;
 }
-.stats-grid {
+/* Progress grid — 2 cols narrow, 4 cols with room. Tile styling
+   comes from <StatsCard>. */
+.stat-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
-.stat-card {
-  background: var(--card);
-  border-radius: 10px;
-  padding: 10px 8px;
-  text-align: center;
+@media (min-width: 520px) {
+  .stat-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
-.stat-label {
-  font-size: 10px;
-  color: var(--muted);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-.stat-value {
+/* Suffix inside a StatsCard value slot (e.g. "14 / 30"). */
+.stat-grid :deep(.stat-value-suffix) {
   font-size: 18px;
   font-weight: 600;
-  margin-top: 2px;
-  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  letter-spacing: 0;
+  margin-inline-start: 4px;
 }
 
 /* Week-by-week plan list */

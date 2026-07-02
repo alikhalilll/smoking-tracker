@@ -101,6 +101,7 @@
 
       <HistoryView
         v-else-if="view === 'history'"
+        :active-mode="activeMode.mode.value"
         :days="days"
         :by-day="byDay"
         :gap-stats="gapStats"

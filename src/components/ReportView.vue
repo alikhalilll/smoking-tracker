@@ -17,38 +17,79 @@
             </button>
           </div>
 
-      <!-- Summary -->
+      <!-- Summary. Uses the shared <StatsCard> so the report reads as
+           a natural extension of the dashboard. Tints cycle so no two
+           adjacent cards share a hue. -->
       <section v-reveal class="report-section">
         <div class="section-title">{{ t('report.summary') }}</div>
         <div class="summary-grid">
-          <div class="summary-card">
-            <div class="summary-label">{{ t('home.total_logged') }}</div>
-            <div class="summary-value">{{ formatNumber(totalSmoked) }}</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-label">{{ t('home.days_tracked') }}</div>
-            <div class="summary-value">{{ formatNumber(totalDays) }}</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-label">{{ t('home.daily_avg') }}</div>
-            <div class="summary-value">{{ formatNumber(dailyAvg) }}</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-label">{{ t('report.logged_gaps') }}</div>
-            <div class="summary-value">{{ formatNumber(gapStats.count) }}</div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-label">{{ t('history.avg_gap') }}</div>
-            <div class="summary-value">
-              {{ formatDuration(gapStats.avg) }}
-            </div>
-          </div>
-          <div class="summary-card">
-            <div class="summary-label">{{ t('history.longest_gap') }}</div>
-            <div class="summary-value">
-              {{ formatDuration(gapStats.longest) }}
-            </div>
-          </div>
+          <StatsCard tint="peach" :label="t('home.total_logged')" :value="formatNumber(totalSmoked)">
+            <template #icon>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="4" rx="1"/><path d="M17 11V9M20 11V9"/></svg>
+            </template>
+            <template #flourish>
+              <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="60" y="46" width="8" height="30" rx="1"/>
+                <rect x="72" y="30" width="8" height="46" rx="1"/>
+                <rect x="84" y="52" width="8" height="24" rx="1"/>
+                <rect x="96" y="38" width="8" height="38" rx="1"/>
+              </svg>
+            </template>
+          </StatsCard>
+          <StatsCard tint="mint" :label="t('home.days_tracked')" :value="formatNumber(totalDays)">
+            <template #icon>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 3v4M16 3v4"/></svg>
+            </template>
+            <template #flourish>
+              <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="66" y="30" width="34" height="34" rx="4"/>
+                <path d="M66 42 L100 42"/>
+                <path d="M74 30 V26 M92 30 V26"/>
+              </svg>
+            </template>
+          </StatsCard>
+          <StatsCard tint="lavender" :label="t('home.daily_avg')" :value="formatNumber(dailyAvg)">
+            <template #icon>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l3.5-3.5 3 3L21 6"/><path d="M17 6h4v4"/></svg>
+            </template>
+            <template #flourish>
+              <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 82 Q30 62 48 74 T96 56"/>
+                <circle cx="96" cy="56" r="3" fill="currentColor" stroke="none"/>
+              </svg>
+            </template>
+          </StatsCard>
+          <StatsCard tint="sun" :label="t('report.logged_gaps')" :value="formatNumber(gapStats.count)">
+            <template #icon>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h4l2-6 4 12 2-6h4"/></svg>
+            </template>
+            <template #flourish>
+              <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M8 58 L26 58 L34 34 L48 82 L56 46 L72 66 L110 50"/>
+              </svg>
+            </template>
+          </StatsCard>
+          <StatsCard tint="peach" :label="t('history.avg_gap')" :value="formatDuration(gapStats.avg)">
+            <template #icon>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            </template>
+            <template #flourish>
+              <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="88" cy="46" r="26"/>
+                <path d="M88 30 v16 l10 6"/>
+              </svg>
+            </template>
+          </StatsCard>
+          <StatsCard tint="lavender" :label="t('history.longest_gap')" :value="formatDuration(gapStats.longest)">
+            <template #icon>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 8v5l3 2"/><path d="M19 4l2 2"/></svg>
+            </template>
+            <template #flourish>
+              <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M74 20 h28 v10 l-14 20 14 20 v10 h-28 v-10 l14 -20 -14 -20 z"/>
+              </svg>
+            </template>
+          </StatsCard>
         </div>
       </section>
 
@@ -177,6 +218,7 @@ import type {
   HourBucket,
   WeekdayBucket,
 } from '../types'
+import StatsCard from './StatsCard.vue'
 
 const { t } = useI18n()
 
@@ -348,24 +390,11 @@ function shortDate(dateStr: string): string {
   color: var(--text);
   margin-bottom: 12px;
 }
+/* Summary grid — 2 cols. Tile styling comes from <StatsCard>. */
 .summary-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-.summary-card {
-  background: var(--card);
-  border-radius: 10px;
-  padding: 12px 14px;
-}
-.summary-label {
-  font-size: 11px;
-  color: var(--muted);
-}
-.summary-value {
-  font-size: 18px;
-  font-weight: 600;
-  margin-top: 3px;
+  gap: 12px;
 }
 
 /* Daily chart */

@@ -48,7 +48,7 @@ export function useConsumableLife(
     for (const e of data.value.entries) {
       if ((e.type ?? 'cigarette') !== 'vape') continue
       const t = new Date(e.time).getTime()
-      if (t >= startMs) n++
+      if (t >= startMs) n += e.puffCount ?? 1
     }
     return n
   })

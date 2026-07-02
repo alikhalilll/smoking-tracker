@@ -102,16 +102,32 @@ export function useStorage(): UseStorage {
   watch(data, save, { deep: true })
 
   function addEntries(count: number, type: EntryType): void {
+    if (count <= 0) return
     const now = new Date().toISOString()
     const today = getToday()
-    for (let i = 0; i < count; i++) {
+    if (type === 'vape') {
+      // One entry per session — puffCount carries the puff count.
+      // History and sessionsToday derive naturally from row count.
       data.value.entries.push({
         id: newId(),
         time: now,
         date: today,
         type,
         synced: false,
+        puffCount: count,
       })
+    } else {
+      // Cigarettes stay one-entry-per-stick: each stick is a discrete
+      // event the user reasons about individually.
+      for (let i = 0; i < count; i++) {
+        data.value.entries.push({
+          id: newId(),
+          time: now,
+          date: today,
+          type,
+          synced: false,
+        })
+      }
     }
     save()
   }

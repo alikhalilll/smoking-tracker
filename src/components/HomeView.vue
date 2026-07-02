@@ -105,38 +105,83 @@
       />
     </div>
     <div v-else v-reveal class="hero" data-onboard="home-hero">
-      <div class="ring-wrap" :class="{ pulsing: isPulsing }">
+      <div
+        class="ring-wrap"
+        :class="[
+          { pulsing: isPulsing },
+          ringStatus === 'over' ? 'ring-over' : ringStatus === 'warning' ? 'ring-warning' : 'ring-ok',
+        ]"
+      >
         <Confetti :trigger="confettiTrigger" />
-        <svg class="ring" viewBox="0 0 120 120">
+        <svg class="ring" viewBox="0 0 240 240" aria-hidden="true">
           <defs>
             <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="var(--brand-grad-from)" />
-              <stop offset="100%" stop-color="var(--brand-grad-to)" />
+              <stop offset="0%" stop-color="var(--ring-grad-from)" />
+              <stop offset="100%" stop-color="var(--ring-grad-to)" />
             </linearGradient>
+            <linearGradient id="ringHalo" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="var(--ring-grad-from)" stop-opacity="0.55" />
+              <stop offset="100%" stop-color="var(--ring-grad-to)" stop-opacity="0" />
+            </linearGradient>
+            <radialGradient id="ringInner" cx="50%" cy="50%" r="55%">
+              <stop offset="60%" stop-color="var(--card)" stop-opacity="0" />
+              <stop offset="100%" stop-color="rgba(0,0,0,0.06)" />
+            </radialGradient>
           </defs>
+
+          <!-- Soft outer halo — the pulsing class scales this on log tap. -->
+          <circle class="ring-halo" cx="120" cy="120" r="116" fill="none" stroke="url(#ringHalo)" stroke-width="6" />
+
+          <!-- Ticks — 12 short marks around the ring for a subtle
+               "clock face" texture. Sits behind the track. -->
+          <g class="ring-ticks">
+            <line v-for="i in 12" :key="'tk'+i"
+              x1="120" :y1="10"
+              x2="120" :y2="14"
+              stroke="var(--faint)"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              :transform="`rotate(${(i - 1) * 30} 120 120)`"
+            />
+          </g>
+
+          <!-- Background track. -->
           <circle
             class="ring-bg"
-            cx="60"
-            cy="60"
-            r="52"
+            cx="120"
+            cy="120"
+            r="102"
             fill="none"
             stroke="var(--surface-tint)"
-            stroke-width="10"
+            stroke-width="16"
           />
+
+          <!-- Progress arc. The stroke-dashoffset transition creates the
+               smooth arc-fill effect when the count changes. -->
           <circle
             class="ring-fg"
-            cx="60"
-            cy="60"
-            r="52"
+            cx="120"
+            cy="120"
+            r="102"
             fill="none"
             stroke="url(#ringGrad)"
-            stroke-width="10"
+            stroke-width="16"
             stroke-linecap="round"
-            transform="rotate(-90 60 60)"
+            transform="rotate(-90 120 120)"
             :stroke-dasharray="ringCircumference"
             :stroke-dashoffset="ringOffset"
           />
+
+          <!-- Cursor dot at the end of the progress arc. Follows the
+               arc via the same rotation as the progress angle. -->
+          <g v-if="todayCount > 0" :transform="`rotate(${ringAngleDeg - 90} 120 120)`">
+            <circle class="ring-cursor" cx="222" cy="120" r="9" />
+          </g>
+
+          <!-- Inner vignette for depth. -->
+          <circle cx="120" cy="120" r="94" fill="url(#ringInner)" />
         </svg>
+
         <div class="ring-content">
           <div class="counter-number tabular">
             <Transition name="num-flip" mode="out-in">
@@ -144,6 +189,10 @@
             </Transition>
           </div>
           <div class="counter-label">{{ labels.todayCounter }}</div>
+          <div v-if="ringTargetLabel" class="counter-target">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/></svg>
+            <span class="tabular">{{ ringTargetLabel }}</span>
+          </div>
         </div>
       </div>
       <div v-if="stopwatchParts" class="gap-stopwatch">
@@ -214,97 +263,92 @@
       </div>
     </div>
 
-    <!-- Log composer. Cigarette: keep the +/- stepper because each
-         cigarette *is* a discrete unit. Vape: real vapers take sessions
-         of many puffs at once — the +/- stepper misrepresents that as
-         one discrete "puff" per tap. Chips let the user log a whole
-         session in one tap; "Custom" opens a slider for edge cases. -->
+    <!-- Log composer. Stripped-back container so the log button is
+         the unambiguous hero: no tint, no flourish, no border — just
+         the CTA on top, a compact adjust-count strip beneath, and a
+         tiny undo footer. The card only exists to group them. -->
     <div
-      v-if="activeMode === 'vape'"
       v-reveal="{ delay: 80 }"
-      class="log-row"
+      class="log-card"
+      :class="{ 'log-card-vape': activeMode === 'vape' }"
       data-onboard="home-log"
     >
+      <!-- Primary CTA — text-only pill with a faded mode icon in the
+           background as texture. On successful log the whole label
+           swaps to "✓ Logged" for a moment. -->
       <button
-        v-for="preset in vapePresets"
-        :key="preset.value"
-        type="button"
-        class="log-pill"
-        data-onboard="log-button"
-        :aria-label="`${preset.label} — ${preset.value} puffs`"
-        @click="onPresetTap(preset.value)"
-      >
-        <span class="log-pill-num tabular">{{ formatNumber(preset.value) }}</span>
-        <span class="log-pill-unit">{{ preset.label }}</span>
-      </button>
-      <button
-        type="button"
-        class="log-pill log-pill-more"
-        :aria-label="t('home.preset_custom_label')"
-        @click="customSheetOpen = true"
-      >
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>
-      </button>
-    </div>
-    <button
-      v-if="activeMode === 'vape' && hasEntries"
-      class="undo-btn undo-standalone"
-      @click="emit('undo')"
-    >
-      {{ t('home.undo_last') }}
-    </button>
-
-    <div
-      v-else
-      v-reveal="{ delay: 80 }"
-      class="log-card card"
-      data-onboard="home-log"
-    >
-      <div class="log-stepper">
-        <button class="step-btn" @click="decrement" :aria-label="'minus'">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg>
-        </button>
-        <div class="step-count tabular">{{ formatNumber(logCount) }}</div>
-        <button class="step-btn" @click="increment" :aria-label="'plus'">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg>
-        </button>
-      </div>
-
-      <button
-        class="btn btn-primary log-btn"
+        class="log-btn"
+        :class="{ 'log-btn-vape': activeMode === 'vape', 'is-check': showCheck }"
         data-onboard="log-button"
         @click="handleLog"
       >
-        <svg
-          v-if="showCheck"
-          class="check-icon"
-          width="18"
-          height="18"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2.4"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        ><path d="M5 13l4 4L19 7" /></svg>
-        <span>{{
-          logCount === 1 ? labels.logOne : labels.logMany(logCount)
-        }}</span>
+        <span class="log-btn-texture" aria-hidden="true">
+          <svg v-if="activeMode === 'vape'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21c0-4 4-5 4-9 0-3-2-4-2-7"/><path d="M13 21c0-4 4-5 4-9 0-3-2-4-2-7"/><path d="M3 21c0-2 2-3 2-5"/></svg>
+          <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="4" rx="1"/><path d="M17 11V9M20 11V9"/><path d="M6 7c1-1 1-2 0-3M10 7c1-1 1-2 0-3"/></svg>
+        </span>
+        <Transition name="log-icon-swap" mode="out-in">
+          <span v-if="showCheck" key="check" class="log-btn-content">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            ><path d="M5 13l4 4L19 7"/></svg>
+            <span>{{ t('home.log_done') }}</span>
+          </span>
+          <span v-else key="label" class="log-btn-content">{{
+            logCount === 1 ? labels.logOne : labels.logMany(logCount)
+          }}</span>
+        </Transition>
       </button>
+
+      <!-- Secondary stepper — "adjust the count". Compact so it stays
+           subordinate to the CTA. -->
+      <div class="log-stepper">
+        <button
+          class="step-btn"
+          :aria-label="'minus'"
+          @click="decrement"
+          @pointerdown="onStepHoldStart('down', $event)"
+          @pointerup="onStepHoldEnd"
+          @pointerleave="onStepHoldEnd"
+          @pointercancel="onStepHoldEnd"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14"/></svg>
+        </button>
+        <div class="step-count-wrap">
+          <div class="step-count tabular">
+            <Transition name="num-flip" mode="out-in">
+              <span :key="logCount">{{ formatNumber(logCount) }}</span>
+            </Transition>
+          </div>
+          <div class="step-count-unit">{{
+            activeMode === 'vape'
+              ? (logCount === 1 ? t('home.step_unit_puff_one') : t('home.step_unit_puff_many'))
+              : (logCount === 1 ? t('home.step_unit_cig_one') : t('home.step_unit_cig_many'))
+          }}</div>
+        </div>
+        <button
+          class="step-btn"
+          :aria-label="'plus'"
+          @click="increment"
+          @pointerdown="onStepHoldStart('up', $event)"
+          @pointerup="onStepHoldEnd"
+          @pointerleave="onStepHoldEnd"
+          @pointercancel="onStepHoldEnd"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M12 5v14"/></svg>
+        </button>
+      </div>
 
       <button v-if="hasEntries" class="undo-btn" @click="emit('undo')">
         {{ t('home.undo_last') }}
       </button>
     </div>
-
-    <!-- Custom-puffs sheet (vape only). Mounted whenever we're in vape
-         mode so the drawer transition is smooth on repeat opens. -->
-    <PuffCountSheet
-      v-if="activeMode === 'vape'"
-      v-model:open="customSheetOpen"
-      :initial="lastCustom > 0 ? lastCustom : 15"
-      @log="onCustomLog"
-    />
 
     <!-- 7-day sparkline. Dropped the section header + card chrome —
          the tiny caption below the strip identifies it, and losing
@@ -338,45 +382,109 @@
       <div class="chart-caption">{{ t('home.last_7_days') }}</div>
     </div>
 
-    <!-- Insight strip: horizontal-scroll chips. Replaces the old
-         2-column card grid so at-a-glance stats live on one row
-         instead of eating half a screen of vertical space. Users
-         who care about a specific number can flick sideways; the
-         page above the fold stays lighter. -->
-    <div v-reveal class="insight-strip" data-onboard="home-stats">
-      <div class="insight-card">
-        <div class="insight-label">{{ labels.dailyAvg }}</div>
-        <div class="insight-value tabular">{{
-          formatNumber(activeMode === 'vape' ? (avgPuffsPerSession ?? 0) : dailyAvg)
-        }}</div>
-      </div>
-      <div class="insight-card">
-        <div class="insight-label">{{ labels.totalLogged }}</div>
-        <div class="insight-value tabular">{{ formatNumber(totalSmoked) }}</div>
-      </div>
-      <div class="insight-card">
-        <div class="insight-label">{{ t('home.days_tracked') }}</div>
-        <div class="insight-value tabular">{{ formatNumber(totalDays) }}</div>
-      </div>
-      <div class="insight-card">
-        <div class="insight-label">{{ labels.bestDay }}</div>
-        <div class="insight-value tabular">{{ formatNumber(bestDay) }}</div>
-      </div>
-      <div
+    <!-- Insight grid: colorful 2-column tile grid built from the shared
+         <StatsCard> component so every stats surface across the app
+         has the same DNA. Money tile spans full width when present. -->
+    <div v-reveal class="insight-grid" data-onboard="home-stats">
+      <StatsCard
+        tint="peach"
+        :label="labels.dailyAvg"
+        :value="formatNumber(activeMode === 'vape' ? (avgPuffsPerSession ?? 0) : dailyAvg)"
+        :sub="activeMode === 'vape' ? t('home.stat_sub_avg_puffs') : t('home.stat_sub_avg_cigs')"
+      >
+        <template #icon>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M7 15l3.5-3.5 3 3L21 6"/><path d="M17 6h4v4"/></svg>
+        </template>
+        <template #flourish>
+          <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 82 Q30 62 48 74 T96 56"/>
+            <circle cx="96" cy="56" r="3" fill="currentColor" stroke="none"/>
+          </svg>
+        </template>
+      </StatsCard>
+
+      <StatsCard
+        tint="lavender"
+        :label="labels.totalLogged"
+        :value="formatNumber(totalSmoked)"
+        :sub="t('home.stat_sub_since_start')"
+      >
+        <template #icon>
+          <template v-if="activeMode === 'vape'">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21c0-4 4-5 4-9 0-3-2-4-2-7"/><path d="M13 21c0-4 4-5 4-9 0-3-2-4-2-7"/><path d="M3 21c0-2 2-3 2-5"/></svg>
+          </template>
+          <template v-else>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="4" rx="1"/><path d="M17 11V9M20 11V9"/><path d="M6 7c1-1 1-2 0-3M10 7c1-1 1-2 0-3"/></svg>
+          </template>
+        </template>
+        <template #flourish>
+          <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="86" cy="46" r="20"/>
+            <circle cx="86" cy="46" r="10"/>
+          </svg>
+        </template>
+      </StatsCard>
+
+      <StatsCard
+        tint="mint"
+        :label="t('home.days_tracked')"
+        :value="formatNumber(totalDays)"
+        :sub="t('home.stat_sub_days')"
+      >
+        <template #icon>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 3v4M16 3v4"/></svg>
+        </template>
+        <template #flourish>
+          <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="66" y="30" width="34" height="34" rx="4"/>
+            <path d="M66 42 L100 42"/>
+            <path d="M74 30 V26 M92 30 V26"/>
+          </svg>
+        </template>
+      </StatsCard>
+
+      <StatsCard
+        tint="sun"
+        :label="labels.bestDay"
+        :value="formatNumber(bestDay)"
+        :sub="t('home.stat_sub_best_day')"
+      >
+        <template #icon>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M17 4h3v3a5 5 0 0 1-5 5"/><path d="M7 4H4v3a5 5 0 0 0 5 5"/><path d="M7 4h10v4a5 5 0 0 1-10 0V4z"/></svg>
+        </template>
+        <template #flourish>
+          <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M74 24 l6 12 12 2 -8 8 2 12 -12 -6 -12 6 2 -12 -8 -8 12 -2 z"/>
+          </svg>
+        </template>
+      </StatsCard>
+
+      <StatsCard
         v-if="moneyMode != null"
-        class="insight-card insight-money"
+        tint="mint"
+        wide
+        :label="moneyLabel"
+        :value="formatMoney(moneyAmount, currency)"
+        :sub="moneyMode === 'saved' ? t('home.stat_sub_money_saved') : t('home.stat_sub_money_spent')"
         :class="moneyMode === 'saved' ? 'is-saved' : ''"
       >
-        <div class="insight-label">{{ moneyLabel }}</div>
-        <div class="insight-value tabular">{{ formatMoney(moneyAmount, currency) }}</div>
-      </div>
+        <template #icon>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z"/><path d="M4 10h16"/><circle cx="16" cy="14" r="1.5"/></svg>
+        </template>
+        <template #flourish>
+          <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="86" cy="50" r="22"/>
+            <path d="M86 40 v20 M80 46 h12 M80 54 h12"/>
+          </svg>
+        </template>
+      </StatsCard>
     </div>
 
-    <!-- Health milestones — collapsed by default. Only the "Next: X
-         in Y" summary is visible without a tap. The full progress
-         list was a big card that dominated the fold once a user
-         had scrolled once; hiding it behind a disclosure keeps the
-         top of the screen focused on today's log. -->
+    <!-- Body-recovery milestones. Same tinted stats-card language as
+         the insight grid so the "how is my body doing?" view sits
+         visually alongside the daily numbers. Each milestone tile
+         carries the emoji + label + big % + animated fill; the fill
+         animation stagger-drops in when the section opens. -->
     <section
       v-if="hasEntries"
       v-reveal
@@ -390,6 +498,12 @@
         :aria-expanded="healthOpen"
         @click="healthOpen = !healthOpen"
       >
+        <span class="health-toggle-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 21s-7-4.5-7-11a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 6.5-7 11-7 11z"/>
+            <path d="M9 12h2l1-2 1 4 1-2h2"/>
+          </svg>
+        </span>
         <span class="health-toggle-body">
           <span class="health-toggle-label">{{ t('home.health_section') }}</span>
           <span v-if="nextMilestone" class="health-toggle-next">
@@ -414,26 +528,56 @@
           stroke-linejoin="round"
         ><polyline points="6 9 12 15 18 9"/></svg>
       </button>
-      <div v-if="healthOpen" class="milestones-grid">
+      <div v-if="healthOpen" class="milestone-grid">
         <div
-          v-for="m in milestones"
+          v-for="(m, i) in milestones"
           :key="m.key"
-          class="milestone"
-          :class="{ reached: m.reached }"
+          class="milestone-card"
+          :class="[milestoneTint(i), { reached: m.reached }]"
+          :style="{ '--i': i } as any"
         >
-          <div class="milestone-emoji">{{ m.emoji }}</div>
-          <div class="milestone-text">
-            <div class="milestone-label">{{ t(`health.${m.key}.label`) }}</div>
-            <div class="milestone-progress-row">
-              <div class="milestone-bar">
-                <div
-                  class="milestone-bar-fill"
-                  :style="{ width: Math.round(m.progress * 100) + '%' }"
-                />
-              </div>
-              <div class="milestone-pct tabular">
-                {{ formatNumber(Math.round(m.progress * 100)) }}%
-              </div>
+          <span class="milestone-flourish" aria-hidden="true">
+            <svg viewBox="0 0 120 120" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="88" cy="42" r="24"/>
+              <circle cx="88" cy="42" r="12"/>
+            </svg>
+          </span>
+          <div class="milestone-pill">
+            <span
+              class="milestone-emoji"
+              :class="milestoneAnim(m.key, m.reached)"
+              aria-hidden="true"
+            >{{ m.emoji }}</span>
+            <span class="milestone-label">{{ t(`health.${m.key}.label`) }}</span>
+            <svg
+              v-if="m.reached"
+              class="milestone-check"
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            ><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div class="milestone-body">
+            <div class="milestone-value tabular">
+              {{ formatNumber(Math.round(m.progress * 100)) }}<span class="milestone-pct-sign">%</span>
+            </div>
+            <div class="milestone-progress" :aria-valuenow="Math.round(m.progress * 100)" aria-valuemin="0" aria-valuemax="100" role="progressbar">
+              <div
+                class="milestone-progress-fill"
+                :style="{ '--fill': Math.round(m.progress * 100) + '%' } as any"
+              />
+            </div>
+            <div class="milestone-sub">
+              {{
+                m.reached
+                  ? t('home.milestone_reached')
+                  : t('home.milestone_in', { time: formatRemaining(m.remainingMs) })
+              }}
             </div>
           </div>
         </div>
@@ -455,7 +599,7 @@ import { formatDuration } from '../composables/useStats'
 import Confetti from './Confetti.vue'
 import ModeToggle from './ModeToggle.vue'
 import ConsumableRing from './ConsumableRing.vue'
-import PuffCountSheet from './PuffCountSheet.vue'
+import StatsCard from './StatsCard.vue'
 import { useConfirm } from '../composables/useConfirm'
 import type { ConsumableKind, DayBucket, EntryType } from '../types'
 
@@ -512,9 +656,13 @@ const labels = computed(() => {
   return {
     todayCounter: vape ? t('home.puffs_today') : t('home.cigarettes_today'),
     sinceLast: vape ? t('home.since_last_puff') : t('home.since_last'),
-    logOne: vape ? t('home.log_one_puff') : t('home.log_one'),
+    // Vape button is always "Log session" — the stepper carries the
+    // puff count, and one tap = one session regardless of how many
+    // puffs were in it. Cigarette keeps the count-in-label pattern
+    // because each stick is discrete.
+    logOne: vape ? t('home.log_session') : t('home.log_one'),
     logMany: (n: number) =>
-      vape ? t('home.log_many_puffs', { n }) : t('home.log_many', { n }),
+      vape ? t('home.log_session') : t('home.log_many', { n }),
     dailyAvg: vape ? t('home.daily_avg_puffs') : t('home.daily_avg'),
     totalLogged: vape ? t('home.total_logged_puffs') : t('home.total_logged'),
     bestDay: vape ? t('home.best_day_puffs') : t('home.best_day'),
@@ -526,7 +674,22 @@ const modeOptions = computed(() => [
   { value: 'vape' as EntryType, label: t('home.mode_vape'), emoji: '💨' },
 ])
 
-const logCount = ref(1)
+// A "quick log" default per mode: cigarette = 1 (each stick is
+// discrete), vape = 5 puffs (a typical short session — user can bump
+// the count up for a longer sitting). The stepper starts at this
+// value on load and after each log, so tapping Log twice in a row
+// logs 5 + 5 in vape mode.
+const DEFAULT_LOG_COUNT: Record<EntryType, number> = {
+  cigarette: 1,
+  vape: 5,
+}
+const logCount = ref(DEFAULT_LOG_COUNT[props.activeMode])
+watch(
+  () => props.activeMode,
+  (m) => {
+    logCount.value = DEFAULT_LOG_COUNT[m]
+  }
+)
 const isPulsing = ref(false)
 const showCheck = ref(false)
 const confettiTrigger = ref(0)
@@ -535,31 +698,6 @@ const confettiTrigger = ref(0)
 // see progress.
 const healthOpen = ref(false)
 
-// Vape session presets. Sizes tuned to the three coarse ways people
-// actually vape: a "just needed a hit" moment (~5), a normal sitting
-// (~15), and the sustained watch-a-movie-with-a-vape session (~30).
-// Labels come from i18n; values are the puff counts we log on tap.
-const vapePresets = computed(() => [
-  { value: 5, label: t('home.preset_quick_label') },
-  { value: 15, label: t('home.preset_session_label') },
-  { value: 30, label: t('home.preset_long_label') },
-])
-const customSheetOpen = ref(false)
-const lastCustom = ref<number>(0)
-
-function onPresetTap(count: number): void {
-  emit('log', count)
-  isPulsing.value = true
-  showCheck.value = true
-  setTimeout(() => (isPulsing.value = false), 500)
-  setTimeout(() => (showCheck.value = false), 700)
-}
-function onCustomLog(count: number): void {
-  lastCustom.value = count
-  emit('log', count)
-  isPulsing.value = true
-  setTimeout(() => (isPulsing.value = false), 500)
-}
 async function onStartNewPod(): Promise<void> {
   // Confirm copy varies per consumable — "Start a new pod?" reads
   // wrong for coil / bottle / disposable users. Falls back to the
@@ -610,6 +748,43 @@ function formatRemaining(ms: number): string {
   return formatDuration(ms)
 }
 
+// Cycle through the four card tints so the milestone grid reads as a
+// "collection" like the insight grid above. Order matches the visual
+// warmth ramp we use elsewhere (peach → lavender → mint → sun).
+const MILESTONE_TINTS = ['tint-peach', 'tint-lavender', 'tint-mint', 'tint-sun'] as const
+function milestoneTint(i: number): string {
+  return MILESTONE_TINTS[i % MILESTONE_TINTS.length]
+}
+
+// Contextual micro-animation per milestone. Each key maps to a themed
+// keyframe (heartbeat for pulse/heart, breathing for lungs, sparkle for
+// nicotine clear, etc.) so the icon chip feels alive with the meaning
+// of the milestone. Reached milestones drop to a still `anim-still`
+// state — the animation implies "still working on this", so an already-
+// achieved milestone shouldn't keep pulsing.
+const MILESTONE_ANIMS: Record<string, string> = {
+  // cigarette
+  pulse: 'anim-beat',
+  co: 'anim-breathe',
+  taste_smell: 'anim-bob',
+  circulation: 'anim-beat',
+  lungs: 'anim-breathe',
+  heart: 'anim-beat',
+  stroke: 'anim-shimmer',
+  // vape
+  vape_pulse: 'anim-beat',
+  vape_nicotine_half: 'anim-flip',
+  vape_cravings_peak: 'anim-spin',
+  vape_nicotine_clear: 'anim-sparkle',
+  vape_taste_throat: 'anim-bob',
+  vape_oral: 'anim-shine',
+  vape_lung: 'anim-breathe',
+}
+function milestoneAnim(key: string, reached: boolean): string {
+  if (reached) return 'anim-still'
+  return MILESTONE_ANIMS[key] ?? 'anim-breathe'
+}
+
 // Live stopwatch since the last logged cigarette. Ticks every second
 // while the component is mounted; the computed gates display so we
 // render nothing before the first log.
@@ -620,6 +795,7 @@ onMounted(() => {
 })
 onUnmounted(() => {
   if (nowTimer) clearInterval(nowTimer)
+  onStepHoldEnd()
 })
 
 interface StopwatchParts {
@@ -685,19 +861,90 @@ const stopwatchParts = computed<StopwatchParts | null>(() => {
 // Progress ring fills relative to either the quit-plan target (if any)
 // or the daily average baseline. When today exceeds the target the ring
 // is fully drawn — we don't over-fill, just lock at 100%.
-const RING_R = 52
+const RING_R = 102
 const ringCircumference = 2 * Math.PI * RING_R
-const ringOffset = computed(() => {
+const ringFilled = computed(() => {
   const baseline = props.quitTodayTarget ?? Math.max(props.dailyAvg, 1)
-  const filled = Math.min(1, props.todayCount / Math.max(1, baseline))
-  return ringCircumference * (1 - filled)
+  return Math.min(1, props.todayCount / Math.max(1, baseline))
+})
+const ringOffset = computed(() => ringCircumference * (1 - ringFilled.value))
+const ringAngleDeg = computed(() => ringFilled.value * 360)
+// Status drives which gradient the ring wears: green when comfortably
+// under baseline, warm when approaching, warning red when exceeding.
+// Reads at a glance without asking the user to parse a number.
+const ringStatus = computed<'ok' | 'warning' | 'over'>(() => {
+  const baseline = props.quitTodayTarget ?? Math.max(props.dailyAvg, 1)
+  if (props.todayCount > baseline) return 'over'
+  if (props.todayCount >= baseline * 0.8) return 'warning'
+  return 'ok'
+})
+// Small chip under the counter — either "8 / 15 target" from an active
+// quit plan or "vs 12 avg" against the daily average, depending on
+// what the user has configured.
+const ringTargetLabel = computed<string | null>(() => {
+  if (props.quitTodayTarget != null) {
+    return t('home.ring_target_chip', {
+      count: formatNumber(props.todayCount),
+      target: formatNumber(props.quitTodayTarget),
+    })
+  }
+  if (props.dailyAvg > 0) {
+    return t('home.ring_avg_chip', { avg: formatNumber(props.dailyAvg) })
+  }
+  return null
 })
 
+const LOG_COUNT_MAX = 99
+
 function increment(): void {
-  if (logCount.value < 10) logCount.value++
+  if (logCount.value < LOG_COUNT_MAX) logCount.value++
 }
 function decrement(): void {
   if (logCount.value > 1) logCount.value--
+}
+
+// Long-press acceleration on the +/− buttons. Same behaviour in both
+// modes (unified UX), but the fast path matters most for vape mode
+// where a session can be 30+ puffs — tap-and-hold instead of 30 taps.
+// Tiers: after 400ms hold, step by 1 every 70ms. After 1.4s total,
+// step by 5. Cancelled on pointerup / leave / cancel.
+let holdTimer: ReturnType<typeof setTimeout> | null = null
+let repeatTimer: ReturnType<typeof setInterval> | null = null
+let boostTimer: ReturnType<typeof setTimeout> | null = null
+
+function stepBy(direction: 'up' | 'down', n: number): void {
+  const next =
+    direction === 'up' ? logCount.value + n : logCount.value - n
+  logCount.value = Math.max(1, Math.min(LOG_COUNT_MAX, next))
+}
+
+function onStepHoldStart(direction: 'up' | 'down', ev: PointerEvent): void {
+  // Only respond to the primary pointer — right-click / two-finger
+  // shouldn't kick off a repeat.
+  if (ev.button !== 0 && ev.pointerType === 'mouse') return
+  onStepHoldEnd()
+  holdTimer = setTimeout(() => {
+    let step = 1
+    repeatTimer = setInterval(() => stepBy(direction, step), 70)
+    boostTimer = setTimeout(() => {
+      step = 5
+    }, 1000)
+  }, 400)
+}
+
+function onStepHoldEnd(): void {
+  if (holdTimer) {
+    clearTimeout(holdTimer)
+    holdTimer = null
+  }
+  if (repeatTimer) {
+    clearInterval(repeatTimer)
+    repeatTimer = null
+  }
+  if (boostTimer) {
+    clearTimeout(boostTimer)
+    boostTimer = null
+  }
 }
 
 function handleLog(): void {
@@ -706,7 +953,7 @@ function handleLog(): void {
   showCheck.value = true
   setTimeout(() => (isPulsing.value = false), 500)
   setTimeout(() => (showCheck.value = false), 700)
-  logCount.value = 1
+  logCount.value = DEFAULT_LOG_COUNT[props.activeMode]
 }
 
 // Confetti on smoke-free milestones (1 / 7 / 14 / 30 / 100 days).
@@ -846,25 +1093,79 @@ async function onShare(): Promise<void> {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  margin: 6px 0;
+  gap: 14px;
+  margin: 8px 0;
 }
 .ring-wrap {
   position: relative;
-  width: 220px;
+  width: 260px;
   aspect-ratio: 1;
+  /* Ring color tokens — swap via .ring-ok/.ring-warning/.ring-over
+     so the fill hue matches whether the user is under, near, or over
+     their baseline / quit target. */
+  --ring-grad-from: var(--brand-grad-from);
+  --ring-grad-to: var(--brand-grad-to);
+  --ring-glow: rgba(255, 122, 61, 0.32);
+}
+.ring-wrap.ring-ok {
+  --ring-grad-from: #22c55e;
+  --ring-grad-to: #4ade80;
+  --ring-glow: rgba(34, 197, 94, 0.28);
+}
+.ring-wrap.ring-warning {
+  --ring-grad-from: var(--brand-grad-from);
+  --ring-grad-to: var(--brand-grad-to);
+  --ring-glow: rgba(255, 122, 61, 0.32);
+}
+.ring-wrap.ring-over {
+  --ring-grad-from: #ef4444;
+  --ring-grad-to: #fb7185;
+  --ring-glow: rgba(239, 68, 68, 0.32);
 }
 .ring-wrap.pulsing {
-  animation: pop 0.45s ease;
+  animation: ringPop 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes ringPop {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.03); }
+  100% { transform: scale(1); }
 }
 .ring {
   width: 100%;
   height: 100%;
   display: block;
+  overflow: visible;
+}
+.ring-halo {
+  animation: ringHaloBreathe 4s ease-in-out infinite;
+  transform-origin: 120px 120px;
+}
+@keyframes ringHaloBreathe {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.03); opacity: 1; }
+}
+.ring-ticks {
+  opacity: 0.5;
 }
 .ring-fg {
-  transition: stroke-dashoffset 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-  filter: drop-shadow(0 0 6px rgba(255, 122, 61, 0.25));
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.2, 0.8, 0.2, 1),
+    stroke 0.4s ease;
+  filter: drop-shadow(0 4px 12px var(--ring-glow));
+}
+.ring-cursor {
+  fill: var(--ring-grad-to);
+  stroke: var(--card);
+  stroke-width: 3;
+  filter: drop-shadow(0 2px 6px var(--ring-glow));
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.ring-wrap.pulsing .ring-cursor {
+  animation: ringCursorPulse 0.8s ease-out;
+}
+@keyframes ringCursorPulse {
+  0% { r: 9; }
+  40% { r: 13; }
+  100% { r: 9; }
 }
 .ring-content {
   position: absolute;
@@ -873,16 +1174,18 @@ async function onShare(): Promise<void> {
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 4px;
+  padding: 0 24px;
 }
 .counter-number {
   /* Override the global .tabular mono font so the counter follows
      the app's language font (Inter for en, Cairo for ar) — the
      tabular-nums variant from .tabular still keeps digits aligned. */
   font-family: inherit;
-  font-size: 64px;
-  font-weight: 700;
+  font-size: 76px;
+  font-weight: 800;
   line-height: 1;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.045em;
   color: var(--text);
   /* Establish a positioning context so the in/out spans of the
      <Transition> can stack over each other without shifting layout
@@ -893,6 +1196,9 @@ async function onShare(): Promise<void> {
 }
 .counter-number > span {
   display: inline-block;
+}
+.ring-wrap.ring-over .counter-number {
+  color: var(--danger);
 }
 /* Counter flip — slide + fade when the today count actually changes. */
 .num-flip-enter-active,
@@ -910,10 +1216,32 @@ async function onShare(): Promise<void> {
   transform: translateY(-14px) scale(0.92);
 }
 .counter-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted);
-  margin-top: 6px;
-  font-weight: 500;
+  margin-top: 2px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.counter-target {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ring-grad-to) 12%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--ring-grad-to) 28%, transparent);
+  color: var(--ring-grad-from);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  animation: chipFadeIn 0.3s ease-out both;
+}
+@keyframes chipFadeIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .gap-stopwatch {
   display: flex;
@@ -1036,50 +1364,221 @@ async function onShare(): Promise<void> {
 }
 
 /* Log card */
+/* Log card — bare container. No tint, no border, no flourish. Only
+   padding and a vertical gap to group the CTA, the adjust strip, and
+   the undo footer. This forces the log button to carry the fold's
+   visual weight; the card recedes. */
 .log-card {
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 12px;
+  padding: 0;
+  --tile-fg: var(--brand);
 }
+.log-card.log-card-vape {
+  --tile-fg: #14b8a6;
+}
+
+/* Adjust strip — a single compact horizontal pill: [−] [count · unit] [+].
+   Lives on a soft neutral surface (not the card's tint) so it whispers
+   "you can tweak this" without competing with the primary CTA above.
+   Wraps the entire row in one bordered pill for a tight, tidy look. */
 .log-stepper {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 18px;
-  padding: 4px 0;
+  align-self: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface-tint);
+  border: 1px solid var(--hairline);
 }
 .step-btn {
-  width: 44px;
-  height: 44px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   border: none;
-  background: var(--btn-ghost-bg);
+  background: transparent;
+  color: var(--tile-fg);
   font-family: inherit;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text);
-  transition: transform 0.1s ease, background 0.15s ease;
+  transition:
+    transform 0.1s ease,
+    background 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+}
+.step-btn:hover {
+  background: color-mix(in srgb, var(--tile-fg) 14%, var(--card));
 }
 .step-btn:active {
-  transform: scale(0.92);
-  background: var(--surface-tint);
+  transform: scale(0.9);
+  background: color-mix(in srgb, var(--tile-fg) 22%, var(--card));
+}
+.step-count-wrap {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 0 10px;
+  min-width: 74px;
+  justify-content: center;
 }
 .step-count {
-  font-size: 28px;
-  font-weight: 700;
-  min-width: 36px;
+  font-size: 18px;
+  font-weight: 800;
   text-align: center;
   color: var(--text);
+  letter-spacing: -0.01em;
+  line-height: 1;
+  position: relative;
+  display: inline-block;
+  min-width: 1ch;
 }
+.step-count > span { display: inline-block; }
+.step-count-unit {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  line-height: 1;
+}
+/* Log button — the simplest thing that works. Solid mode color,
+   centered label, one soft shadow. On log the whole label swaps to
+   "✓ Logged" for a moment, so the button carries its own
+   confirmation without needing a decorative icon slot. */
 .log-btn {
-  font-size: 16px;
-  padding: 16px;
+  position: relative;
+  z-index: 1;
+  --lb-bg: var(--brand);
+  --lb-glow: rgba(255, 122, 61, 0.22);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px 24px;
+  min-height: 60px;
+  border: none;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+  color: #fff;
+  background: var(--lb-bg);
+  box-shadow: 0 6px 16px var(--lb-glow);
+  transition:
+    transform 0.12s ease,
+    box-shadow 0.18s ease,
+    filter 0.18s ease;
+  overflow: hidden;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
 }
-.check-icon {
-  animation: pop 0.4s ease;
+
+/* Mode-aware icon sitting in the background at low opacity — reads
+   as a subtle brand texture rather than a UI element. Sized big and
+   tilted so it feels like a bold watermark; extends past the pill's
+   edges (clipped by overflow:hidden). */
+.log-btn-texture {
+  position: absolute;
+  right: -32px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-14deg);
+  width: 160px;
+  height: 160px;
+  color: #fff;
+  opacity: 0.14;
+  pointer-events: none;
+  z-index: 0;
+}
+.log-btn-texture svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.log-btn > :not(.log-btn-texture) {
+  position: relative;
+  z-index: 1;
+}
+.log-btn.log-btn-vape {
+  --lb-bg: #14b8a6;
+  --lb-glow: rgba(20, 184, 166, 0.22);
+}
+.log-btn:hover {
+  filter: brightness(1.05);
+  box-shadow: 0 8px 20px var(--lb-glow);
+}
+.log-btn:active {
+  transform: scale(0.985);
+  box-shadow: 0 4px 10px var(--lb-glow);
+}
+.log-btn-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+.log-btn-content svg { display: block; }
+
+/* Confirm pulse — a small, quick scale bump on log. Signals success
+   without wiggling the whole button around. */
+.log-btn.is-check {
+  animation: logBtnConfirm 0.32s ease-out;
+}
+@keyframes logBtnConfirm {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+/* Icon/arrow cross-fade during the log confirmation. */
+.log-icon-swap-enter-active,
+.log-icon-swap-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.log-icon-swap-enter-from,
+.log-icon-swap-leave-to {
+  opacity: 0;
+  transform: scale(0.7);
+}
+
+/* Undo lives inside the tinted card too — subtle text link so it
+   doesn't compete with the primary CTA. */
+.undo-btn {
+  position: relative;
+  z-index: 1;
+}
+
+/* Number flip on the stepper count — same class name reused by the
+   ring counter. Slides + fades so the count feels alive when you
+   long-press the ± buttons. */
+.num-flip-enter-active,
+.num-flip-leave-active {
+  transition: opacity 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: opacity, transform;
+}
+.num-flip-enter-from {
+  opacity: 0;
+  transform: translateY(10px) scale(0.85);
+}
+.num-flip-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.92);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .log-btn,
+  .log-btn.is-check { animation: none; }
+  .num-flip-enter-active,
+  .num-flip-leave-active { transition: none; }
+  .num-flip-enter-from,
+  .num-flip-leave-to { opacity: 1; transform: none; }
 }
 .undo-btn {
   align-self: center;
@@ -1095,69 +1594,6 @@ async function onShare(): Promise<void> {
 }
 .undo-btn:hover {
   color: var(--text);
-}
-
-/* Vape log row — single horizontal row of number-forward pills
-   instead of the old 2×2 chip grid. Cutting to one row keeps the
-   log control roughly the same footprint as the cigarette stepper
-   below it (fair comparison across modes) and stops the log block
-   from dominating the fold. Each pill shows the puff count in a
-   big tabular numeral because that's what matters — the verb
-   ("Quick hit" etc.) is the caption underneath. */
-.log-row {
-  display: flex;
-  gap: 8px;
-  align-items: stretch;
-}
-.log-pill {
-  appearance: none;
-  border: 1.5px solid var(--hairline);
-  background: var(--card);
-  font-family: inherit;
-  cursor: pointer;
-  flex: 1;
-  min-height: 64px;
-  border-radius: 18px;
-  padding: 8px 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  color: var(--text);
-  transition: transform 0.1s ease, border-color 0.15s ease, background 0.15s ease;
-}
-.log-pill:active {
-  transform: scale(0.96);
-  background: color-mix(in srgb, #14b8a6 10%, var(--card));
-  border-color: color-mix(in srgb, #14b8a6 45%, var(--hairline));
-}
-.log-pill-num {
-  font-size: 22px;
-  font-weight: 800;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  color: #14b8a6;
-}
-.log-pill-unit {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-  letter-spacing: 0.02em;
-}
-.log-pill-more {
-  flex: 0 0 56px;
-  color: var(--muted);
-  background: var(--surface-tint);
-  border-color: transparent;
-}
-.log-pill-more:active {
-  background: color-mix(in srgb, #14b8a6 8%, var(--surface-tint));
-}
-/* Vape mode's undo lives outside the log-row (no card wrap) so it
-   needs its own margin instead of relying on card gap. */
-.undo-standalone {
-  margin-top: 6px;
 }
 
 /* Chart — stripped of card chrome so it reads as ambient data next
@@ -1232,63 +1668,27 @@ async function onShare(): Promise<void> {
   line-height: 1;
 }
 
-/* Insight strip — replaces the 2-column stat card grid. Horizontal
-   scroll keeps every metric one flick away without demanding half
-   the fold. Snap prevents landing on a card boundary. */
-.insight-strip {
-  display: flex;
-  gap: 10px;
-  overflow-x: auto;
-  scroll-snap-type: x proximity;
-  padding: 2px 0 4px;
-  margin: 0 -4px;
-  scrollbar-width: none;
+/* Insight grid layout only — the tile styling now lives in
+   <StatsCard>. Two columns; the money tile passes `wide` so it spans
+   both columns via .stats-card-wide. */
+.insight-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
-.insight-strip::-webkit-scrollbar { display: none; }
-.insight-card {
-  flex: 0 0 118px;
-  scroll-snap-align: start;
-  background: var(--card);
-  border-radius: 16px;
-  padding: 12px 14px;
-  box-shadow: var(--shadow-sm);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-.insight-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--muted);
-  line-height: 1.2;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.insight-value {
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--text);
-  line-height: 1;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-.insight-money {
-  background: color-mix(in srgb, #22c55e 8%, var(--card));
-}
-.insight-money.is-saved .insight-value {
+.insight-grid :deep(.stats-card.is-saved .stats-value) {
   color: var(--success);
 }
 
-/* Health milestones — disclosure pill by default, expands into the
-   full list when tapped. The toggle button is styled as a soft chip
-   so it doesn't compete visually with real cards. */
+/* Body-recovery section. Header collapses into a compact "next
+   milestone" pill; expanding reveals a grid of tinted milestone
+   tiles that share the DNA of the home insight grid — same border
+   radius, same tint tokens, same pill header — with an animated
+   progress fill that stagger-drops in on open. */
 .health-section {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 .health-toggle {
   appearance: none;
@@ -1296,11 +1696,11 @@ async function onShare(): Promise<void> {
   background: var(--card);
   font-family: inherit;
   cursor: pointer;
-  padding: 10px 14px;
-  border-radius: 14px;
+  padding: 12px 14px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   text-align: start;
   color: var(--text);
   transition: background 0.15s ease, border-color 0.15s ease;
@@ -1308,9 +1708,20 @@ async function onShare(): Promise<void> {
 .health-toggle:active {
   background: var(--surface-tint);
 }
-.health-section.is-expanded .health-toggle {
-  border-bottom-left-radius: 4px;
-  border-bottom-right-radius: 4px;
+.health-toggle-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.health-toggle-icon svg {
+  width: 18px;
+  height: 18px;
 }
 .health-toggle-body {
   display: flex;
@@ -1338,73 +1749,319 @@ async function onShare(): Promise<void> {
 .health-chev.is-open {
   transform: rotate(180deg);
 }
-.milestones-grid {
+
+/* Milestone grid — 2-column, matches insight-grid gap. */
+.milestone-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.milestone-card {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  padding: 14px 16px 16px;
+  border-radius: 20px;
+  border: 1px solid var(--hairline);
+  background: var(--card);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.15s ease, opacity 0.25s ease;
+  opacity: 0.7;
+  animation: milestoneRise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+.milestone-card.reached {
+  opacity: 1;
+}
+.milestone-card:active {
+  transform: scale(0.98);
+}
+@keyframes milestoneRise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 0.7;
+    transform: translateY(0);
+  }
+}
+.milestone-card.reached { animation-name: milestoneRiseReached; }
+@keyframes milestoneRiseReached {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Tint palette — reuses the design-system tokens so dark mode swaps
+   variants automatically. */
+.milestone-card.tint-peach {
+  background: var(--tint-peach-bg);
+  border-color: transparent;
+  --tile-fg: var(--tint-peach-fg);
+}
+.milestone-card.tint-lavender {
+  background: var(--tint-lavender-bg);
+  border-color: transparent;
+  --tile-fg: var(--tint-lavender-fg);
+}
+.milestone-card.tint-mint {
+  background: var(--tint-mint-bg);
+  border-color: transparent;
+  --tile-fg: var(--tint-mint-fg);
+}
+.milestone-card.tint-sun {
+  background: var(--tint-sun-bg);
+  border-color: transparent;
+  --tile-fg: var(--tint-sun-fg);
+}
+
+.milestone-flourish {
+  position: absolute;
+  right: -22px;
+  bottom: -22px;
+  width: 120px;
+  height: 120px;
+  color: var(--tile-fg, var(--brand));
+  opacity: 0.14;
+  z-index: 0;
+  pointer-events: none;
+}
+.milestone-flourish svg {
+  width: 100%;
+  height: 100%;
+}
+
+.milestone-pill {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px 5px 5px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card) 72%, transparent);
+  align-self: flex-start;
+  max-width: 100%;
+  backdrop-filter: blur(6px);
+}
+.milestone-emoji {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--tile-fg, var(--brand)) 16%, transparent);
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+/* Contextual micro-animations. Each keyframe lasts long enough (2–4s)
+   to be ambient rather than distracting — a subtle "this system is
+   still working on it" signal. Reached tiles get `.anim-still` and
+   stop moving. */
+.milestone-emoji.anim-beat {
+  animation: mAnimBeat 1.4s ease-in-out infinite;
+}
+@keyframes mAnimBeat {
+  0%, 100% { transform: scale(1); }
+  20% { transform: scale(1.16); }
+  40% { transform: scale(1); }
+  60% { transform: scale(1.12); }
+  80% { transform: scale(1); }
+}
+.milestone-emoji.anim-breathe {
+  animation: mAnimBreathe 4s ease-in-out infinite;
+}
+@keyframes mAnimBreathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.14); }
+}
+.milestone-emoji.anim-bob {
+  animation: mAnimBob 2.4s ease-in-out infinite;
+}
+@keyframes mAnimBob {
+  0%, 100% { transform: rotate(-6deg); }
+  50% { transform: rotate(6deg); }
+}
+.milestone-emoji.anim-spin {
+  animation: mAnimSpin 3.6s linear infinite;
+}
+@keyframes mAnimSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.milestone-emoji.anim-flip {
+  animation: mAnimFlip 4s cubic-bezier(0.6, 0.05, 0.4, 0.95) infinite;
+}
+@keyframes mAnimFlip {
+  0% { transform: rotate(0deg); }
+  45%, 55% { transform: rotate(180deg); }
+  100% { transform: rotate(360deg); }
+}
+.milestone-emoji.anim-sparkle {
+  animation: mAnimSparkle 2.2s ease-in-out infinite;
+}
+@keyframes mAnimSparkle {
+  0%, 100% { transform: scale(1) rotate(0deg); opacity: 1; }
+  25% { transform: scale(1.2) rotate(10deg); opacity: 0.75; }
+  50% { transform: scale(1) rotate(0deg); opacity: 1; }
+  75% { transform: scale(1.15) rotate(-10deg); opacity: 0.75; }
+}
+.milestone-emoji.anim-shine {
+  animation: mAnimShine 3s ease-in-out infinite;
+}
+@keyframes mAnimShine {
+  0%, 100% { opacity: 1; filter: brightness(1); }
+  50% { opacity: 0.7; filter: brightness(1.35); }
+}
+.milestone-emoji.anim-shimmer {
+  animation: mAnimShimmer 3s ease-in-out infinite;
+}
+@keyframes mAnimShimmer {
+  0%, 100% { transform: scale(1); filter: brightness(1) hue-rotate(0deg); }
+  50% { transform: scale(1.08); filter: brightness(1.25) hue-rotate(15deg); }
+}
+.milestone-emoji.anim-still {
+  animation: none;
+  transform: scale(1);
+}
+/* Respect prefers-reduced-motion — stop all ambient animations. */
+@media (prefers-reduced-motion: reduce) {
+  .milestone-emoji {
+    animation: none !important;
+    transform: scale(1) !important;
+  }
+}
+.milestone-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.milestone-check {
+  color: var(--success);
+  flex-shrink: 0;
+  animation: milestonePop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+@keyframes milestonePop {
+  from { transform: scale(0.3); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.milestone-body {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: var(--card);
-  border-radius: var(--radius-card);
-  padding: 14px;
-  box-shadow: var(--shadow-sm);
-}
-.milestone {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 4px;
-  opacity: 0.55;
-  transition: opacity 0.2s ease;
-}
-.milestone.reached {
-  opacity: 1;
-}
-.milestone-emoji {
-  font-size: 22px;
-  width: 32px;
-  text-align: center;
-  flex-shrink: 0;
-}
-.milestone-text {
-  flex: 1;
   min-width: 0;
 }
-.milestone-label {
-  font-size: 13px;
-  font-weight: 600;
+.milestone-value {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
   color: var(--text);
-  margin-bottom: 6px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
 }
-.milestone-progress-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.milestone-bar {
-  flex: 1;
-  height: 6px;
-  background: var(--surface-tint);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.milestone-bar-fill {
-  height: 100%;
-  background: linear-gradient(
-    90deg,
-    var(--brand-grad-from),
-    var(--brand-grad-to)
-  );
-  transition: width 0.4s ease;
-}
-.milestone.reached .milestone-bar-fill {
-  background: var(--success);
-}
-.milestone-pct {
-  font-size: 10px;
+.milestone-pct-sign {
+  font-size: 18px;
   font-weight: 700;
   color: var(--muted);
-  min-width: 28px;
-  text-align: end;
-  letter-spacing: 0.02em;
+  letter-spacing: 0;
+  margin-inline-start: 2px;
+}
+.milestone-card.reached .milestone-value {
+  color: var(--success);
+}
+
+.milestone-progress {
+  position: relative;
+  height: 8px;
+  background: color-mix(in srgb, var(--tile-fg, var(--brand)) 14%, transparent);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.milestone-progress-fill {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--tile-fg, var(--brand)) 100%, transparent),
+    color-mix(in srgb, var(--tile-fg, var(--brand)) 65%, transparent)
+  );
+  width: 0;
+  animation: milestoneFill 1.1s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms + 120ms);
+}
+@keyframes milestoneFill {
+  from { width: 0; }
+  to { width: var(--fill, 0%); }
+}
+.milestone-card.reached .milestone-progress-fill {
+  background: linear-gradient(
+    90deg,
+    var(--success),
+    color-mix(in srgb, var(--success) 65%, transparent)
+  );
+}
+/* Subtle shimmer on active (not-yet-reached) progress. Fires once per
+   render so it draws the eye when the section first opens. */
+.milestone-progress-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.4),
+    transparent
+  );
+  transform: translateX(-100%);
+  animation: milestoneShimmer 1.6s ease-out 0.9s both;
+}
+.milestone-card.reached .milestone-progress-fill::after {
+  animation: none;
+  display: none;
+}
+@keyframes milestoneShimmer {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(200%); }
+}
+
+.milestone-sub {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.milestone-card.reached .milestone-sub {
+  color: var(--success);
 }
 
 /* Header row — mode toggle stretches, action icons cluster on the
