@@ -78,6 +78,7 @@
         :total-days="totalDays"
         :best-day="bestDay"
         :longest-gap-ms="gapStats.longest"
+        :last-gap-ms="lastGapMs"
         :has-entries="modeHasEntries"
         :quit-today-target="quit.todayTarget.value"
         :quit-today-status="quit.todayStatus.value"
@@ -422,6 +423,7 @@ const {
   maxLast7,
   bestDay,
   gapStats,
+  lastGapMs,
   dayReports,
   hourlyDistribution,
   weekdayDistribution,

@@ -56,6 +56,7 @@ const ar = {
     stopwatch_days: '{d} ي {hms}',
     stopwatch_day_unit: 'ي',
     longest_gap_label: 'الأفضل {duration}',
+    last_gap_label: 'الأخيرة {duration}',
     new_record: 'رقم قياسي جديد',
     log_one: 'سجّل سيجارة',
     log_many: 'سجّل {n} سجائر',

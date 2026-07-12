@@ -59,6 +59,7 @@ const en = {
     stopwatch_days: '{d}d {hms}',
     stopwatch_day_unit: 'd',
     longest_gap_label: 'Best {duration}',
+    last_gap_label: 'Last {duration}',
     new_record: 'New record in progress',
     log_one: 'Log 1 cigarette',
     log_many: 'Log {n} cigarettes',

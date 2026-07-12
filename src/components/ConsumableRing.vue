@@ -151,19 +151,70 @@
             v-for="(digit, i) in stopwatchParts.days"
             :key="'d' + i"
             class="sw-cell"
-          >{{ digit }}</span>
+          >
+            <Transition name="tick-flip">
+              <span :key="digit" class="sw-seg">{{ digit }}</span>
+            </Transition>
+          </span>
           <span class="sw-unit">{{ t('home.stopwatch_day_unit') }}</span>
         </template>
-        <span class="sw-cell">{{ stopwatchParts.hh[0] }}</span>
-        <span class="sw-cell">{{ stopwatchParts.hh[1] }}</span>
+        <span class="sw-cell">
+          <Transition name="tick-flip">
+            <span :key="stopwatchParts.hh[0]" class="sw-seg">{{ stopwatchParts.hh[0] }}</span>
+          </Transition>
+        </span>
+        <span class="sw-cell">
+          <Transition name="tick-flip">
+            <span :key="stopwatchParts.hh[1]" class="sw-seg">{{ stopwatchParts.hh[1] }}</span>
+          </Transition>
+        </span>
         <span class="sw-sep">:</span>
-        <span class="sw-cell">{{ stopwatchParts.mm[0] }}</span>
-        <span class="sw-cell">{{ stopwatchParts.mm[1] }}</span>
+        <span class="sw-cell">
+          <Transition name="tick-flip">
+            <span :key="stopwatchParts.mm[0]" class="sw-seg">{{ stopwatchParts.mm[0] }}</span>
+          </Transition>
+        </span>
+        <span class="sw-cell">
+          <Transition name="tick-flip">
+            <span :key="stopwatchParts.mm[1]" class="sw-seg">{{ stopwatchParts.mm[1] }}</span>
+          </Transition>
+        </span>
         <span class="sw-sep">:</span>
-        <span class="sw-cell">{{ stopwatchParts.ss[0] }}</span>
-        <span class="sw-cell">{{ stopwatchParts.ss[1] }}</span>
+        <span class="sw-cell">
+          <Transition name="tick-flip">
+            <span :key="stopwatchParts.ss[0]" class="sw-seg">{{ stopwatchParts.ss[0] }}</span>
+          </Transition>
+        </span>
+        <span class="sw-cell">
+          <Transition name="tick-flip">
+            <span :key="stopwatchParts.ss[1]" class="sw-seg">{{ stopwatchParts.ss[1] }}</span>
+          </Transition>
+        </span>
       </div>
       <div class="stopwatch-label">{{ t('home.since_last_puff') }}</div>
+      <div
+        v-if="(longestGapMs ?? 0) > 0 || (lastGapMs ?? 0) > 0"
+        class="stopwatch-best"
+        :class="{ 'is-new-record': beatingBest }"
+      >
+        <span class="sw-best-icon" aria-hidden="true">{{ beatingBest ? '🏆' : '⏱' }}</span>
+        <span class="sw-best-text">
+          <template v-if="beatingBest">{{ t('home.new_record') }}</template>
+          <template v-else>
+            <span v-if="(lastGapMs ?? 0) > 0">{{
+              t('home.last_gap_label', { duration: formatDuration(lastGapMs ?? 0) })
+            }}</span>
+            <span
+              v-if="(lastGapMs ?? 0) > 0 && (longestGapMs ?? 0) > 0"
+              class="sw-best-sep"
+              aria-hidden="true"
+            >·</span>
+            <span v-if="(longestGapMs ?? 0) > 0">{{
+              t('home.longest_gap_label', { duration: formatDuration(longestGapMs ?? 0) })
+            }}</span>
+          </template>
+        </span>
+      </div>
     </div>
 
     <button
@@ -180,6 +231,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n, intlLocale, formatNumber } from '../i18n'
+import { formatDuration } from '../composables/useStats'
 import type { ConsumableKind } from '../types'
 
 interface Props {
@@ -195,6 +247,12 @@ interface Props {
    *  "since last session" stopwatch beneath the ring. Sessions are
    *  timestamp-clusters so this is equivalent to "since last session". */
   lastSmokeTime?: string
+  /** Longest historical vape-session gap in ms. Drives the personal-best
+   *  chip under the stopwatch (⏱ Best {duration} / 🏆 New record). */
+  longestGapMs?: number
+  /** Previous completed vape-session gap (ms). Shown next to the best so
+   *  the user can eyeball how the last stretch compared. 0 if none. */
+  lastGapMs?: number
 }
 
 const props = defineProps<Props>()
@@ -272,6 +330,13 @@ interface StopwatchParts {
   mm: [string, string]
   ss: [string, string]
 }
+
+const beatingBest = computed<boolean>(() => {
+  const best = props.longestGapMs ?? 0
+  if (best <= 0 || !props.lastSmokeTime) return false
+  const elapsed = now.value - new Date(props.lastSmokeTime).getTime()
+  return elapsed > best
+})
 
 const stopwatchParts = computed<StopwatchParts | null>(() => {
   if (!props.lastSmokeTime) return null
@@ -529,7 +594,7 @@ const stopwatchParts = computed<StopwatchParts | null>(() => {
 }
 .stopwatch-time {
   font-family: inherit;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--text);
@@ -541,10 +606,20 @@ const stopwatchParts = computed<StopwatchParts | null>(() => {
   direction: ltr;
   unicode-bidi: isolate;
 }
+/* One cell per digit. Relative positioning lets the in/out spans of
+   each digit's <Transition> stack without budging neighbors; `1ch`
+   width keeps the cell from reflowing while a digit fades. */
 .sw-cell {
+  position: relative;
   display: inline-block;
   width: 1ch;
+  height: 1em;
   text-align: center;
+}
+.sw-seg {
+  position: absolute;
+  inset: 0;
+  display: inline-block;
 }
 .sw-sep {
   padding: 0 1px;
@@ -555,10 +630,75 @@ const stopwatchParts = computed<StopwatchParts | null>(() => {
   margin-right: 6px;
   font-weight: 600;
 }
+/* Stopwatch tick — concurrent crossfade (no mode="out-in" gap). */
+.tick-flip-enter-active,
+.tick-flip-leave-active {
+  transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: opacity, transform;
+}
+.tick-flip-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.tick-flip-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tick-flip-enter-active,
+  .tick-flip-leave-active {
+    transition: none !important;
+  }
+  .tick-flip-enter-from,
+  .tick-flip-leave-to {
+    transform: none !important;
+  }
+}
 .stopwatch-label {
   font-size: 10px;
   font-weight: 500;
   color: var(--subtle);
   letter-spacing: 0.02em;
+}
+/* Personal-best line under the stopwatch. Subtle by default; flips
+   to a brand-tinted chip with a trophy when the live elapsed time
+   beats the historical best. */
+.stopwatch-best {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  background: var(--surface-tint);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.02em;
+  transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease;
+}
+.stopwatch-best.is-new-record {
+  color: #fff;
+  background: linear-gradient(
+    135deg,
+    var(--brand-grad-from),
+    var(--brand-grad-to)
+  );
+  box-shadow: 0 4px 14px rgba(255, 122, 61, 0.32);
+  animation: best-pop 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.sw-best-icon {
+  font-size: 14px;
+  line-height: 1;
+}
+.sw-best-sep {
+  display: inline-block;
+  margin: 0 6px;
+  opacity: 0.55;
+}
+@keyframes best-pop {
+  0%   { transform: scale(0.92); }
+  60%  { transform: scale(1.06); }
+  100% { transform: scale(1); }
 }
 </style>

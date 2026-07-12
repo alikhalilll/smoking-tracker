@@ -101,6 +101,8 @@
         :today-count="todayCount"
         :sessions-today="sessionsToday ?? 0"
         :last-smoke-time="lastSmokeTime"
+        :longest-gap-ms="longestGapMs"
+        :last-gap-ms="lastGapMs"
         @start-new="onStartNewPod"
       />
     </div>
@@ -245,19 +247,26 @@
         </div>
         <div class="stopwatch-label">{{ labels.sinceLast }}</div>
         <div
-          v-if="(longestGapMs ?? 0) > 0"
+          v-if="(longestGapMs ?? 0) > 0 || (lastGapMs ?? 0) > 0"
           class="stopwatch-best"
           :class="{ 'is-new-record': beatingBest }"
         >
           <span class="sw-best-icon" aria-hidden="true">{{ beatingBest ? '🏆' : '⏱' }}</span>
           <span class="sw-best-text">
-            {{
-              beatingBest
-                ? t('home.new_record')
-                : t('home.longest_gap_label', {
-                    duration: formatDuration(longestGapMs),
-                  })
-            }}
+            <template v-if="beatingBest">{{ t('home.new_record') }}</template>
+            <template v-else>
+              <span v-if="(lastGapMs ?? 0) > 0">{{
+                t('home.last_gap_label', { duration: formatDuration(lastGapMs) })
+              }}</span>
+              <span
+                v-if="(lastGapMs ?? 0) > 0 && (longestGapMs ?? 0) > 0"
+                class="sw-best-sep"
+                aria-hidden="true"
+              >·</span>
+              <span v-if="(longestGapMs ?? 0) > 0">{{
+                t('home.longest_gap_label', { duration: formatDuration(longestGapMs) })
+              }}</span>
+            </template>
           </span>
         </div>
       </div>
@@ -617,6 +626,9 @@ interface Props {
   bestDay: number
   /** Longest awake gap recorded between two logs (ms). 0 if none. */
   longestGapMs?: number
+  /** Previous completed awake gap (ms). Shown next to the best so the
+   *  user can see how their last stretch compared. 0 if none. */
+  lastGapMs?: number
   hasEntries: boolean
   quitTodayTarget?: number | null
   quitTodayStatus?: 'on-track' | 'over' | null
@@ -1252,7 +1264,7 @@ async function onShare(): Promise<void> {
 .stopwatch-time {
   /* Same override as .counter-number — follow the app font. */
   font-family: inherit;
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--text);
@@ -1350,6 +1362,11 @@ async function onShare(): Promise<void> {
 .sw-best-icon {
   font-size: 14px;
   line-height: 1;
+}
+.sw-best-sep {
+  display: inline-block;
+  margin: 0 6px;
+  opacity: 0.55;
 }
 @keyframes best-pop {
   0%   { transform: scale(0.92); }

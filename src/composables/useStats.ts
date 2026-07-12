@@ -309,6 +309,14 @@ export function useStats(data: Ref<AppData>) {
     return gaps
   })
 
+  // Most recent completed gap. Used by the home hero to display the
+  // previous gap alongside the personal best, so the user can eyeball
+  // "how did my last stretch compare to my best?" without opening stats.
+  const lastGapMs = computed<number>(() => {
+    const gaps = allGapsMs.value
+    return gaps.length > 0 ? gaps[gaps.length - 1] : 0
+  })
+
   const gapStats = computed<GapStats>(() => {
     const gaps = allGapsMs.value
     if (gaps.length === 0) {
@@ -452,6 +460,7 @@ export function useStats(data: Ref<AppData>) {
     maxLast7,
     bestDay,
     gapStats,
+    lastGapMs,
     dayReports,
     hourlyDistribution,
     weekdayDistribution,
