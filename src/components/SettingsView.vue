@@ -726,8 +726,10 @@ function isSection(s: string | null | undefined): s is SectionId {
 
 // The active sub-section is mirrored into the URL hash (so a
 // refresh / shared link lands on the same section) and into
-// localStorage (so coming back to Settings via the nav restores
-// where you were last). The hash takes precedence on first read.
+// sessionStorage (so navigating away and back to Settings within the
+// same tab restores where you were last). The hash takes precedence
+// on first read. sessionStorage — not localStorage — because "last
+// tab" is ephemeral UI state and shouldn't survive a browser restart.
 function readHashSection(): SectionId | null {
   if (typeof window === 'undefined') return null
   const raw = window.location.hash.replace(/^#\/?/, '')
@@ -739,7 +741,7 @@ function readHashSection(): SectionId | null {
 function readRememberedSection(): SectionId {
   if (typeof window === 'undefined') return 'account'
   try {
-    const raw = localStorage.getItem(SECTION_STORAGE_KEY)
+    const raw = sessionStorage.getItem(SECTION_STORAGE_KEY)
     if (isSection(raw)) return raw
   } catch {
     // ignore — privacy mode or storage disabled
@@ -763,7 +765,7 @@ const section = ref<SectionId>(initialSection)
 
 watch(section, (s) => {
   try {
-    localStorage.setItem(SECTION_STORAGE_KEY, s)
+    sessionStorage.setItem(SECTION_STORAGE_KEY, s)
   } catch {
     // ignore
   }

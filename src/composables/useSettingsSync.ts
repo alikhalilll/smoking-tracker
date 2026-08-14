@@ -12,6 +12,7 @@ import {
   applyRemoteLocale,
   type Locale,
 } from '../i18n'
+import { metaPut, META } from '../db'
 
 export type SettingsSyncStatus =
   | 'idle'
@@ -37,26 +38,28 @@ interface ServerRow {
   updated_at: string
 }
 
-/** ms-resolution timestamp of the last LOCAL settings edit on this device.
- *  Used to decide whether the server snapshot is newer than ours. */
-const LOCAL_UPDATED_KEY = 'smoking-tracker-settings-updated-at'
+/** ms-resolution timestamp of the last LOCAL settings edit on this
+ *  device. Used to decide whether the server snapshot is newer than
+ *  ours. Backed by Dexie's meta bag; hydrated at boot and cached in
+ *  memory so the sync watcher's read path stays synchronous. */
+let localUpdatedAt = 0
 
-function readLocalUpdatedAt(): number {
-  try {
-    const raw = localStorage.getItem(LOCAL_UPDATED_KEY)
-    const n = raw ? parseInt(raw, 10) : 0
-    return Number.isFinite(n) ? n : 0
-  } catch {
-    return 0
+/** Called by hydrate.ts after Dexie is open. */
+export function hydrateSettingsUpdatedAtFromDexie(
+  value: number | undefined
+): void {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    localUpdatedAt = value
   }
 }
 
+function readLocalUpdatedAt(): number {
+  return localUpdatedAt
+}
+
 function writeLocalUpdatedAt(ms: number): void {
-  try {
-    localStorage.setItem(LOCAL_UPDATED_KEY, String(ms))
-  } catch {
-    // ignore
-  }
+  localUpdatedAt = ms
+  void metaPut(META.settingsUpdatedAt, ms)
 }
 
 export interface UseSettingsSync {

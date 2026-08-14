@@ -1,4 +1,5 @@
 import { ref, type Ref } from 'vue'
+import { metaPut, META } from '../db'
 
 /**
  * Tiny haptics wrapper. Uses `navigator.vibrate` where available
@@ -18,28 +19,19 @@ const PATTERNS: Record<HapticPattern, number | number[]> = {
   warn: [40, 20, 40],
 }
 
-const STORAGE_KEY = 'smoking-tracker-haptics-enabled'
+// Module-level singleton so every consumer reads the same toggle.
+// Default true; hydrateFromDexie overrides after boot.
+const enabled: Ref<boolean> = ref(true)
 
-function load(): boolean {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw === 'false') return false
-    return true
-  } catch {
-    return true
-  }
+/** Called by hydrate.ts after Dexie is open. */
+export function hydrateHapticsFromDexie(value: boolean | undefined): void {
+  if (typeof value !== 'boolean') return
+  enabled.value = value
 }
 
 function persist(v: boolean): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, v ? 'true' : 'false')
-  } catch {
-    // ignore
-  }
+  void metaPut(META.settingsHapticsEnabled, v)
 }
-
-// Module-level singleton so every consumer reads the same toggle.
-const enabled: Ref<boolean> = ref(load())
 
 export interface UseHaptics {
   enabled: Ref<boolean>

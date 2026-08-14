@@ -1,4 +1,5 @@
 import { computed, ref, type ComputedRef, type Ref } from 'vue'
+import { metaPut, META } from '../db'
 
 export type OnboardingTabId =
   | 'home'
@@ -25,24 +26,20 @@ export interface OnboardingStep {
   children?: OnboardingStep[]
 }
 
-const STORAGE_KEY = 'st-onboarding-v1'
-
 const active = ref(false)
 const stepIndex = ref(0)
 const steps = ref<OnboardingStep[]>([])
-const completed = ref(loadCompleted())
+const completed = ref(false)
 const confettiTick = ref(0)
 const desiredSettingsSection = ref<SettingsSection | null>(null)
 
-function loadCompleted(): boolean {
-  if (typeof localStorage === 'undefined') return false
-  return localStorage.getItem(STORAGE_KEY) === '1'
+/** Called by hydrate.ts after Dexie is open. */
+export function hydrateOnboardingFromDexie(value: boolean | undefined): void {
+  if (typeof value === 'boolean') completed.value = value
 }
 
 function persistCompleted(v: boolean): void {
-  if (typeof localStorage === 'undefined') return
-  if (v) localStorage.setItem(STORAGE_KEY, '1')
-  else localStorage.removeItem(STORAGE_KEY)
+  void metaPut(META.settingsOnboardingCompleted, v)
 }
 
 function setHashView(view: OnboardingTabId): void {

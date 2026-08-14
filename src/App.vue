@@ -379,6 +379,7 @@ watch(
   { immediate: true }
 )
 
+const storage = useStorage()
 const {
   data,
   addEntries,
@@ -388,7 +389,7 @@ const {
   resetAll,
   startQuitPlan,
   abandonQuitPlan,
-} = useStorage()
+} = storage
 
 const activeMode = useActiveMode()
 
@@ -456,7 +457,7 @@ function handleStartNewPod(): void {
 
 const quit = useQuitPlan(data, byDay, dailyAvg)
 
-const sync = isSupabaseConfigured() ? useSync(data) : null
+const sync = isSupabaseConfigured() ? useSync(storage) : null
 const leaderboard = isSupabaseConfigured() ? useLeaderboard(data) : null
 // Cross-device settings (theme, language, reminder prefs). Side effects
 // only — the composable wires its own watchers and pull triggers.

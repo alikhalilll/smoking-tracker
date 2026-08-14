@@ -63,6 +63,15 @@ export interface AppData {
    * deleted instead of pulled back into local state.
    */
   quitPlanClearedAt?: number
+  /**
+   * Tombstones for entries the user removed locally. Sync uses this to
+   * explicitly delete those ids from the server — without it, `pushDiff`
+   * would have to *infer* deletions by diffing local vs server, which
+   * silently wipes rows that another device just created (the stale
+   * device thinks they're server-only and deletes them). Cleared by
+   * pushDiff after a successful delete.
+   */
+  deletedIds?: string[]
 }
 
 export type QuitIntensity = 'quick' | 'standard' | 'gradual' | 'extended'

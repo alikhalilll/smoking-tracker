@@ -4,8 +4,7 @@ import { useAuth } from './useAuth'
 import { formatLocalDate, getToday, daysBetween } from './useDate'
 import { validateDisplayName } from '../utils/nameValidator'
 import type { AppData, LeaderboardEntry } from '../types'
-
-const STORAGE_KEY = 'smoking-tracker-leaderboard-prefs'
+import { metaPut, META } from '../db'
 
 /**
  * Local-only mocks injected into the leaderboard when
@@ -28,7 +27,7 @@ const SEED_USERS: ReadonlyArray<Omit<LeaderboardEntry, 'updated_at'>> = [
   { user_id: 'mock-12', display_name: 'Noah Brooks',      smoke_free_days: 14,  reduction_pct: 18,  total_logged: 72, daily_avg: 2.0 },
 ]
 
-const SEED_ENABLED = import.meta.env.VITE_SEED_LEADERBOARD === 'true'
+const SEED_ENABLED = import.meta.env?.VITE_SEED_LEADERBOARD === 'true'
 
 function withMocks(real: LeaderboardEntry[]): LeaderboardEntry[] {
   if (!SEED_ENABLED) return real
@@ -50,30 +49,29 @@ const DEFAULT_PREFS: LeaderboardPrefs = {
   displayName: '',
 }
 
-function loadPrefs(): LeaderboardPrefs {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { ...DEFAULT_PREFS }
-    const parsed = JSON.parse(raw) as Partial<LeaderboardPrefs>
-    return {
-      optedIn: !!parsed.optedIn,
-      displayName:
-        typeof parsed.displayName === 'string' ? parsed.displayName : '',
-    }
-  } catch {
-    return { ...DEFAULT_PREFS }
+function coercePrefs(
+  parsed: Partial<LeaderboardPrefs>
+): LeaderboardPrefs {
+  return {
+    optedIn: !!parsed.optedIn,
+    displayName:
+      typeof parsed.displayName === 'string' ? parsed.displayName : '',
   }
 }
 
 function savePrefs(p: LeaderboardPrefs): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(p))
-  } catch {
-    // ignore
-  }
+  void metaPut(META.settingsLeaderboardPrefs, p)
 }
 
-const prefs = ref<LeaderboardPrefs>(loadPrefs())
+const prefs = ref<LeaderboardPrefs>({ ...DEFAULT_PREFS })
+
+/** Called by hydrate.ts after Dexie is open. */
+export function hydrateLeaderboardPrefsFromDexie(
+  value: Partial<LeaderboardPrefs> | undefined
+): void {
+  if (!value || typeof value !== 'object') return
+  prefs.value = coercePrefs(value)
+}
 
 export interface ComputedMetrics {
   smokeFreeDays: number

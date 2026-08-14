@@ -1,17 +1,29 @@
 import { ref, computed, type ComputedRef, type Ref } from 'vue'
 import en from './locales/en'
 import ar from './locales/ar'
+import { metaPut, META } from './db'
 
 export type Locale = 'en' | 'ar'
 
 const LOCALES = { en, ar } as const
 
-const STORAGE_KEY = 'smoking-tracker-locale'
+/**
+ * localStorage key kept as a synchronous "pre-paint hint". Dexie is the
+ * source of truth for locale, but IndexedDB is async and would flash
+ * the wrong lang/dir before hydrateAll finishes. main.ts reads this
+ * key synchronously before mount to set <html lang> and <html dir>.
+ */
+const PREPAINT_KEY = 'smoking-tracker-locale'
 
-function load(): Locale {
+function coerceLocale(raw: unknown): Locale | null {
+  if (raw === 'en' || raw === 'ar') return raw
+  return null
+}
+
+function readPrepaintHint(): Locale {
   try {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved === 'en' || saved === 'ar') return saved
+    const coerced = coerceLocale(localStorage.getItem(PREPAINT_KEY))
+    if (coerced) return coerced
   } catch {
     // ignore
   }
@@ -22,7 +34,7 @@ function load(): Locale {
   return 'en'
 }
 
-export const currentLocale: Ref<Locale> = ref(load())
+export const currentLocale: Ref<Locale> = ref(readPrepaintHint())
 
 function apply(l: Locale): void {
   if (typeof document === 'undefined') return
@@ -31,6 +43,30 @@ function apply(l: Locale): void {
 }
 
 apply(currentLocale.value)
+
+/** Applied synchronously from main.ts before Dexie opens. */
+export function applyPrepaintLocale(): void {
+  const hint = readPrepaintHint()
+  currentLocale.value = hint
+  apply(hint)
+}
+
+/** Called by hydrate.ts after Dexie is open. */
+export function hydrateLocaleFromDexie(value: Locale | undefined): void {
+  const coerced = value ? coerceLocale(value) : null
+  if (!coerced) return
+  currentLocale.value = coerced
+  writePrepaintHint(coerced)
+  apply(coerced)
+}
+
+function writePrepaintHint(l: Locale): void {
+  try {
+    localStorage.setItem(PREPAINT_KEY, l)
+  } catch {
+    // ignore
+  }
+}
 
 function getPath(obj: unknown, path: string): unknown {
   return path.split('.').reduce<unknown>(
@@ -96,11 +132,8 @@ export function tArray(key: string): readonly string[] {
 
 export function setLocale(l: Locale): void {
   currentLocale.value = l
-  try {
-    localStorage.setItem(STORAGE_KEY, l)
-  } catch {
-    // ignore
-  }
+  writePrepaintHint(l)
+  void metaPut(META.settingsLocale, l)
   apply(l)
 }
 

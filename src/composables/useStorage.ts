@@ -1,9 +1,14 @@
-import { ref, watch, type Ref } from 'vue'
-import type { AppData, EntryType, QuitIntensity, QuitPlan } from '../types'
+import { ref, type Ref } from 'vue'
+import type { AppData, EntryType, QuitIntensity, QuitPlan, SmokeEntry } from '../types'
 import { generateTargets, INTENSITY_DURATIONS } from './useQuitPlan'
 import { getToday } from './useDate'
+import { db, META, metaGet, metaPut } from '../db'
 
-const STORAGE_KEY = 'smoking-tracker-data'
+interface AppDataMeta {
+  startDate: string
+  quitPlan?: QuitPlan
+  quitPlanClearedAt?: number
+}
 
 function getDefaultData(): AppData {
   return {
@@ -33,82 +38,93 @@ export interface UseStorage {
     type: EntryType
   ) => void
   abandonQuitPlan: () => void
+  // ── Server-driven mutations called by useSync. Each one flips the
+  //    applyingRemote guard synchronously so useSync's watcher can't
+  //    see the mutation as a fresh local change and echo it back.
+  markSynced: (ids: string[]) => void
+  applyServerEntries: (rows: SmokeEntry[]) => void
+  consumeDeletedIds: (ids: string[]) => void
+  applyRemoteQuitPlan: (plan: QuitPlan) => void
+  clearRemoteQuitPlan: () => void
+  /** True while a server-driven mutation is in flight. useSync reads
+   *  this in its `flush: 'sync'` watcher to suppress echo pushes. */
+  isApplyingRemote: () => boolean
+}
+
+// Module-level singletons so App.vue's single useStorage() call and any
+// server-driven method share the same reactive state.
+const data: Ref<AppData> = ref(getDefaultData())
+let applyingRemote = false
+
+function newId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+  // Fallback for very old browsers / non-secure contexts.
+  return (
+    Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
+  )
+}
+
+async function persistAppDataMeta(): Promise<void> {
+  // JSON round-trip strips Vue's reactive Proxy wrapper. Real Chrome's
+  // structured-clone handles Proxies, but not all IDB implementations
+  // do (fake-indexeddb / Node's structuredClone don't), and writing
+  // plain data to persistence is more portable regardless.
+  const meta: AppDataMeta = JSON.parse(
+    JSON.stringify({
+      startDate: data.value.startDate,
+      quitPlan: data.value.quitPlan,
+      quitPlanClearedAt: data.value.quitPlanClearedAt,
+    })
+  )
+  await metaPut(META.appDataMeta, meta)
+}
+
+/**
+ * Called by hydrate.ts before the app mounts. Loads entries,
+ * tombstones and app-data-meta into the reactive `data` ref. Never
+ * throws — a Dexie failure just leaves defaults in place.
+ */
+export async function hydrateStorageFromDexie(): Promise<void> {
+  try {
+    const [rows, tombstoneRows, meta] = await Promise.all([
+      db.entries.toArray(),
+      db.tombstones.toArray(),
+      metaGet<AppDataMeta>(META.appDataMeta),
+    ])
+    const startDate = meta?.startDate ?? getToday()
+    const deletedIds = tombstoneRows.map((t) => t.id)
+    data.value = {
+      entries: rows,
+      startDate,
+      ...(meta?.quitPlan ? { quitPlan: meta.quitPlan } : {}),
+      ...(meta?.quitPlanClearedAt != null
+        ? { quitPlanClearedAt: meta.quitPlanClearedAt }
+        : {}),
+      ...(deletedIds.length > 0 ? { deletedIds } : {}),
+    }
+    if (!meta) {
+      // First-ever boot on a device with no legacy data: persist the
+      // default startDate so subsequent sessions read a stable value
+      // instead of drifting to "today" every launch.
+      await persistAppDataMeta()
+    }
+  } catch (err) {
+    console.error('[useStorage] hydrate failed — defaults in memory:', err)
+  }
 }
 
 export function useStorage(): UseStorage {
-  const data: Ref<AppData> = ref(load())
-
-  function newId(): string {
-    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-      return crypto.randomUUID()
-    }
-    // Fallback for very old browsers / non-secure contexts.
-    return (
-      Date.now().toString(36) + Math.random().toString(36).slice(2, 10)
-    )
-  }
-
-  function load(): AppData {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (!raw) return getDefaultData()
-      const parsed = JSON.parse(raw) as AppData
-      // Backfill IDs and assume previously-stored entries are unsynced
-      // (the next pull will reconcile them with the server). Pre-v2
-      // entries lack a `type` — coerce to 'cigarette' so filters and
-      // counts treat them the same as they always did. We deliberately
-      // do NOT flip `synced` here: the server's DB-level default for
-      // `type` is also 'cigarette', so the local + server values match
-      // and there's nothing to push.
-      let mutated = false
-      for (const e of parsed.entries) {
-        if (!e.id) {
-          e.id = newId()
-          mutated = true
-        }
-        if (e.synced === undefined) {
-          e.synced = false
-          mutated = true
-        }
-        if (!e.type) {
-          e.type = 'cigarette'
-          mutated = true
-        }
-      }
-      if (mutated) {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(parsed))
-        } catch {
-          // ignore
-        }
-      }
-      return parsed
-    } catch {
-      return getDefaultData()
-    }
-  }
-
-  function save(): void {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data.value))
-    } catch (e) {
-      console.error('Failed to save:', e)
-    }
-  }
-
-  // Auto-persist any deep mutation (e.g. useSync flipping `synced: true`
-  // on entries after a successful push). Without this, in-memory updates
-  // are lost on reload and sync re-pushes the same rows → 409 collision.
-  watch(data, save, { deep: true })
-
   function addEntries(count: number, type: EntryType): void {
     if (count <= 0) return
     const now = new Date().toISOString()
     const today = getToday()
+    const toAdd: SmokeEntry[] = []
     if (type === 'vape') {
       // One entry per session — puffCount carries the puff count.
       // History and sessionsToday derive naturally from row count.
-      data.value.entries.push({
+      toAdd.push({
         id: newId(),
         time: now,
         date: today,
@@ -120,7 +136,7 @@ export function useStorage(): UseStorage {
       // Cigarettes stay one-entry-per-stick: each stick is a discrete
       // event the user reasons about individually.
       for (let i = 0; i < count; i++) {
-        data.value.entries.push({
+        toAdd.push({
           id: newId(),
           time: now,
           date: today,
@@ -129,7 +145,23 @@ export function useStorage(): UseStorage {
         })
       }
     }
-    save()
+    data.value.entries.push(...toAdd)
+    void db.entries.bulkAdd(toAdd).catch((err) => {
+      console.error('[useStorage] bulkAdd failed:', err)
+    })
+  }
+
+  function addTombstone(id: string): void {
+    // Only server-known rows need a tombstone — an unsynced local-only
+    // row never made it to the DB, so there's nothing to delete there.
+    // (Also keeps tombstones from growing unbounded on rapid create/undo.)
+    const list = (data.value.deletedIds ??= [])
+    if (!list.includes(id)) {
+      list.push(id)
+      void db.tombstones.put({ id }).catch((err) => {
+        console.error('[useStorage] tombstone put failed:', err)
+      })
+    }
   }
 
   function undoLast(type: EntryType): void {
@@ -140,18 +172,34 @@ export function useStorage(): UseStorage {
     for (let i = data.value.entries.length - 1; i >= 0; i--) {
       const e = data.value.entries[i]
       if ((e.type ?? 'cigarette') === type) {
-        data.value.entries.splice(i, 1)
-        save()
+        if (e.synced) addTombstone(e.id)
+        const [removed] = data.value.entries.splice(i, 1)
+        void db.entries.delete(removed.id).catch((err) => {
+          console.error('[useStorage] entry delete failed:', err)
+        })
         return
       }
     }
   }
 
   function deleteDay(date: string, type: EntryType): void {
-    data.value.entries = data.value.entries.filter(
-      (e) => !(e.date === date && (e.type ?? 'cigarette') === type)
-    )
-    save()
+    const kept: typeof data.value.entries = []
+    const removedIds: string[] = []
+    for (const e of data.value.entries) {
+      const match = e.date === date && (e.type ?? 'cigarette') === type
+      if (match) {
+        removedIds.push(e.id)
+        if (e.synced) addTombstone(e.id)
+      } else {
+        kept.push(e)
+      }
+    }
+    data.value.entries = kept
+    if (removedIds.length > 0) {
+      void db.entries.bulkDelete(removedIds).catch((err) => {
+        console.error('[useStorage] bulkDelete failed:', err)
+      })
+    }
   }
 
   function editEntryTime(id: string, newIsoTime: string): void {
@@ -167,12 +215,32 @@ export function useStorage(): UseStorage {
     const dd = String(d.getDate()).padStart(2, '0')
     e.date = `${yyyy}-${mm}-${dd}`
     e.synced = false
-    save()
+    void db.entries
+      .update(id, { time: e.time, date: e.date, synced: false })
+      .catch((err) => {
+        console.error('[useStorage] entry update failed:', err)
+      })
   }
 
   function resetAll(): void {
+    // getDefaultData() has no deletedIds — a full reset wipes the
+    // tombstone list along with everything else. Sync clears the
+    // server via clearServer() separately.
     data.value = getDefaultData()
-    save()
+    void db
+      .transaction('rw', db.entries, db.tombstones, db.meta, async () => {
+        await db.entries.clear()
+        await db.tombstones.clear()
+        await db.meta.put({
+          key: META.appDataMeta,
+          value: {
+            startDate: data.value.startDate,
+          } satisfies AppDataMeta,
+        })
+      })
+      .catch((err) => {
+        console.error('[useStorage] resetAll transaction failed:', err)
+      })
   }
 
   function startQuitPlan(
@@ -197,7 +265,7 @@ export function useStorage(): UseStorage {
     // Starting a fresh plan invalidates any prior abandon stamp — the
     // new plan is what we want sync to converge on.
     delete data.value.quitPlanClearedAt
-    save()
+    void persistAppDataMeta()
   }
 
   function abandonQuitPlan(): void {
@@ -205,7 +273,131 @@ export function useStorage(): UseStorage {
     // Stamp the moment of abandon so a racing pull can't restore a
     // stale server row written before this point.
     data.value.quitPlanClearedAt = Date.now()
-    save()
+    void persistAppDataMeta()
+  }
+
+  // ── Server-driven mutations ─────────────────────────────────────
+  // Ordering invariant: set applyingRemote=true, mutate the ref
+  // *synchronously*, kick off the Dexie write, then clear the flag
+  // *synchronously*. The `flush: 'sync'` watcher in useSync reads
+  // isApplyingRemote() the moment the ref changes, so the guard MUST
+  // still be true at that point. Awaiting the Dexie write here would
+  // yield the microtask and let the watcher slip through with the
+  // flag already cleared.
+
+  function markSynced(ids: string[]): void {
+    if (ids.length === 0) return
+    applyingRemote = true
+    try {
+      const idSet = new Set(ids)
+      for (const e of data.value.entries) {
+        if (idSet.has(e.id)) e.synced = true
+      }
+    } finally {
+      applyingRemote = false
+    }
+    void db.transaction('rw', db.entries, async () => {
+      for (const id of ids) {
+        await db.entries.update(id, { synced: true })
+      }
+    }).catch((err) => {
+      console.error('[useStorage] markSynced failed:', err)
+    })
+  }
+
+  function applyServerEntries(rows: SmokeEntry[]): void {
+    // Preserve locally-stored puffCount for ids the server returns —
+    // the server schema doesn't carry it, so a naive replace collapses
+    // every vape session back to a single puff. (Once the server row
+    // grows a puffCount column this merge can drop.)
+    const puffCountById = new Map<string, number>()
+    for (const e of data.value.entries) {
+      if (e.puffCount != null) puffCountById.set(e.id, e.puffCount)
+    }
+    const serverIds = new Set(rows.map((r) => r.id))
+    const localUnsyncedNotOnServer = data.value.entries.filter(
+      (e) => !e.synced && !serverIds.has(e.id)
+    )
+    const merged: SmokeEntry[] = [
+      ...rows.map((r) => ({
+        ...r,
+        type: r.type ?? ('cigarette' as EntryType),
+        synced: true,
+        ...(puffCountById.has(r.id)
+          ? { puffCount: puffCountById.get(r.id) }
+          : {}),
+      })),
+      ...localUnsyncedNotOnServer,
+    ]
+    applyingRemote = true
+    try {
+      data.value.entries = merged
+    } finally {
+      applyingRemote = false
+    }
+    // One transaction: replace the server-known slice and keep the
+    // unsynced local rows in place. bulkPut is idempotent on the
+    // primary key so this stays safe on repeated pulls. JSON
+    // round-trip strips Vue's reactive Proxy from the local-unsynced
+    // rows in `merged` — Node's structuredClone (and some stricter
+    // IDB polyfills) reject Proxies, and writing plain data to
+    // persistence is more portable regardless.
+    const plainMerged: SmokeEntry[] = JSON.parse(JSON.stringify(merged))
+    void db
+      .transaction('rw', db.entries, async () => {
+        // Drop any entry that is neither on the server nor unsynced
+        // locally — those were deleted on another device.
+        const keepIds = new Set(plainMerged.map((e) => e.id))
+        const allLocal = await db.entries.toArray()
+        const staleIds = allLocal
+          .filter((e) => !keepIds.has(e.id))
+          .map((e) => e.id)
+        if (staleIds.length > 0) await db.entries.bulkDelete(staleIds)
+        await db.entries.bulkPut(plainMerged)
+      })
+      .catch((err) => {
+        console.error('[useStorage] applyServerEntries failed:', err)
+      })
+  }
+
+  function consumeDeletedIds(ids: string[]): void {
+    if (ids.length === 0) return
+    applyingRemote = true
+    try {
+      const idSet = new Set(ids)
+      data.value.deletedIds = (data.value.deletedIds ?? []).filter(
+        (id) => !idSet.has(id)
+      )
+    } finally {
+      applyingRemote = false
+    }
+    void db.tombstones.bulkDelete(ids).catch((err) => {
+      console.error('[useStorage] tombstone delete failed:', err)
+    })
+  }
+
+  function applyRemoteQuitPlan(plan: QuitPlan): void {
+    applyingRemote = true
+    try {
+      data.value.quitPlan = plan
+    } finally {
+      applyingRemote = false
+    }
+    void persistAppDataMeta()
+  }
+
+  function clearRemoteQuitPlan(): void {
+    applyingRemote = true
+    try {
+      delete data.value.quitPlan
+    } finally {
+      applyingRemote = false
+    }
+    void persistAppDataMeta()
+  }
+
+  function isApplyingRemote(): boolean {
+    return applyingRemote
   }
 
   return {
@@ -217,5 +409,11 @@ export function useStorage(): UseStorage {
     resetAll,
     startQuitPlan,
     abandonQuitPlan,
+    markSynced,
+    applyServerEntries,
+    consumeDeletedIds,
+    applyRemoteQuitPlan,
+    clearRemoteQuitPlan,
+    isApplyingRemote,
   }
 }

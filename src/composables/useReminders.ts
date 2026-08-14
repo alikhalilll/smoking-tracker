@@ -1,5 +1,6 @@
 import { ref, type Ref } from 'vue'
 import { currentLocale, type Locale } from '../i18n'
+import { metaPut, META } from '../db'
 
 export type NotificationLocale = 'auto' | Locale
 
@@ -18,8 +19,6 @@ export interface ReminderSettings {
   bedtimeStart: string
   bedtimeEnd: string
 }
-
-const STORAGE_KEY = 'smoking-tracker-reminders'
 
 const DEFAULT_SETTINGS: ReminderSettings = {
   enabled: false,
@@ -60,58 +59,57 @@ function nextOccurrenceAt(hm: string): Date {
 
 const HM_RE = /^\d{2}:\d{2}$/
 
-function load(): ReminderSettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { ...DEFAULT_SETTINGS }
-    // The old shape had a `bedtimeEnabled` toggle. When it was `false`
-    // the user never opted into bedtime, so any stored times were just
-    // stale defaults from the prior version (22:00–07:00). Drop those
-    // and use the new defaults so existing users don't silently start
-    // subtracting a sleep window they never chose.
-    const parsed = JSON.parse(raw) as Partial<ReminderSettings> & {
-      bedtimeEnabled?: boolean
-    }
-    const userOptedIntoBedtime = parsed.bedtimeEnabled !== false
-    const loc = parsed.notificationLocale
-    const validLoc: NotificationLocale =
-      loc === 'auto' || loc === 'en' || loc === 'ar' ? loc : 'auto'
-    const startHM =
-      userOptedIntoBedtime &&
-      typeof parsed.bedtimeStart === 'string' &&
-      HM_RE.test(parsed.bedtimeStart)
-        ? parsed.bedtimeStart
-        : DEFAULT_SETTINGS.bedtimeStart
-    const endHM =
-      userOptedIntoBedtime &&
-      typeof parsed.bedtimeEnd === 'string' &&
-      HM_RE.test(parsed.bedtimeEnd)
-        ? parsed.bedtimeEnd
-        : DEFAULT_SETTINGS.bedtimeEnd
-    return {
-      enabled: !!parsed.enabled,
-      gapMinutes:
-        typeof parsed.gapMinutes === 'number' && parsed.gapMinutes > 0
-          ? parsed.gapMinutes
-          : DEFAULT_SETTINGS.gapMinutes,
-      notificationLocale: validLoc,
-      bedtimeStart: startHM,
-      bedtimeEnd: endHM,
-    }
-  } catch {
-    return { ...DEFAULT_SETTINGS }
+function coerce(
+  raw: Partial<ReminderSettings> & { bedtimeEnabled?: boolean }
+): ReminderSettings {
+  // The old shape had a `bedtimeEnabled` toggle. When it was `false`
+  // the user never opted into bedtime, so any stored times were just
+  // stale defaults from the prior version (22:00–07:00). Drop those
+  // and use the new defaults so existing users don't silently start
+  // subtracting a sleep window they never chose.
+  const userOptedIntoBedtime = raw.bedtimeEnabled !== false
+  const loc = raw.notificationLocale
+  const validLoc: NotificationLocale =
+    loc === 'auto' || loc === 'en' || loc === 'ar' ? loc : 'auto'
+  const startHM =
+    userOptedIntoBedtime &&
+    typeof raw.bedtimeStart === 'string' &&
+    HM_RE.test(raw.bedtimeStart)
+      ? raw.bedtimeStart
+      : DEFAULT_SETTINGS.bedtimeStart
+  const endHM =
+    userOptedIntoBedtime &&
+    typeof raw.bedtimeEnd === 'string' &&
+    HM_RE.test(raw.bedtimeEnd)
+      ? raw.bedtimeEnd
+      : DEFAULT_SETTINGS.bedtimeEnd
+  return {
+    enabled: !!raw.enabled,
+    gapMinutes:
+      typeof raw.gapMinutes === 'number' && raw.gapMinutes > 0
+        ? raw.gapMinutes
+        : DEFAULT_SETTINGS.gapMinutes,
+    notificationLocale: validLoc,
+    bedtimeStart: startHM,
+    bedtimeEnd: endHM,
   }
 }
 
 function save(s: ReminderSettings): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
-  } catch {
-    // ignore
-  }
+  void metaPut(META.settingsReminders, s)
 }
 
-const settings: Ref<ReminderSettings> = ref(load())
+const settings: Ref<ReminderSettings> = ref({ ...DEFAULT_SETTINGS })
+
+/** Called by hydrate.ts after Dexie is open. */
+export function hydrateRemindersFromDexie(
+  value:
+    | (Partial<ReminderSettings> & { bedtimeEnabled?: boolean })
+    | undefined
+): void {
+  if (!value || typeof value !== 'object') return
+  settings.value = coerce(value)
+}
 
 const permission: Ref<NotificationPermission> = ref(
   typeof Notification !== 'undefined' ? Notification.permission : 'denied'
@@ -137,7 +135,10 @@ function clearTimer(): void {
   }
 }
 
-const ICON_URL = `${import.meta.env.BASE_URL}icon-192.png`
+// Guarded read of Vite's BASE_URL — falls back to '/' when
+// `import.meta.env` is absent (e.g. under a non-Vite test runner) so a
+// missing env doesn't crash module load.
+const ICON_URL = `${import.meta.env?.BASE_URL ?? '/'}icon-192.png`
 
 // Single shared AudioContext so iOS doesn't have to re-acquire audio focus
 // every time. Lazy-created on first call inside a user gesture.

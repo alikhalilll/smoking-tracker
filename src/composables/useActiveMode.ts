@@ -1,30 +1,29 @@
 import { ref, type Ref } from 'vue'
 import type { EntryType } from '../types'
+import { metaPut, META } from '../db'
 
-const STORAGE_KEY = 'smoking-tracker-active-mode'
 const DEFAULT_MODE: EntryType = 'cigarette'
 
-function load(): EntryType {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw === 'cigarette' || raw === 'vape') return raw
-    return DEFAULT_MODE
-  } catch {
-    return DEFAULT_MODE
-  }
-}
-
-function persist(m: EntryType): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, m)
-  } catch {
-    // ignore
-  }
+function coerceMode(raw: unknown): EntryType {
+  if (raw === 'cigarette' || raw === 'vape') return raw
+  return DEFAULT_MODE
 }
 
 // Module-level singleton so every consumer (Home, Stats, Economy,
-// SettingsView) sees the same ref. Mirrors the useEconomy pattern.
-const mode: Ref<EntryType> = ref(load())
+// SettingsView) sees the same ref.
+const mode: Ref<EntryType> = ref(DEFAULT_MODE)
+
+/** Called by hydrate.ts after Dexie is open. */
+export function hydrateActiveModeFromDexie(
+  value: EntryType | undefined
+): void {
+  if (value === undefined) return
+  mode.value = coerceMode(value)
+}
+
+function persist(m: EntryType): void {
+  void metaPut(META.settingsActiveMode, m)
+}
 
 export interface UseActiveMode {
   mode: Ref<EntryType>

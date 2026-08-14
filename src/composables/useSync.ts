@@ -1,7 +1,8 @@
 import { ref, watch, type Ref } from 'vue'
 import { supabase } from '../supabase'
 import { useAuth } from './useAuth'
-import type { AppData, EntryType, QuitPlan, SmokeEntry } from '../types'
+import type { EntryType, QuitPlan, SmokeEntry } from '../types'
+import type { UseStorage } from './useStorage'
 
 export type SyncStatus = 'idle' | 'syncing' | 'synced' | 'error' | 'offline'
 
@@ -36,15 +37,13 @@ export interface UseSync {
   clearServer: () => Promise<void>
 }
 
-export function useSync(data: Ref<AppData>): UseSync {
+export function useSync(storage: UseStorage): UseSync {
   const { isAuthed, user } = useAuth()
   const status: Ref<SyncStatus> = ref('idle')
   const lastSyncedAt: Ref<number | null> = ref(null)
   const lastError: Ref<string | null> = ref(null)
 
-  // Suppress the local watcher while we apply server changes locally,
-  // so we don't immediately echo them back.
-  let applyingRemote = false
+  const data = storage.data
   let pushTimer: ReturnType<typeof setTimeout> | null = null
 
   function setStatus(s: SyncStatus, err?: string): void {
@@ -56,11 +55,26 @@ export function useSync(data: Ref<AppData>): UseSync {
     if (!supabase || !user.value) return
     setStatus('syncing')
 
-    // Step 1 — push any not-yet-synced local entries first, so offline
-    // writes (and edits to existing entries) don't get wiped by the
-    // authoritative replace below. Upsert WITHOUT ignoreDuplicates so
-    // an edit (id present on server, synced=false locally) actually
-    // updates the row instead of silently skipping. Last-write-wins.
+    // Step 1 — apply pending tombstones first so a row the user deleted
+    // locally doesn't reappear from the server snapshot below.
+    const pendingDeletes = [...(data.value.deletedIds ?? [])]
+    if (pendingDeletes.length > 0) {
+      const { error: delErr } = await supabase
+        .from('entries')
+        .delete()
+        .in('id', pendingDeletes)
+      if (delErr) {
+        setStatus('error', delErr.message)
+        return
+      }
+      storage.consumeDeletedIds(pendingDeletes)
+    }
+
+    // Step 2 — push any not-yet-synced local entries, so offline writes
+    // (and edits to existing entries) don't get lost when we reconcile
+    // against the server below. Upsert WITHOUT ignoreDuplicates so an
+    // edit (id present on server, synced=false locally) actually updates
+    // the row instead of silently skipping. Last-write-wins.
     const unsyncedLocal = data.value.entries.filter((e) => !e.synced)
     if (unsyncedLocal.length > 0) {
       const { error: insertErr } = await supabase
@@ -81,7 +95,7 @@ export function useSync(data: Ref<AppData>): UseSync {
       }
     }
 
-    // Step 2 — re-fetch the canonical server set.
+    // Step 3 — re-fetch the canonical server set.
     const { data: serverEntries, error: entriesErr } = await supabase
       .from('entries')
       .select('id, time, date, type')
@@ -91,37 +105,19 @@ export function useSync(data: Ref<AppData>): UseSync {
       return
     }
 
-    // Step 3 — REPLACE local entries with the server snapshot. The DB
-    // is the source of truth; an entry deleted on another device is
-    // gone here too once the pull lands.
-    // Preserve locally-stored puffCount across the replace: the server
-    // schema doesn't (yet) carry it, so a naive replace would collapse
-    // every vape session back to a single puff. Rehydrate from the
-    // pre-replace local snapshot keyed by id.
-    const puffCountById = new Map<string, number>()
-    for (const e of data.value.entries) {
-      if (e.puffCount != null) puffCountById.set(e.id, e.puffCount)
-    }
-    applyingRemote = true
-    try {
-      data.value.entries = (
-        (serverEntries as ServerEntry[] | null) ?? []
-      ).map((e) => ({
-        id: e.id,
-        time: e.time,
-        date: e.date,
-        // Pre-migration rows can come back with the column missing
-        // (Postgrest omits null columns) — coerce so the local shape
-        // is always populated.
-        type: e.type ?? 'cigarette',
-        synced: true,
-        ...(puffCountById.has(e.id)
-          ? { puffCount: puffCountById.get(e.id) }
-          : {}),
-      }))
-    } finally {
-      applyingRemote = false
-    }
+    // Step 4 — MERGE server snapshot into local state via useStorage's
+    // applyServerEntries. That method preserves puffCount for known ids
+    // (server schema doesn't carry it) and keeps any unsynced local
+    // row that hasn't reached the server yet.
+    const serverRows = (serverEntries as ServerEntry[] | null) ?? []
+    const asSmokeEntries: SmokeEntry[] = serverRows.map((e) => ({
+      id: e.id,
+      time: e.time,
+      date: e.date,
+      type: e.type ?? 'cigarette',
+      synced: true,
+    }))
+    storage.applyServerEntries(asSmokeEntries)
 
     // Sync the quit plan: server version wins if its updated_at is newer
     // than what we have locally; local wins otherwise.
@@ -158,12 +154,7 @@ export function useSync(data: Ref<AppData>): UseSync {
         return
       }
     } else if (serverPlan && !data.value.quitPlan) {
-      applyingRemote = true
-      try {
-        data.value.quitPlan = serverPlanToLocal(serverPlan as ServerPlan)
-      } finally {
-        applyingRemote = false
-      }
+      storage.applyRemoteQuitPlan(serverPlanToLocal(serverPlan as ServerPlan))
     } else if (data.value.quitPlan && !serverPlan) {
       await pushPlan(data.value.quitPlan)
     } else if (data.value.quitPlan && serverPlan) {
@@ -171,12 +162,9 @@ export function useSync(data: Ref<AppData>): UseSync {
       if (
         (serverPlan as ServerPlan).start_date > data.value.quitPlan.startDate
       ) {
-        applyingRemote = true
-        try {
-          data.value.quitPlan = serverPlanToLocal(serverPlan as ServerPlan)
-        } finally {
-          applyingRemote = false
-        }
+        storage.applyRemoteQuitPlan(
+          serverPlanToLocal(serverPlan as ServerPlan)
+        )
       } else {
         await pushPlan(data.value.quitPlan)
       }
@@ -189,19 +177,6 @@ export function useSync(data: Ref<AppData>): UseSync {
   async function pushDiff(): Promise<void> {
     if (!supabase || !user.value) return
     setStatus('syncing')
-
-    // Fetch server ids for the diff.
-    const { data: serverEntries, error } = await supabase
-      .from('entries')
-      .select('id')
-    if (error) {
-      setStatus('error', error.message)
-      return
-    }
-    const serverIds = new Set(
-      ((serverEntries as { id: string }[] | null) ?? []).map((e) => e.id)
-    )
-    const localIds = new Set(data.value.entries.map((e) => e.id))
 
     // Push every unsynced entry — covers both new logs (id not on server)
     // and local edits (id on server, time/date changed). UPSERT without
@@ -224,31 +199,24 @@ export function useSync(data: Ref<AppData>): UseSync {
         setStatus('error', upsertErr.message)
         return
       }
-      const upsertedIds = new Set(toUpsert.map((e) => e.id))
-      applyingRemote = true
-      try {
-        for (const e of data.value.entries) {
-          if (upsertedIds.has(e.id)) e.synced = true
-        }
-      } finally {
-        applyingRemote = false
-      }
+      storage.markSynced(toUpsert.map((e) => e.id))
     }
 
-    // Delete server-only ids (the user undid them locally).
-    const toDeleteIds: string[] = []
-    for (const id of serverIds) {
-      if (!localIds.has(id)) toDeleteIds.push(id)
-    }
-    if (toDeleteIds.length > 0) {
+    // Apply explicit tombstones. Prior versions inferred deletes by
+    // diffing local vs server ids, which wiped rows that another device
+    // had just added (this device saw them as "server-only" and deleted
+    // them). Tombstones make deletes intentional and race-safe.
+    const pendingDeletes = [...(data.value.deletedIds ?? [])]
+    if (pendingDeletes.length > 0) {
       const { error: deleteErr } = await supabase
         .from('entries')
         .delete()
-        .in('id', toDeleteIds)
+        .in('id', pendingDeletes)
       if (deleteErr) {
         setStatus('error', deleteErr.message)
         return
       }
+      storage.consumeDeletedIds(pendingDeletes)
     }
 
     // Push the plan snapshot too.
@@ -309,16 +277,17 @@ export function useSync(data: Ref<AppData>): UseSync {
   // shouldn't fire 3 separate pushes. We track length AND the count of
   // unsynced rows so an edit (which doesn't change length but flips
   // `synced` to false on a row) still wakes the watcher.
-  // flush: 'sync' so applyingRemote (cleared synchronously after pushDiff
-  // marks rows synced=true) holds across the watcher fire — without it,
-  // every successful push would queue a redundant pushDiff right after.
+  // flush: 'sync' so isApplyingRemote() (cleared synchronously after
+  // the server-driven mutation writes the ref) is still true when the
+  // watcher fires — without it, every successful push would queue a
+  // redundant pushDiff right after.
   watch(
     () => [
       data.value.entries.length,
       data.value.entries.filter((e) => !e.synced).length,
     ],
     () => {
-      if (applyingRemote) return
+      if (storage.isApplyingRemote()) return
       if (!isAuthed.value) return
       if (pushTimer) clearTimeout(pushTimer)
       pushTimer = setTimeout(() => {
@@ -334,7 +303,7 @@ export function useSync(data: Ref<AppData>): UseSync {
   watch(
     () => data.value.quitPlan,
     async (next) => {
-      if (applyingRemote) return
+      if (storage.isApplyingRemote()) return
       if (!isAuthed.value || !supabase || !user.value) return
       try {
         if (next) {

@@ -1,12 +1,14 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { cookieStorage } from './authStorage'
 
-const url = import.meta.env.VITE_SUPABASE_URL
+// Guarded reads — `import.meta.env` is injected by Vite. In a non-Vite
+// test runner (Node with tsx) it's undefined, so optional-chain to a
+// null client instead of crashing at module load.
+const env = import.meta.env
+const url = env?.VITE_SUPABASE_URL
 // Supabase renamed "anon key" → "publishable key" in 2025; support both so
 // existing setups keep working.
-const key =
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
-  import.meta.env.VITE_SUPABASE_ANON_KEY
+const key = env?.VITE_SUPABASE_PUBLISHABLE_KEY ?? env?.VITE_SUPABASE_ANON_KEY
 
 export const supabase: SupabaseClient | null =
   url && key

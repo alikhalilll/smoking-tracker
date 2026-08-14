@@ -2,6 +2,7 @@ import { ref, computed, type ComputedRef, type Ref } from 'vue'
 import { intlLocale } from '../i18n'
 import { useActiveMode } from './useActiveMode'
 import { ALL_CONSUMABLE_KINDS, type ConsumableKind } from '../types'
+import { metaPut, META } from '../db'
 
 /**
  * Money-and-consumable settings for both modes. Vape supports four
@@ -43,8 +44,6 @@ export interface EconomySettings {
   /** ISO 4217 code, e.g. 'USD', 'EUR', 'EGP', 'AED'. */
   currency: string
 }
-
-const STORAGE_KEY = 'smoking-tracker-economy'
 
 const DEFAULT_SETTINGS: EconomySettings = {
   pricePerPack: 0,
@@ -120,68 +119,66 @@ function coerceKindOr(fallback: ConsumableKind, v: unknown): ConsumableKind {
     : fallback
 }
 
-function load(): EconomySettings {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return { ...DEFAULT_SETTINGS }
-    const parsed = JSON.parse(raw) as Partial<EconomySettings> & LegacyShape
+function coerce(
+  parsed: Partial<EconomySettings> & LegacyShape
+): EconomySettings {
+  // Migrate v1 (per-cigarette) → v2 (per-pack of 20). Old users keep
+  // their effective price; the input switches to "pack of 20" view.
+  let pricePerPack = DEFAULT_SETTINGS.pricePerPack
+  if (
+    typeof parsed.pricePerPack === 'number' &&
+    parsed.pricePerPack >= 0
+  ) {
+    pricePerPack = parsed.pricePerPack
+  } else if (
+    typeof parsed.pricePerCigarette === 'number' &&
+    parsed.pricePerCigarette > 0
+  ) {
+    pricePerPack = parsed.pricePerCigarette * 20
+  }
 
-    // Migrate v1 (per-cigarette) → v2 (per-pack of 20). Old users keep
-    // their effective price; the input switches to "pack of 20" view.
-    let pricePerPack = DEFAULT_SETTINGS.pricePerPack
-    if (
-      typeof parsed.pricePerPack === 'number' &&
-      parsed.pricePerPack >= 0
-    ) {
-      pricePerPack = parsed.pricePerPack
-    } else if (
-      typeof parsed.pricePerCigarette === 'number' &&
-      parsed.pricePerCigarette > 0
-    ) {
-      pricePerPack = parsed.pricePerCigarette * 20
-    }
+  return {
+    pricePerPack,
+    cigsPerPack: coerceIntOr(DEFAULT_SETTINGS.cigsPerPack, parsed.cigsPerPack),
 
-    return {
-      pricePerPack,
-      cigsPerPack: coerceIntOr(DEFAULT_SETTINGS.cigsPerPack, parsed.cigsPerPack),
+    pricePerPod: coerceNumberOr(DEFAULT_SETTINGS.pricePerPod, parsed.pricePerPod),
+    puffsPerPod: coerceIntOr(DEFAULT_SETTINGS.puffsPerPod, parsed.puffsPerPod),
+    podStartedAt: coerceIsoOrNull(parsed.podStartedAt),
 
-      pricePerPod: coerceNumberOr(DEFAULT_SETTINGS.pricePerPod, parsed.pricePerPod),
-      puffsPerPod: coerceIntOr(DEFAULT_SETTINGS.puffsPerPod, parsed.puffsPerPod),
-      podStartedAt: coerceIsoOrNull(parsed.podStartedAt),
+    pricePerCoil: coerceNumberOr(DEFAULT_SETTINGS.pricePerCoil, parsed.pricePerCoil),
+    puffsPerCoil: coerceIntOr(DEFAULT_SETTINGS.puffsPerCoil, parsed.puffsPerCoil),
+    coilStartedAt: coerceIsoOrNull(parsed.coilStartedAt),
 
-      pricePerCoil: coerceNumberOr(DEFAULT_SETTINGS.pricePerCoil, parsed.pricePerCoil),
-      puffsPerCoil: coerceIntOr(DEFAULT_SETTINGS.puffsPerCoil, parsed.puffsPerCoil),
-      coilStartedAt: coerceIsoOrNull(parsed.coilStartedAt),
+    pricePerBottle: coerceNumberOr(DEFAULT_SETTINGS.pricePerBottle, parsed.pricePerBottle),
+    puffsPerBottle: coerceIntOr(DEFAULT_SETTINGS.puffsPerBottle, parsed.puffsPerBottle),
+    bottleStartedAt: coerceIsoOrNull(parsed.bottleStartedAt),
 
-      pricePerBottle: coerceNumberOr(DEFAULT_SETTINGS.pricePerBottle, parsed.pricePerBottle),
-      puffsPerBottle: coerceIntOr(DEFAULT_SETTINGS.puffsPerBottle, parsed.puffsPerBottle),
-      bottleStartedAt: coerceIsoOrNull(parsed.bottleStartedAt),
+    pricePerDisposable: coerceNumberOr(DEFAULT_SETTINGS.pricePerDisposable, parsed.pricePerDisposable),
+    puffsPerDisposable: coerceIntOr(DEFAULT_SETTINGS.puffsPerDisposable, parsed.puffsPerDisposable),
+    disposableStartedAt: coerceIsoOrNull(parsed.disposableStartedAt),
 
-      pricePerDisposable: coerceNumberOr(DEFAULT_SETTINGS.pricePerDisposable, parsed.pricePerDisposable),
-      puffsPerDisposable: coerceIntOr(DEFAULT_SETTINGS.puffsPerDisposable, parsed.puffsPerDisposable),
-      disposableStartedAt: coerceIsoOrNull(parsed.disposableStartedAt),
+    heroConsumable: coerceKindOr(DEFAULT_SETTINGS.heroConsumable, parsed.heroConsumable),
 
-      heroConsumable: coerceKindOr(DEFAULT_SETTINGS.heroConsumable, parsed.heroConsumable),
-
-      currency:
-        typeof parsed.currency === 'string' && parsed.currency.length > 0
-          ? parsed.currency
-          : DEFAULT_SETTINGS.currency,
-    }
-  } catch {
-    return { ...DEFAULT_SETTINGS }
+    currency:
+      typeof parsed.currency === 'string' && parsed.currency.length > 0
+        ? parsed.currency
+        : DEFAULT_SETTINGS.currency,
   }
 }
 
 function persist(s: EconomySettings): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(s))
-  } catch {
-    // ignore
-  }
+  void metaPut(META.settingsEconomy, s)
 }
 
-const settings: Ref<EconomySettings> = ref(load())
+const settings: Ref<EconomySettings> = ref({ ...DEFAULT_SETTINGS })
+
+/** Called by hydrate.ts after Dexie is open. */
+export function hydrateEconomyFromDexie(
+  value: (Partial<EconomySettings> & LegacyShape) | undefined
+): void {
+  if (!value || typeof value !== 'object') return
+  settings.value = coerce(value)
+}
 
 export interface UseEconomy {
   settings: Ref<EconomySettings>
