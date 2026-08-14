@@ -275,10 +275,16 @@ export function useLeaderboard(data: Ref<AppData>): UseLeaderboard {
     if (prefs.value.optedIn) void pushOwnRow().then(refresh)
   }
 
-  // Push our row whenever local stats change, debounced.
+  // Push our row whenever local stats change, debounced. Two separate
+  // sources so Vue can compare each with Object.is: length is a
+  // primitive and only fires when the count actually changes (a
+  // no-op array reassignment in applyServerEntries no longer
+  // cascades into an extra leaderboard push+refresh cycle). The
+  // quit-plan source keeps deep so intensity / baseline edits are
+  // still caught.
   let pushTimer: ReturnType<typeof setTimeout> | null = null
   watch(
-    () => [data.value.entries.length, data.value.quitPlan],
+    [() => data.value.entries.length, () => data.value.quitPlan],
     () => {
       if (!prefs.value.optedIn || !isAuthed.value) return
       if (pushTimer) clearTimeout(pushTimer)

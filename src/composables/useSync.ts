@@ -95,21 +95,36 @@ export function useSync(storage: UseStorage): UseSync {
       }
     }
 
-    // Step 3 — re-fetch the canonical server set.
-    const { data: serverEntries, error: entriesErr } = await supabase
-      .from('entries')
-      .select('id, time, date, type')
-      .order('time')
-    if (entriesErr) {
-      setStatus('error', entriesErr.message)
-      return
+    // Step 3 — re-fetch the canonical server set. MUST paginate:
+    // PostgREST / Supabase default `max-rows` is 1000, so a naïve
+    // `.select().order('time')` silently truncates for users past that.
+    // Combined with applyServerEntries's "synced + not in serverIds =
+    // deleted elsewhere" rule, truncation used to silently drop the
+    // newest logged entry on every sync once total_logged > 1000.
+    // Fetch in pages of 1000 (ascending) until a short page arrives.
+    const PAGE_SIZE = 1000
+    const serverRows: ServerEntry[] = []
+    let from = 0
+    while (true) {
+      const { data: page, error: pageErr } = await supabase
+        .from('entries')
+        .select('id, time, date, type')
+        .order('time')
+        .range(from, from + PAGE_SIZE - 1)
+      if (pageErr) {
+        setStatus('error', pageErr.message)
+        return
+      }
+      const pageRows = (page as ServerEntry[] | null) ?? []
+      serverRows.push(...pageRows)
+      if (pageRows.length < PAGE_SIZE) break
+      from += PAGE_SIZE
     }
 
     // Step 4 — MERGE server snapshot into local state via useStorage's
     // applyServerEntries. That method preserves puffCount for known ids
     // (server schema doesn't carry it) and keeps any unsynced local
     // row that hasn't reached the server yet.
-    const serverRows = (serverEntries as ServerEntry[] | null) ?? []
     const asSmokeEntries: SmokeEntry[] = serverRows.map((e) => ({
       id: e.id,
       time: e.time,
@@ -219,14 +234,14 @@ export function useSync(storage: UseStorage): UseSync {
       storage.consumeDeletedIds(pendingDeletes)
     }
 
-    // Push the plan snapshot too.
+    // Push the plan snapshot too. Only if we actually have one — an
+    // empty plan slot doesn't need to fire a DELETE on every sync (the
+    // quit-plan watcher already deletes on explicit abandon, and pull()
+    // reconciles stale server rows via serverPlanIsStale). Sending a
+    // DELETE on every pushDiff was wasted bandwidth for the common case
+    // of "user with no plan."
     if (data.value.quitPlan) {
       await pushPlan(data.value.quitPlan)
-    } else {
-      await supabase
-        .from('quit_plans')
-        .delete()
-        .eq('user_id', user.value.id)
     }
 
     setStatus('synced')
